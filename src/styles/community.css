@@ -1,0 +1,243 @@
+/* ==========================================================================
+   Community Pages Styles (/create, /collections, /creator/[username])
+   ========================================================================== */
+
+.pg-visibility-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pg-visibility-card {
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-hairline);
+  background: var(--bg-inset);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+
+.pg-visibility-card-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-primary);
+}
+
+.pg-visibility-card p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.pg-visibility-card.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.pg-visibility-card.is-active .pg-visibility-card-head {
+  color: var(--accent);
+}
+
+.pg-remix-banner {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--teal-soft);
+  border: 1px solid rgba(15, 118, 110, 0.25);
+  color: var(--teal);
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+/* Saved Decks Grid in /collections */
+.pg-decks-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.pg-deck-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-xs);
+}
+
+.pg-deck-thumb-wrap {
+  background: var(--bg-subtle);
+  padding: 10px;
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.pg-deck-thumb {
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(23, 22, 21, 0.08);
+}
+
+.pg-deck-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.pg-deck-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink-primary);
+}
+
+.pg-deck-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--ink-muted);
+}
+
+.pg-deck-actions {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-hairline);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pg-mine-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+/* Creator Public Profile Page */
+.pg-creator-hero {
+  margin: 28px 0 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: 26px 28px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pg-creator-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.pg-creator-identity {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.pg-creator-avatar-lg {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.pg-creator-name {
+  margin: 0 0 4px;
+  font-family: var(--font-serif), var(--font-cjk-serif), serif;
+  font-size: clamp(24px, 2.5vw, 32px);
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.pg-creator-handle {
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin-bottom: 6px;
+}
+
+.pg-creator-bio {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink-secondary);
+  max-width: 600px;
+}
+
+.pg-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.pg-impact-card {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pg-impact-label {
+  font-size: 11.5px;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.pg-impact-value {
+  font-family: var(--font-mono), monospace;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink-primary);
+}
+
+@media (max-width: 1100px) {
+  .pg-decks-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .pg-visibility-cards,
+  .pg-decks-grid {
+    grid-template-columns: 1fr;
+  }
+  .pg-impact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
