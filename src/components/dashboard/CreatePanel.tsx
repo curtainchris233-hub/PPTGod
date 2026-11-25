@@ -184,6 +184,7 @@ export default function CreatePanel({
         variant="compact"
         size="sm"
         label="页数"
+        name="slideCount"
         value={slideCount}
         onChange={(e) => setSlideCount(e.target.value)}
         options={SLIDE_COUNT_OPTIONS}
@@ -193,6 +194,7 @@ export default function CreatePanel({
         variant="compact"
         size="sm"
         label="受众"
+        name="audience"
         value={audience}
         onChange={(e) => setAudience(e.target.value)}
         options={AUDIENCE_OPTIONS}

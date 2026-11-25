@@ -212,7 +212,7 @@ export default function DashboardClient({ prompts }: DashboardClientProps) {
   const recentLoading = authLoading || (Boolean(user) && decksLoading);
 
   return (
-    <div className="gl-dash" id="gl-dashboard">
+    <main className="gl-dash" id="gl-dashboard">
       <PageHeader
         className="gl-dash-hero"
         title={
@@ -296,6 +296,6 @@ export default function DashboardClient({ prompts }: DashboardClientProps) {
         initialParsed={intakeParsed}
         onApplyTopic={(t) => setGlobalTopic(t)}
       />
-    </div>
+    </main>
   );
 }

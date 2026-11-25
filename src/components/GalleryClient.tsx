@@ -3,21 +3,29 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  Briefcase,
+  Building2,
   Compass,
-  FileUp,
+  GraduationCap,
+  Images,
+  LayoutGrid,
+  Microscope,
+  Palette,
   RotateCcw,
   Search,
-  SlidersHorizontal,
   Sparkles,
   Upload,
   Wand2,
+  X,
 } from "lucide-react";
-import AiAmbientAccent from "@/components/AiAmbientAccent";
 import DocIntakeWorkbench, {
   type DocIntakeParsedState,
 } from "@/components/DocIntakeWorkbench";
-import PromptCard from "@/components/PromptCard";
+import PageHeader from "@/components/layout/PageHeader";
+import StyleCard from "@/components/presentation/StyleCard";
+import StyleDetailDrawer from "@/components/presentation/StyleDetailDrawer";
 import StyleMatcherModal from "@/components/StyleMatcherModal";
+import { Button, EmptyState } from "@/components/ui";
 import { useApp } from "@/context/AppContext";
 import { analyzeDocumentAndRecommendStyles } from "@/lib/documentAnalyzer";
 import {
@@ -31,6 +39,7 @@ import {
   type PromptItem,
   type TargetTool,
 } from "@/types/prompt";
+import "@/styles/gallery.css";
 
 const TOPIC_PRESETS = [
   "2026 AI Agent 落地路线",
@@ -39,35 +48,87 @@ const TOPIC_PRESETS = [
   "国家自然科学基金答辩",
 ];
 
+const DOMAIN_ICONS: Record<DomainTabId, React.ReactNode> = {
+  all: <LayoutGrid size={14} aria-hidden="true" />,
+  "business-tech": <Briefcase size={14} aria-hidden="true" />,
+  teaching: <GraduationCap size={14} aria-hidden="true" />,
+  research: <Microscope size={14} aria-hidden="true" />,
+  workplace: <Building2 size={14} aria-hidden="true" />,
+  lifestyle: <Palette size={14} aria-hidden="true" />,
+};
+
+const VALID_DOMAINS = new Set<string>(DOMAIN_TABS.map((t) => t.id));
+const VALID_SCENARIOS = new Set<string>(SCENARIO_OPTIONS);
+const VALID_STYLES = new Set<string>(STYLE_CATEGORY_OPTIONS);
+const VALID_COLORS = new Set<string>(["all", "light", "dark", "warm", "vivid", "earth"]);
+const VALID_TOOLS = new Set<string>(["all", ...Object.keys(TOOL_METADATA)]);
+const VALID_SORTS = new Set<string>(["popular", "copies", "newest"]);
+
+export interface GalleryInitialFilters {
+  q?: string;
+  domain?: string;
+  scenario?: string;
+  style?: string;
+  color?: string;
+  tool?: string;
+  sort?: string;
+}
+
 interface GalleryClientProps {
   initialPrompts: PromptItem[];
   /** Search pre-filled from `/gallery?q=` (e.g. the global top-bar search). */
   initialSearch?: string;
+  /** Full URL-hydrated filter state from `/gallery?...`. */
+  initialFilters?: GalleryInitialFilters;
 }
 
 export default function GalleryClient({
   initialPrompts,
   initialSearch = "",
+  initialFilters,
 }: GalleryClientProps) {
   const { user, syncVersion, globalTopic, setGlobalTopic, showToast } =
     useApp();
 
   const [prompts, setPrompts] = useState<PromptItem[]>(initialPrompts);
-  const [domainTab, setDomainTab] = useState<DomainTabId>("all");
-  const [searchQuery, setSearchQuery] = useState(initialSearch);
-  const [scenario, setScenario] = useState<string>("全部场景");
-  const [styleCategory, setStyleCategory] = useState<string>("全部风格");
-  const [colorFamily, setColorFamily] = useState<ColorFamily | "all">("all");
-  const [targetTool, setTargetTool] = useState<TargetTool | "all">("all");
-  const [sortBy, setSortBy] = useState<"popular" | "copies" | "newest">(
-    "popular"
+  const [domainTab, setDomainTab] = useState<DomainTabId>(() => {
+    const d = initialFilters?.domain;
+    return d && VALID_DOMAINS.has(d) ? (d as DomainTabId) : "all";
+  });
+  const [searchQuery, setSearchQuery] = useState(
+    initialFilters?.q ?? initialSearch
   );
-  const [advFiltersOpen, setAdvFiltersOpen] = useState(false);
+  const [scenario, setScenario] = useState<string>(() => {
+    const s = initialFilters?.scenario;
+    return s && VALID_SCENARIOS.has(s) ? s : "全部场景";
+  });
+  const [styleCategory, setStyleCategory] = useState<string>(() => {
+    const s = initialFilters?.style;
+    return s && VALID_STYLES.has(s) ? s : "全部风格";
+  });
+  const [colorFamily, setColorFamily] = useState<ColorFamily | "all">(() => {
+    const c = initialFilters?.color;
+    return c && VALID_COLORS.has(c) ? (c as ColorFamily | "all") : "all";
+  });
+  const [targetTool, setTargetTool] = useState<TargetTool | "all">(() => {
+    const t = initialFilters?.tool;
+    return t && VALID_TOOLS.has(t) ? (t as TargetTool | "all") : "all";
+  });
+  const [sortBy, setSortBy] = useState<"popular" | "copies" | "newest">(() => {
+    const s = initialFilters?.sort;
+    return s && VALID_SORTS.has(s)
+      ? (s as "popular" | "copies" | "newest")
+      : "popular";
+  });
+
+  const [selectedSlug, setSelectedSlug] = useState<string>(
+    initialPrompts[0]?.slug ?? ""
+  );
+  const [previewSlug, setPreviewSlug] = useState<string | null>(null);
   const [matcherOpen, setMatcherOpen] = useState(false);
 
-  // v7 Drop-a-Doc Intake Hub state
+  // Drop-a-Doc Intake state
   const heroDocInputRef = useRef<HTMLInputElement | null>(null);
-  const [heroDocDragging, setHeroDocDragging] = useState(false);
   const [heroParsingDoc, setHeroParsingDoc] = useState(false);
   const [docIntakeOpen, setDocIntakeOpen] = useState(false);
   const [heroParsedDoc, setHeroParsedDoc] =
@@ -89,6 +150,38 @@ export default function GalleryClient({
       cancelled = true;
     };
   }, [user?.id, syncVersion]);
+
+  // Bidirectional URL query sync (history.replaceState avoids RSC reload flicker)
+  const isFirstUrlSync = useRef(true);
+  useEffect(() => {
+    if (isFirstUrlSync.current) {
+      isFirstUrlSync.current = false;
+      return;
+    }
+    const params = new URLSearchParams();
+    if (domainTab !== "all") params.set("domain", domainTab);
+    if (scenario !== "全部场景") params.set("scenario", scenario);
+    if (styleCategory !== "全部风格") params.set("style", styleCategory);
+    if (colorFamily !== "all") params.set("color", colorFamily);
+    if (targetTool !== "all") params.set("tool", targetTool);
+    if (sortBy !== "popular") params.set("sort", sortBy);
+    const trimmed = searchQuery.trim();
+    if (trimmed) params.set("q", trimmed);
+
+    const qs = params.toString();
+    const nextUrl = qs ? `/gallery?${qs}` : "/gallery";
+    if (window.location.pathname + window.location.search !== nextUrl) {
+      window.history.replaceState(null, "", nextUrl);
+    }
+  }, [
+    domainTab,
+    scenario,
+    styleCategory,
+    colorFamily,
+    targetTool,
+    sortBy,
+    searchQuery,
+  ]);
 
   const activeDomainDef = useMemo(
     () => DOMAIN_TABS.find((t) => t.id === domainTab) ?? DOMAIN_TABS[0],
@@ -182,20 +275,14 @@ export default function GalleryClient({
     sortBy,
   ]);
 
-  const advFilterCount =
-    (scenario !== "全部场景" ? 1 : 0) +
-    (styleCategory !== "全部风格" ? 1 : 0) +
-    (colorFamily !== "all" ? 1 : 0) +
-    (targetTool !== "all" ? 1 : 0) +
-    (sortBy !== "popular" ? 1 : 0);
-
   const hasActiveFilters =
     domainTab !== "all" ||
     searchQuery.trim() !== "" ||
     scenario !== "全部场景" ||
     styleCategory !== "全部风格" ||
     colorFamily !== "all" ||
-    targetTool !== "all";
+    targetTool !== "all" ||
+    sortBy !== "popular";
 
   const resetFilters = () => {
     setDomainTab("all");
@@ -272,401 +359,325 @@ export default function GalleryClient({
     }
   };
 
-  const quickGenerateHref = globalTopic.trim()
-    ? `/generate?topic=${encodeURIComponent(globalTopic.trim())}`
-    : "/generate";
+  const previewPrompt = useMemo(
+    () => (previewSlug ? prompts.find((p) => p.slug === previewSlug) ?? null : null),
+    [prompts, previewSlug]
+  );
 
   return (
-    <main className="pg-page">
-      {/* Airy Minimal Editorial Hero + Unified Command Capsule */}
-      <section className="pg-hero pg-hero--minimal">
-        <AiAmbientAccent variant="hero-neural" />
-        <div className="pg-container">
-          <div className="pg-hero-grid">
-            <div className="pg-hero-copy">
-              <p className="pg-kicker">
-                PPTGOD · {prompts.length} 套全领域视觉系统
-              </p>
-              <h1 className="pg-hero-title">
-                先看见 PPT 视觉，
-                <br />
-                再带走精准提示词
-              </h1>
-              <p className="pg-hero-lead">
-                全领域 12 种页型实时预览 · 一键出词或直出 .pptx
-              </p>
-
-              <div className="pg-hero-actions">
-                <button
-                  type="button"
-                  className="pg-btn pg-btn-primary"
-                  onClick={() => setMatcherOpen(true)}
-                  id="pg-open-matcher-btn"
-                >
-                  <Compass size={15} />
-                  <span>智能选词</span>
-                </button>
-                <Link
-                  href={quickGenerateHref}
-                  className="pg-btn pg-btn-secondary"
-                  id="pg-hero-generate-btn"
-                >
-                  <Sparkles size={15} />
-                  <span>在线生成 PPT</span>
-                </Link>
-              </div>
-            </div>
-
-            {/* Unified Floating Command Capsule: Live Topic + Drop-a-Doc */}
-            <div className="pg-live-topic-panel pg-command-capsule">
-              <AiAmbientAccent variant="panel-corner" />
-              <div className="pg-live-topic-input-wrap pg-command-input-row">
-                <Wand2 size={15} className="pg-command-input-icon" />
-                <input
-                  id="pg-global-topic-input"
-                  type="text"
-                  className="pg-live-topic-input pg-command-input"
-                  placeholder="输入你的 PPT 主题，下方画布实时换字..."
-                  value={globalTopic}
-                  onChange={(e) => setGlobalTopic(e.target.value)}
-                />
-                {globalTopic && (
-                  <button
-                    type="button"
-                    className="pg-text-btn pg-command-clear"
-                    onClick={() => setGlobalTopic("")}
-                  >
-                    重置
-                  </button>
-                )}
-              </div>
-
-              <div className="pg-topic-presets pg-topic-presets--single">
-                {TOPIC_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className={`pg-preset-chip ${
-                      globalTopic === preset ? "is-active" : ""
-                    }`}
-                    onClick={() =>
-                      setGlobalTopic(globalTopic === preset ? "" : preset)
-                    }
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-
-              {/* Compact Drop-a-Doc Intake Strip */}
-              <div
-                id="pg-hero-doc-dropzone"
-                className={`pg-hero-doc-dropzone pg-hero-doc-dropzone--slim ${
-                  heroDocDragging ? "is-drag-over" : ""
-                }`}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setHeroDocDragging(true);
-                }}
-                onDragLeave={() => setHeroDocDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setHeroDocDragging(false);
-                  const file = e.dataTransfer.files?.[0];
-                  if (file) handleHeroDocUpload(file);
-                }}
-              >
-                <input
-                  ref={heroDocInputRef}
-                  id="pg-hero-doc-input"
-                  type="file"
-                  accept=".pdf,.docx,.pptx,.md,.txt"
-                  className="pg-hero-doc-file-input"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleHeroDocUpload(file);
-                    e.target.value = "";
-                  }}
-                />
-                <div className="pg-hero-doc-copy">
-                  <FileUp size={15} className="pg-hero-doc-icon" />
-                  <span className="pg-hero-doc-title">
-                    丢入 PDF / Word / TXT · 推风格 · 生成 PPT
-                  </span>
-                </div>
-                <div className="pg-hero-doc-btns">
-                  <button
-                    type="button"
-                    id="pg-hero-doc-upload-btn"
-                    className="pg-btn pg-btn-ink pg-btn-xs"
-                    disabled={heroParsingDoc}
-                    onClick={() => heroDocInputRef.current?.click()}
-                  >
-                    <Upload size={12} />
-                    <span>{heroParsingDoc ? "解析中..." : "上传资料"}</span>
-                  </button>
-                  <button
-                    type="button"
-                    id="pg-open-doc-intake-btn"
-                    className="pg-btn pg-btn-secondary pg-btn-xs"
-                    onClick={() => setDocIntakeOpen(true)}
-                  >
-                    <span>工作台</span>
-                  </button>
-                </div>
-              </div>
-            </div>
+    <main className="gl-gallery" id="gl-gallery-page">
+      <PageHeader
+        className="gl-gallery-hero"
+        icon={<Images size={22} />}
+        title="风格画廊"
+        subtitle={`精选 ${prompts.length} 套高品质 PPT 视觉设计系统，覆盖学术、商务、科技、教育等全领域，一键预览并应用于演示文稿。`}
+        actions={
+          <div className="gl-gallery-hero-actions">
+            <input
+              ref={heroDocInputRef}
+              id="pg-hero-doc-input"
+              type="file"
+              accept=".pdf,.docx,.pptx,.md,.txt"
+              className="gl-sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleHeroDocUpload(file);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              variant="secondary"
+              size="md"
+              id="pg-open-matcher-btn"
+              leftIcon={<Compass size={15} />}
+              onClick={() => setMatcherOpen(true)}
+            >
+              智能选词
+            </Button>
+            <Button
+              variant="secondary"
+              size="md"
+              id="pg-open-doc-intake-btn"
+              leftIcon={<Upload size={15} />}
+              loading={heroParsingDoc}
+              loadingText="解析中…"
+              onClick={() => setDocIntakeOpen(true)}
+            >
+              资料转 PPT
+            </Button>
           </div>
-        </div>
-      </section>
+        }
+      />
 
-      {/* Single-Row Calm Filter Bar + Progressive Disclosure Drawer */}
-      <section className="pg-filters-section" aria-label="多维度筛选提示词">
-        <div className="pg-container">
-          <div
-            className={`pg-filter-shell ${
-              advFiltersOpen ? "is-expanded" : "is-compact"
-            }`}
-          >
-            {/* Row 1 (Always Visible): 6 Domain Tabs + Inline Search + Progressive Filter Toggle */}
-            <div className="pg-domain-bar">
-              <div
-                className="pg-domain-tabs"
-                role="tablist"
-                aria-label="按人群领域浏览"
-                id="pg-domain-tabs"
+      {/* Filter Deck */}
+      <section className="gl-gallery-controls" aria-label="筛选演示风格">
+        {/* Row 1: Domain Capsules with live DB counts */}
+        <div
+          className="gl-gallery-capsules"
+          role="tablist"
+          aria-label="按场景领域分类"
+          id="pg-domain-tabs"
+        >
+          {DOMAIN_TABS.map((tab) => {
+            const active = domainTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                id={`pg-domain-tab-${tab.id}`}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                title={tab.desc}
+                className={`gl-gallery-capsule ${active ? "is-active" : ""}`}
+                onClick={() => handleSelectDomain(tab.id)}
               >
-                {DOMAIN_TABS.map((tab) => {
-                  const active = domainTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      id={`pg-domain-tab-${tab.id}`}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      title={tab.desc}
-                      className={`pg-domain-tab ${active ? "is-active" : ""}`}
-                      onClick={() => handleSelectDomain(tab.id)}
-                    >
-                      <span className="pg-domain-tab-label">{tab.label}</span>
-                      <span className="pg-domain-tab-count">
-                        {domainCounts[tab.id] ?? 0}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="pg-filter-right-controls">
-                <div className="pg-search-box">
-                  <Search size={14} className="pg-search-icon" />
-                  <input
-                    id="pg-gallery-search"
-                    type="search"
-                    placeholder="搜索风格、关键词..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  id="pg-toggle-adv-filters"
-                  className={`pg-filter-toggle-btn ${
-                    advFiltersOpen || advFilterCount > 0 ? "is-active" : ""
-                  }`}
-                  aria-expanded={advFiltersOpen}
-                  onClick={() => setAdvFiltersOpen((v) => !v)}
-                >
-                  <SlidersHorizontal size={13} />
-                  <span>筛选</span>
-                  {advFilterCount > 0 && (
-                    <span className="pg-filter-badge">{advFilterCount}</span>
-                  )}
-                </button>
-
-                {hasActiveFilters && (
-                  <button
-                    type="button"
-                    className="pg-icon-btn"
-                    onClick={resetFilters}
-                    id="pg-reset-filters-btn"
-                    title="重置全部筛选"
-                    aria-label="重置全部筛选"
-                  >
-                    <RotateCcw size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Progressive Disclosure Drawer: Scenario, Style, Color, Tool & Sort */}
-            {advFiltersOpen && (
-              <div className="pg-adv-filter-drawer" id="pg-adv-filter-drawer">
-                <div className="pg-filter-row-top">
-                  <div
-                    className="pg-scenario-pills pg-scenario-pills--compact"
-                    role="group"
-                    aria-label="按使用场景筛选"
-                  >
-                    {visibleScenarios.map((sc) => (
-                      <button
-                        key={sc}
-                        type="button"
-                        className={`pg-pill ${scenario === sc ? "is-active" : ""}`}
-                        onClick={() => setScenario(sc)}
-                      >
-                        {sc}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pg-filter-row-sub">
-                  <div className="pg-filter-group">
-                    <select
-                      id="pg-filter-style"
-                      className="pg-select"
-                      aria-label="按视觉风格筛选"
-                      value={styleCategory}
-                      onChange={(e) => setStyleCategory(e.target.value)}
-                    >
-                      {STYLE_CATEGORY_OPTIONS.map((st) => (
-                        <option key={st} value={st}>
-                          {st}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="pg-filter-group">
-                    <div className="pg-color-pills" role="group" aria-label="按色系调性筛选">
-                      {(
-                        [
-                          { id: "all", dot: null },
-                          { id: "light", dot: "#F6F5F0" },
-                          { id: "dark", dot: "#0F141A" },
-                          { id: "warm", dot: "#F4EDE3" },
-                          { id: "vivid", dot: "#FF5A1F" },
-                          { id: "earth", dot: "#526D62" },
-                        ] as const
-                      ).map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className={`pg-mini-pill ${
-                            colorFamily === item.id ? "is-active" : ""
-                          }`}
-                          onClick={() => setColorFamily(item.id)}
-                        >
-                          {item.dot && (
-                            <span
-                              className="pg-color-dot"
-                              style={{ background: item.dot }}
-                            />
-                          )}
-                          <span>{COLOR_FAMILY_LABELS[item.id]}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="pg-filter-group">
-                    <select
-                      id="pg-filter-tool"
-                      className="pg-select"
-                      aria-label="按适配 AI 工具筛选"
-                      value={targetTool}
-                      onChange={(e) =>
-                        setTargetTool(e.target.value as TargetTool | "all")
-                      }
-                    >
-                      <option value="all">全部工具</option>
-                      {(Object.keys(TOOL_METADATA) as TargetTool[]).map((t) => (
-                        <option key={t} value={t}>
-                          {TOOL_METADATA[t].shortName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="pg-filter-group pg-filter-sort">
-                    <select
-                      id="pg-filter-sort"
-                      className="pg-select"
-                      aria-label="排序方式"
-                      value={sortBy}
-                      onChange={(e) =>
-                        setSortBy(
-                          e.target.value as "popular" | "copies" | "newest"
-                        )
-                      }
-                    >
-                      <option value="popular">按点赞热门</option>
-                      <option value="copies">按复制次数</option>
-                      <option value="newest">按最新发布</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Contextual Status Line: Only shown when actively filtered or previewing custom topic */}
-            {(hasActiveFilters || globalTopic) && (
-              <div className="pg-filter-meta">
-                <span>
-                  匹配 <strong>{filteredPrompts.length}</strong> 套
-                  {globalTopic && (
-                    <em className="pg-active-topic-indicator">
-                      {" "}
-                      · 预览主题「{globalTopic}」
-                    </em>
-                  )}
+                {DOMAIN_ICONS[tab.id]}
+                <span>{tab.id === "all" ? "全部风格" : tab.label}</span>
+                <span className="gl-gallery-capsule-count">
+                  {domainCounts[tab.id] ?? 0}
                 </span>
-              </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Row 2: Facet Selects + Search + Sort */}
+        <div className="gl-gallery-toolbar">
+          <div className="gl-gallery-facets">
+            <select
+              id="pg-filter-scenario"
+              className={`gl-gallery-select ${
+                scenario !== "全部场景" ? "is-filtered" : ""
+              }`}
+              aria-label="使用场景"
+              value={scenario}
+              onChange={(e) => setScenario(e.target.value)}
+            >
+              {visibleScenarios.map((sc) => (
+                <option key={sc} value={sc}>
+                  {sc === "全部场景" ? "使用场景" : sc}
+                </option>
+              ))}
+            </select>
+
+            <select
+              id="pg-filter-style"
+              className={`gl-gallery-select ${
+                styleCategory !== "全部风格" ? "is-filtered" : ""
+              }`}
+              aria-label="视觉风格"
+              value={styleCategory}
+              onChange={(e) => setStyleCategory(e.target.value)}
+            >
+              {STYLE_CATEGORY_OPTIONS.map((st) => (
+                <option key={st} value={st}>
+                  {st === "全部风格" ? "视觉风格" : st}
+                </option>
+              ))}
+            </select>
+
+            <select
+              id="pg-filter-color"
+              className={`gl-gallery-select ${
+                colorFamily !== "all" ? "is-filtered" : ""
+              }`}
+              aria-label="配色方案"
+              value={colorFamily}
+              onChange={(e) =>
+                setColorFamily(e.target.value as ColorFamily | "all")
+              }
+            >
+              <option value="all">配色方案</option>
+              {(["light", "dark", "warm", "vivid", "earth"] as const).map(
+                (id) => (
+                  <option key={id} value={id}>
+                    {COLOR_FAMILY_LABELS[id]}
+                  </option>
+                )
+              )}
+            </select>
+
+            <select
+              id="pg-filter-tool"
+              className={`gl-gallery-select ${
+                targetTool !== "all" ? "is-filtered" : ""
+              }`}
+              aria-label="适配工具"
+              value={targetTool}
+              onChange={(e) =>
+                setTargetTool(e.target.value as TargetTool | "all")
+              }
+            >
+              <option value="all">适配工具</option>
+              {(Object.keys(TOOL_METADATA) as TargetTool[]).map((t) => (
+                <option key={t} value={t}>
+                  {TOOL_METADATA[t].shortName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="gl-gallery-toolbar-right">
+            <div className="gl-gallery-search">
+              <Search
+                size={15}
+                className="gl-gallery-search-icon"
+                aria-hidden="true"
+              />
+              <input
+                id="pg-gallery-search"
+                type="search"
+                aria-label="搜索风格名称或关键词"
+                placeholder="搜索风格名称、关键词"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="gl-gallery-search-clear"
+                  aria-label="清空搜索"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X size={13} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+
+            <select
+              id="pg-filter-sort"
+              className={`gl-gallery-select ${
+                sortBy !== "popular" ? "is-filtered" : ""
+              }`}
+              aria-label="排序方式"
+              value={sortBy}
+              onChange={(e) =>
+                setSortBy(e.target.value as "popular" | "copies" | "newest")
+              }
+            >
+              <option value="popular">按热门排序</option>
+              <option value="copies">按复制次数</option>
+              <option value="newest">最新上架</option>
+            </select>
+
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                id="pg-reset-filters-btn"
+                leftIcon={<RotateCcw size={13} />}
+                onClick={resetFilters}
+              >
+                清除筛选
+              </Button>
             )}
           </div>
         </div>
+
+        {/* Slim Live-Topic Preview Strip */}
+        <div className="gl-gallery-topic-bar">
+          <div className="gl-gallery-topic-field">
+            <Wand2
+              size={14}
+              className="gl-gallery-topic-icon"
+              aria-hidden="true"
+            />
+            <input
+              id="pg-global-topic-input"
+              type="text"
+              className="gl-gallery-topic-input"
+              aria-label="输入实时预览主题"
+              placeholder="输入你的演示主题，下方所有风格画布同步换字预览…"
+              value={globalTopic}
+              onChange={(e) => setGlobalTopic(e.target.value)}
+            />
+            {globalTopic && (
+              <button
+                type="button"
+                className="gl-sdrawer-topic-clear"
+                onClick={() => setGlobalTopic("")}
+              >
+                重置
+              </button>
+            )}
+          </div>
+          <div className="gl-gallery-topic-presets">
+            {TOPIC_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`gl-gallery-preset-chip ${
+                  globalTopic === preset ? "is-active" : ""
+                }`}
+                onClick={() =>
+                  setGlobalTopic(globalTopic === preset ? "" : preset)
+                }
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {(hasActiveFilters || globalTopic) && (
+          <div className="gl-gallery-meta-line">
+            <span>
+              共匹配 <strong>{filteredPrompts.length}</strong> 套视觉风格
+              {globalTopic && <> · 实时主题「{globalTopic}」</>}
+            </span>
+          </div>
+        )}
       </section>
 
-      {/* Gallery Specimen Grid */}
-      <section className="pg-gallery-section">
-        <div className="pg-container">
-          {filteredPrompts.length > 0 ? (
-            <div className="pg-gallery-grid">
-              {filteredPrompts.map((prompt) => (
-                <PromptCard
-                  key={prompt.id}
-                  prompt={prompt}
-                  liveTopic={globalTopic}
-                  onUpdatePrompt={handleUpdatePrompt}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="pg-empty-state">
-              <Sparkles size={28} strokeWidth={1.5} />
-              <h2>没有找到完全匹配的视觉风格</h2>
-              <p>
-                你可以放宽筛选条件，或者直接在「发布风格」中亲手调配并保存一套专属提示词。
-              </p>
-              <div className="pg-empty-actions">
-                <button
-                  type="button"
-                  className="pg-btn pg-btn-secondary"
-                  onClick={resetFilters}
-                >
-                  重置全部筛选
-                </button>
-                <Link href="/create" className="pg-btn pg-btn-primary">
-                  去创建这套风格
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+      {/* 4-Column StyleCard Grid */}
+      <section aria-label="风格模板列表">
+        {filteredPrompts.length > 0 ? (
+          <div className="gl-gallery-grid">
+            {filteredPrompts.map((prompt) => (
+              <StyleCard
+                key={prompt.id}
+                prompt={prompt}
+                liveTopic={globalTopic}
+                selected={selectedSlug === prompt.slug}
+                onSelect={setSelectedSlug}
+                onPreview={(item) => setPreviewSlug(item.slug)}
+                onUpdatePrompt={handleUpdatePrompt}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<Sparkles size={24} />}
+            title="没有找到匹配的视觉风格"
+            description="试试清空部分筛选条件，或者直接去「发布风格」定制并保存一套专属视觉母版。"
+            primaryAction={
+              <Button
+                variant="secondary"
+                size="md"
+                id="pg-empty-reset-filters-btn"
+                leftIcon={<RotateCcw size={14} />}
+                onClick={resetFilters}
+              >
+                清除筛选
+              </Button>
+            }
+            secondaryAction={
+              <Link href="/create" className="gl-btn gl-btn--primary gl-btn--md">
+                发布新风格
+              </Link>
+            }
+          />
+        )}
       </section>
+
+      <StyleDetailDrawer
+        key={previewPrompt?.id ?? "closed"}
+        prompt={previewPrompt}
+        liveTopic={globalTopic}
+        onLiveTopicChange={setGlobalTopic}
+        onClose={() => setPreviewSlug(null)}
+        onUpdatePrompt={handleUpdatePrompt}
+      />
 
       <StyleMatcherModal
         open={matcherOpen}
