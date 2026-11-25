@@ -620,6 +620,7 @@ export function renderFooter(ctx: SlideRenderContext) {
     currentPageLabel,
   } = ctx;
   if (!layout.showPageNumber || slideType === "cover") return null;
+  const customFooter = layout.brandFooter?.trim();
   return (
     <div
       style={{
@@ -634,7 +635,9 @@ export function renderFooter(ctx: SlideRenderContext) {
       }}
     >
       <span>
-        {isChalkboard
+        {customFooter
+          ? customFooter
+          : isChalkboard
           ? `CLASSROOM LESSON · 护眼黑板板书微课 · ${audience}`
           : isScientific
           ? `Nature Methods Okabe-Ito CVD-Safe · Evidence Deck · ${topic.slice(0, 22)}`

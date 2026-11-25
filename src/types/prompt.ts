@@ -104,6 +104,8 @@ export interface VisualLayout {
   cornerRadius: number;
   showPageNumber: boolean;
   decorativeMotif: DecorativeMotif;
+  /** Optional custom institution/course/company footer text synced across Canvas, PPTX & HTML */
+  brandFooter?: string;
 }
 
 export interface VisualSpec {
@@ -365,6 +367,35 @@ export const DOMAIN_TABS: {
     scenarios: ["生活纪实", "文化创意", "个人述职"],
   },
 ];
+
+export function getDefaultAudienceForScenario(scenario: string): string {
+  switch (scenario) {
+    case "课堂教学":
+      return "课堂学生与教研评审组";
+    case "教育培训":
+      return "参训学员与教学督导组";
+    case "科研基金":
+      return "基金委与同行评审专家委员会";
+    case "学术答辩":
+      return "答辩委员会专家与实验室同侪";
+    case "项目汇报":
+      return "项目指导委员会与跨部门干系人";
+    case "政务党建":
+      return "机关领导与专项工作评审组";
+    case "个人述职":
+      return "晋升评审委员会与业务负责人";
+    case "生活纪实":
+      return "亲友、兴趣同好与分享会听众";
+    case "文化创意":
+      return "策展团队与文化受众";
+    case "品牌提案":
+      return "品牌主理人与市场营销委员会";
+    case "技术分享":
+      return "研发架构师与工程技术团队";
+    default:
+      return "核心管理层与业务伙伴";
+  }
+}
 
 export const STYLE_CATEGORY_OPTIONS = [
   "全部风格",

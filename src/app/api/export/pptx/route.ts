@@ -419,7 +419,11 @@ export async function POST(request: Request) {
         h: 0,
         line: { color: cBorder, width: 0.5 },
       });
-      slide.addText(`${styleName} · ${audience}`, {
+      const customBrandFooter =
+        typeof layoutObj?.brandFooter === "string"
+          ? layoutObj.brandFooter.replace(/[<>]/g, "").trim().slice(0, 60)
+          : "";
+      slide.addText(customBrandFooter || `${styleName} · ${audience}`, {
         x: leftPad,
         y: 5.18,
         w: 6.5,

@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import SlideCanvas from "@/components/SlideCanvas";
+import DeckAuditDrawer from "@/components/generate/DeckAuditDrawer";
 import DeckSpecTweaker from "@/components/generate/DeckSpecTweaker";
 import ExportPromptModal from "@/components/generate/ExportPromptModal";
 import OutlineDraftPanel from "@/components/generate/OutlineDraftPanel";
@@ -40,10 +41,13 @@ import {
   SOURCE_MATERIAL_PRESETS,
   type PolishAction,
 } from "@/lib/deckGenerator";
+import { autoFillMissingSpeakerNotes } from "@/lib/deckLinter";
 import { exportStandaloneHtmlDeck } from "@/lib/htmlExporter";
+import { autoFixPaletteContrast } from "@/lib/paletteExtractor";
 import { buildSlideImagePrompt } from "@/lib/promptCompiler";
 import { clearStudioHandoff, readStudioHandoff } from "@/lib/studioHandoff";
 import {
+  DOMAIN_TABS,
   SLIDE_TYPE_LABELS,
   type DeckSlideItem,
   type OutlineDraftItem,
@@ -1129,12 +1133,12 @@ export default function GenerateClient({
         <header className="pg-gen-topbar">
           <div>
             <p className="pg-kicker">
-              ONLINE PPT GENERATION &amp; DELIVERY WORKSHOP · V4
+              ONLINE PPT GENERATION &amp; DELIVERY WORKSHOP · V6
             </p>
             <h1 className="pg-subpage-title">在线 PPT 生成与编辑工坊</h1>
             <p className="pg-subpage-lead">
-              上传 PDF / Word / PPTX / Markdown 文档，两步可控编排 5–20 页全套 12 种商业版式，在{" "}
-              {styles.length} 套视觉体系间一键无损换肤与微调品牌色，直出原生 .pptx / 离线 .html / Marp 源码。
+              上传 PDF / Word / PPTX / Markdown 文档，两步可控编排 5–20 页全套 12 种页型，在{" "}
+              {styles.length} 套全领域视觉体系间一键无损换肤、自定义机构署名与智能体检，直出原生 .pptx / 离线 .html / Marp 源码。
             </p>
           </div>
 
@@ -1294,11 +1298,40 @@ export default function GenerateClient({
                 value={activeStyle.slug}
                 onChange={(e) => handleSelectStyle(e.target.value)}
               >
-                {styles.map((st) => (
-                  <option key={st.id} value={st.slug}>
-                    {st.title}
-                  </option>
-                ))}
+                {(() => {
+                  const assigned = new Set<string>();
+                  const groups = DOMAIN_TABS.filter((t) => t.id !== "all").map(
+                    (tab) => {
+                      const items = styles.filter((st) => {
+                        if (assigned.has(st.id)) return false;
+                        if (tab.scenarios.includes(st.scenario)) {
+                          assigned.add(st.id);
+                          return true;
+                        }
+                        return false;
+                      });
+                      return { label: tab.label, items };
+                    }
+                  );
+                  const remaining = styles.filter((st) => !assigned.has(st.id));
+                  if (remaining.length > 0) {
+                    groups.push({ label: "社区自定义风格", items: remaining });
+                  }
+                  return groups
+                    .filter((g) => g.items.length > 0)
+                    .map((g) => (
+                      <optgroup
+                        key={g.label}
+                        label={`${g.label} (${g.items.length})`}
+                      >
+                        {g.items.map((st) => (
+                          <option key={st.id} value={st.slug}>
+                            {st.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ));
+                })()}
               </select>
               <button
                 type="button"
@@ -1318,7 +1351,7 @@ export default function GenerateClient({
             </div>
           </div>
 
-          {/* 18+ Live Re-Skinning Strip */}
+          {/* 36+ Live Re-Skinning Strip */}
           <div
             className="pg-gen-style-strip"
             role="radiogroup"
@@ -1347,7 +1380,7 @@ export default function GenerateClient({
             })}
           </div>
 
-          {/* v4: Inline Deck-Level VisualSpec Brand Tweaker */}
+          {/* v4/v6: Inline Deck-Level VisualSpec Brand Tweaker + WCAG + Custom Brand Footer */}
           <DeckSpecTweaker
             deckSpec={deckSpec}
             baseSpec={activeStyle.visualSpec}
@@ -1361,6 +1394,32 @@ export default function GenerateClient({
               setHandoffApplied(false);
               clearStudioHandoff();
               showToast("已恢复当前母版默认配色与版式", "default");
+            }}
+          />
+
+          {/* v6: 100-Point Real-Time Deck Quality & Pacing Linter */}
+          <DeckAuditDrawer
+            slides={slides}
+            spec={deckSpec}
+            topic={topic}
+            audience={audience}
+            onJumpToSlide={(idx) => {
+              setActiveIndex(idx);
+              showToast(`已定位到第 ${idx + 1} 页，可在右侧直接优化`);
+            }}
+            onAutoFixContrast={() => {
+              hasLocalEditsRef.current = true;
+              setDeckSpec((prev) => ({
+                ...prev,
+                palette: autoFixPaletteContrast(prev.palette),
+              }));
+              showToast("已按 WCAG AA 投影可读标准一键校正色板对比度", "success");
+            }}
+            onAutoFillNotes={() => {
+              commitSlides((prev) =>
+                autoFillMissingSpeakerNotes(prev, topic, audience)
+              );
+              showToast("已为所有缺失备注页一键补齐自然口语提词讲稿", "success");
             }}
           />
 

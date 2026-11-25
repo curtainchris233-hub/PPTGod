@@ -229,6 +229,30 @@ export function sanitizeAndValidateVisualSpec(
   const showPageNumber =
     typeof l.showPageNumber === "boolean" ? l.showPageNumber : true;
 
+  let brandFooter: string | undefined;
+  if (l.brandFooter !== undefined && l.brandFooter !== null) {
+    if (typeof l.brandFooter !== "string") {
+      return {
+        ok: false,
+        error: "VisualSpec 自定义页脚署名（layout.brandFooter）必须为字符串",
+      };
+    }
+    const cleanedFooter = l.brandFooter
+      .replace(/[<>]/g, "")
+      .replace(/[\u0000-\u001F\u007F]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (cleanedFooter.length > 60) {
+      return {
+        ok: false,
+        error: "VisualSpec 自定义页脚署名不能超过 60 个字符",
+      };
+    }
+    if (cleanedFooter.length > 0) {
+      brandFooter = cleanedFooter;
+    }
+  }
+
   return {
     ok: true,
     data: {
@@ -255,6 +279,7 @@ export function sanitizeAndValidateVisualSpec(
         cornerRadius,
         showPageNumber,
         decorativeMotif: motifRaw as DecorativeMotif,
+        ...(brandFooter ? { brandFooter } : {}),
       },
     },
   };

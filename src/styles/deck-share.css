@@ -252,6 +252,187 @@
   font-weight: 700;
 }
 
+.pg-share-stage-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pg-share-cockpit-grid {
+  width: 100%;
+  max-width: 1360px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.95fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.pg-share-cockpit-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pg-rehearsal-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pg-rehearsal-card {
+  background: rgba(30, 29, 27, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pg-rehearsal-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pg-rehearsal-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #ffb8a8;
+}
+
+.pg-rehearsal-timer-actions,
+.pg-rehearsal-font-btns {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pg-rehearsal-mini-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+.pg-rehearsal-clock {
+  font-family: var(--font-mono), monospace;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.08;
+  color: #ffffff;
+}
+
+.pg-rehearsal-clock.is-warning {
+  color: #fbbf24;
+}
+
+.pg-rehearsal-clock.is-overtime {
+  color: #f87171;
+}
+
+.pg-rehearsal-progress-track {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.pg-rehearsal-progress-fill {
+  height: 100%;
+  background: #22c55e;
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+.pg-rehearsal-progress-fill.is-warning {
+  background: #f59e0b;
+}
+
+.pg-rehearsal-progress-fill.is-overtime {
+  background: #ef4444;
+}
+
+.pg-rehearsal-hint {
+  margin: 0;
+  font-size: 11.5px;
+  color: rgba(245, 242, 235, 0.65);
+}
+
+.pg-rehearsal-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.pg-rehearsal-preset-btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(245, 242, 235, 0.8);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.pg-rehearsal-preset-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.pg-rehearsal-preset-btn.is-active {
+  background: #c84b31;
+  border-color: #c84b31;
+  color: #ffffff;
+}
+
+.pg-rehearsal-teleprompter {
+  border-left: 3px solid #c84b31;
+}
+
+.pg-rehearsal-notes-body {
+  margin: 0;
+  line-height: 1.65;
+  color: #f5f2eb;
+  max-height: 170px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.pg-rehearsal-next-canvas-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  overflow: hidden;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.pg-rehearsal-next-canvas-btn:hover {
+  border-color: #c84b31;
+  transform: translateY(-1px);
+}
+
+.pg-rehearsal-next-canvas {
+  width: 100%;
+  pointer-events: none;
+}
+
 .pg-share-hint-row {
   display: flex;
   align-items: center;
@@ -260,6 +441,12 @@
   font-size: 12px;
   color: rgba(245, 242, 235, 0.52);
   flex-wrap: wrap;
+}
+
+@media (max-width: 980px) {
+  .pg-share-cockpit-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {

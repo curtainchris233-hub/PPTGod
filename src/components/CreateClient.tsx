@@ -1,11 +1,28 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GitFork, Globe, Lock, Pencil, Sparkles, Wand2 } from "lucide-react";
+import {
+  GitFork,
+  Globe,
+  ImagePlus,
+  Lock,
+  Pencil,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+  Wand2,
+  Wrench,
+} from "lucide-react";
 import SlideCanvas from "@/components/SlideCanvas";
 import { useApp } from "@/context/AppContext";
+import {
+  autoFixPaletteContrast,
+  evaluatePaletteContrast,
+  extractStyleFromImageData,
+  parseImportedStylePackJson,
+} from "@/lib/paletteExtractor";
 import {
   ALL_SLIDE_TYPES,
   COLOR_FAMILY_LABELS,
@@ -229,6 +246,110 @@ export default function CreateClient({
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [extractedSwatches, setExtractedSwatches] = useState<string[]>([]);
+  const [extractedSourceName, setExtractedSourceName] = useState("");
+  const [extractingImage, setExtractingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const jsonImportRef = useRef<HTMLInputElement | null>(null);
+
+  const contrastReport = useMemo(
+    () => evaluatePaletteContrast(visualSpec.palette),
+    [visualSpec.palette]
+  );
+
+  const handleExtractFromImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("请上传 PNG / JPG / WebP 格式的参考图片", "error");
+      return;
+    }
+    setExtractingImage(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const size = 120;
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas unavailable");
+          ctx.drawImage(img, 0, 0, size, size);
+          const imageData = ctx.getImageData(0, 0, size, size);
+          const extracted = extractStyleFromImageData(
+            imageData.data,
+            size,
+            size
+          );
+          setVisualSpec((prev) => ({
+            ...prev,
+            palette: extracted.palette,
+          }));
+          setColorFamily(extracted.colorFamily);
+          setExtractedSwatches(extracted.dominantSwatches);
+          setExtractedSourceName(file.name);
+          setPromptAnatomy((prev) => ({
+            ...prev,
+            palette: `由参考图「${file.name}」自动量化提取：画布底色 ${extracted.palette.bg}，表面 ${extracted.palette.surface}，正文 ${extracted.palette.text}（WCAG ${extracted.contrast.textGrade} ${extracted.contrast.textBgRatio.toFixed(1)}:1），核心强调色 ${extracted.palette.accent}，图表四阶 ${extracted.palette.chartColors.join(" / ")}。`,
+          }));
+          showToast(
+            `已从「${file.name}」提取完整配色（WCAG ${extracted.contrast.overallGrade}）`,
+            "success"
+          );
+        } catch {
+          showToast("图片取色失败，请更换标准 PNG/JPG 图片", "error");
+        } finally {
+          setExtractingImage(false);
+        }
+      };
+      img.onerror = () => {
+        setExtractingImage(false);
+        showToast("图片解码失败，请确认文件完整", "error");
+      };
+      img.src = String(reader.result || "");
+    };
+    reader.onerror = () => {
+      setExtractingImage(false);
+      showToast("读取本地图片失败", "error");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleImportStyleJson = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = parseImportedStylePackJson(text);
+      if (!parsed.ok) {
+        showToast(parsed.error, "error");
+        return;
+      }
+      const pk = parsed.pack;
+      setTitle(pk.title);
+      setEnglishTitle(pk.englishTitle);
+      if (pk.summary) setSummary(pk.summary);
+      setScenario(pk.scenario);
+      setStyleCategory(pk.styleCategory);
+      setColorFamily(pk.colorFamily);
+      setRecommendedTools(pk.recommendedTools);
+      setTagsInput(pk.tags.join(", "));
+      setSampleTopic(pk.sampleTopic);
+      setSampleSubtitle(pk.sampleSubtitle);
+      setCustomNotes(pk.customNotes);
+      setVisualSpec(pk.visualSpec);
+      if (pk.promptAnatomy.style) setPromptAnatomy(pk.promptAnatomy);
+      showToast(`已导入风格包「${pk.title}」`, "success");
+    } catch {
+      showToast("读取风格 JSON 文件失败", "error");
+    }
+  };
 
   const toggleTool = (tool: TargetTool) => {
     setRecommendedTools((prev) =>
@@ -421,6 +542,110 @@ export default function CreateClient({
                     englishTitle={englishTitle}
                     scenario={scenario}
                   />
+                </div>
+              </div>
+
+              {/* v6: Image-to-Style Palette Extractor + WCAG 2.1 Contrast Guard + .pptgod.json Import */}
+              <div className="pg-panel" style={{ marginTop: "16px" }}>
+                <div className="pg-panel-head">
+                  <h2>以图生风格 &amp; 对比度守卫</h2>
+                  <button
+                    type="button"
+                    className="pg-btn pg-btn-secondary pg-btn-xs"
+                    id="pg-import-style-json-btn"
+                    onClick={() => jsonImportRef.current?.click()}
+                    title="导入从工作室导出的 .pptgod.json 风格设计系统"
+                  >
+                    <Upload size={12} />
+                    <span>导入 .pptgod.json</span>
+                  </button>
+                  <input
+                    ref={jsonImportRef}
+                    id="pg-import-style-json-input"
+                    type="file"
+                    accept=".json,application/json"
+                    style={{ display: "none" }}
+                    onChange={handleImportStyleJson}
+                  />
+                </div>
+
+                <div className="pg-img-extract-box">
+                  <div className="pg-img-extract-row">
+                    <button
+                      type="button"
+                      id="pg-extract-image-btn"
+                      className="pg-btn pg-btn-primary pg-btn-xs"
+                      onClick={() => imageInputRef.current?.click()}
+                      disabled={extractingImage}
+                    >
+                      <ImagePlus size={13} />
+                      <span>
+                        {extractingImage
+                          ? "正在取色..."
+                          : "上传参考图 / PPT 截图自动取色"}
+                      </span>
+                    </button>
+                    <input
+                      ref={imageInputRef}
+                      id="pg-extract-image-input"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      style={{ display: "none" }}
+                      onChange={handleExtractFromImage}
+                    />
+                    <span className="pg-img-extract-hint">
+                      本地 Canvas 毫秒量化 · 零上传隐私安全
+                    </span>
+                  </div>
+
+                  {extractedSwatches.length > 0 && (
+                    <div
+                      className="pg-extracted-strip"
+                      id="pg-extracted-swatches"
+                    >
+                      <span className="pg-extracted-src">
+                        已提取「{extractedSourceName}」：
+                      </span>
+                      <div className="pg-extracted-dots">
+                        {extractedSwatches.map((hex, i) => (
+                          <span
+                            key={`${hex}-${i}`}
+                            className="pg-extracted-swatch"
+                            style={{ background: hex }}
+                            title={hex}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pg-wcag-bar" id="pg-wcag-status">
+                    <span
+                      className={`pg-wcag-pill pg-wcag-pill--${contrastReport.overallGrade.toLowerCase()}`}
+                    >
+                      <ShieldCheck size={12} />
+                      <span>
+                        WCAG {contrastReport.overallGrade} · 正文/底色{" "}
+                        {contrastReport.textBgRatio.toFixed(1)}:1 · 强调色{" "}
+                        {contrastReport.accentBgRatio.toFixed(1)}:1
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      id="pg-wcag-autofix-btn"
+                      className="pg-btn pg-btn-secondary pg-btn-xs"
+                      onClick={() => {
+                        setVisualSpec((prev) => ({
+                          ...prev,
+                          palette: autoFixPaletteContrast(prev.palette),
+                        }));
+                        showToast("已按投影可读标准自动校正配色对比度", "success");
+                      }}
+                    >
+                      <Wrench size={11} />
+                      <span>一键校正对比度</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -650,7 +875,7 @@ export default function CreateClient({
               <div className="pg-form">
                 <div className="pg-form-3col">
                   <div className="pg-field">
-                    <label htmlFor="create-arch">版式原型（15 种）</label>
+                    <label htmlFor="create-arch">版式原型（20 种）</label>
                     <select
                       id="create-arch"
                       className="pg-select pg-select-full"
@@ -674,7 +899,7 @@ export default function CreateClient({
                   </div>
 
                   <div className="pg-field">
-                    <label htmlFor="create-motif">装饰元素（11 种）</label>
+                    <label htmlFor="create-motif">装饰元素（16 种）</label>
                     <select
                       id="create-motif"
                       className="pg-select pg-select-full"
@@ -826,6 +1051,28 @@ export default function CreateClient({
                       className="pg-range"
                     />
                   </div>
+                </div>
+
+                <div className="pg-field">
+                  <label htmlFor="create-brand-footer">
+                    自定义页脚署名（可选，最多 60 字，将同步渲染到画布、.pptx 与 .html）
+                  </label>
+                  <input
+                    id="create-brand-footer"
+                    type="text"
+                    maxLength={60}
+                    placeholder="例如：XX 大学计算机学院 · 2026 学术专题"
+                    value={visualSpec.layout.brandFooter || ""}
+                    onChange={(e) =>
+                      setVisualSpec((prev) => ({
+                        ...prev,
+                        layout: {
+                          ...prev.layout,
+                          brandFooter: e.target.value.slice(0, 60) || undefined,
+                        },
+                      }))
+                    }
+                  />
                 </div>
               </div>
             </section>

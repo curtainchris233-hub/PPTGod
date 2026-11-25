@@ -534,9 +534,10 @@ export function exportStandaloneHtmlDeck(options: {
       </header>
     `;
 
+    const customBrandFooter = (layout?.brandFooter || "").trim().slice(0, 60);
     const footerHtml = `
       <footer class="slide-foot">
-        <span>${esc(styleName)} · ${esc(audience)}</span>
+        <span>${esc(customBrandFooter || `${styleName} · ${audience}`)}</span>
         <strong>${pageStr}</strong>
       </footer>
     `;

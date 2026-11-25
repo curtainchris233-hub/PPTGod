@@ -1,7 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
-import { Palette, RotateCcw, SlidersHorizontal } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { Palette, RotateCcw, ShieldCheck, SlidersHorizontal, Wrench } from "lucide-react";
+import {
+  autoFixPaletteContrast,
+  evaluatePaletteContrast,
+} from "@/lib/paletteExtractor";
 import type { VisualSpec } from "@/types/prompt";
 
 const BRAND_ACCENT_SWATCHES = [
@@ -36,6 +40,11 @@ export default function DeckSpecTweaker({
   const isCustomized =
     JSON.stringify(deckSpec) !== JSON.stringify(baseSpec);
 
+  const contrast = useMemo(
+    () => evaluatePaletteContrast(deckSpec.palette),
+    [deckSpec.palette]
+  );
+
   const setAccent = (hex: string) => {
     onChangeSpec({
       ...deckSpec,
@@ -63,7 +72,7 @@ export default function DeckSpecTweaker({
           aria-expanded={open}
         >
           <SlidersHorizontal size={13} />
-          <span>品牌视觉微调（强调色 / 底色 / 圆角 / 留白）</span>
+          <span>品牌视觉微调（配色 / 圆角 / 机构页脚）</span>
         </button>
 
         <div className="pg-tweaker-bar-badges">
@@ -73,6 +82,16 @@ export default function DeckSpecTweaker({
             title={`当前强调色 ${deckSpec.palette.accent}`}
           />
           <code className="pg-tweaker-hex">{deckSpec.palette.accent}</code>
+          <span
+            className={`pg-wcag-pill pg-wcag-pill--${contrast.overallGrade.toLowerCase()}`}
+            id="pg-deck-wcag-pill"
+            title={`正文/底色对比度 ${contrast.textBgRatio}:1 · 强调色/底色 ${contrast.accentBgRatio}:1`}
+          >
+            <ShieldCheck size={11} />
+            <span>
+              WCAG {contrast.overallGrade} · {contrast.textBgRatio.toFixed(1)}:1
+            </span>
+          </span>
           <span className="pg-tweaker-meta">
             R{deckSpec.layout.cornerRadius}px · {deckSpec.layout.density}
           </span>
@@ -175,6 +194,23 @@ export default function DeckSpecTweaker({
                   }
                 />
               </label>
+              {contrast.overallGrade === "WARN" && (
+                <button
+                  type="button"
+                  id="pg-deck-wcag-fix-btn"
+                  className="pg-btn pg-btn-secondary pg-btn-xs"
+                  onClick={() =>
+                    onChangeSpec({
+                      ...deckSpec,
+                      palette: autoFixPaletteContrast(deckSpec.palette),
+                    })
+                  }
+                  title="自动优化正文与强调色亮度以满足 WCAG AA 投影可读标准"
+                >
+                  <Wrench size={11} />
+                  <span>校正对比度</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -235,6 +271,29 @@ export default function DeckSpecTweaker({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="pg-tweaker-group pg-tweaker-group--wide">
+            <label className="pg-tweaker-label" htmlFor="pg-deck-footer-input">
+              <span>自定义机构 / 课程 / 实验室页脚署名（同步写入画布、.pptx 与 .html）</span>
+            </label>
+            <input
+              id="pg-deck-footer-input"
+              type="text"
+              className="pg-input"
+              maxLength={60}
+              placeholder="例如：清华大学材料学院 · NSFC 2026 或 XX 中学物理公开课"
+              value={deckSpec.layout.brandFooter || ""}
+              onChange={(e) =>
+                onChangeSpec({
+                  ...deckSpec,
+                  layout: {
+                    ...deckSpec.layout,
+                    brandFooter: e.target.value.slice(0, 60) || undefined,
+                  },
+                })
+              }
+            />
           </div>
         </div>
       )}

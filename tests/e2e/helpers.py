@@ -1734,7 +1734,7 @@ class PlaywrightSession:
 
     def _ensure_browser(self) -> Any:
         if self._browser is not None:
-            if self._contexts_since_launch >= 20 or not self._browser.is_connected():
+            if self._contexts_since_launch >= 10 or not self._browser.is_connected():
                 self.force_recycle()
                 return self._launch_browser()
             return self._browser
