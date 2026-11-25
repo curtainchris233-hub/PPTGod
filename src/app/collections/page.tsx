@@ -26,9 +26,12 @@ export default async function CollectionsPage({
   const initialDecks = viewer ? listSavedDecksByUser(viewer.id) : [];
 
   const initialTab =
-    sp.tab === "decks" || sp.tab === "mine" || sp.tab === "liked"
+    sp.tab === "favorites" ||
+    sp.tab === "decks" ||
+    sp.tab === "mine" ||
+    sp.tab === "liked"
       ? sp.tab
-      : "favorites";
+      : "decks";
 
   return (
     <CollectionsClient

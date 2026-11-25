@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import {
   Instrument_Serif,
   JetBrains_Mono,
@@ -7,11 +6,14 @@ import {
   Noto_Serif_SC,
   Plus_Jakarta_Sans,
 } from "next/font/google";
-import AiAmbientAccent from "@/components/AiAmbientAccent";
 import AuthModal from "@/components/AuthModal";
 import CompareDock from "@/components/CompareDock";
-import Navbar from "@/components/Navbar";
+import AppShell from "@/components/layout/AppShell";
 import { AppProvider } from "@/context/AppContext";
+import { LayoutProvider } from "@/context/LayoutContext";
+import "@/styles/glacier-tokens.css";
+import "@/styles/glacier-layout.css";
+import "@/styles/glacier-ui.css";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -54,11 +56,11 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
   ),
   title: {
-    default: "PPTGod · 可视化 PPT 提示词视觉画廊与工作台",
+    default: "PPTGod · AI 演示文稿创作平台与可视化风格画廊",
     template: "%s | PPTGod",
   },
   description:
-    "实时可视化渲染每一套 PPT 提示词的 16:9 封面、目录、数据图表、双栏对比与结尾页视觉效果，一键定制并导出适配 Claude HTML、Gamma、Kimi、NotebookLM 与 AI 生图的专业提示词。",
+    "从主题、文档与灵感到可编辑演示文稿的 AI 创作平台：实时 16:9 风格预览、智能大纲、在线编辑器、设计体检、演讲排练与原生 PPTX / 离线 HTML 导出。",
 };
 
 export default function RootLayout({
@@ -73,30 +75,11 @@ export default function RootLayout({
     >
       <body>
         <AppProvider>
-          <div className="pg-shell">
-            <Navbar />
-            {children}
-            <footer className="pg-footer">
-              <AiAmbientAccent variant="footer-stream" />
-              <div className="pg-container pg-footer-inner">
-                <div className="pg-footer-brand">
-                  <strong>PPTGod</strong>
-                  <span> · 视觉驱动的 PPT 提示词与生成实验室</span>
-                </div>
-                <div className="pg-footer-meta pg-footer-links">
-                  <Link href="/tools" id="pg-footer-tools-link" className="pg-footer-link">
-                    PPT 效率工具箱
-                  </Link>
-                  <span>·</span>
-                  <span>6 大 AI 工具编译</span>
-                  <span>·</span>
-                  <span>原生 .pptx / .html</span>
-                </div>
-              </div>
-            </footer>
+          <LayoutProvider>
+            <AppShell>{children}</AppShell>
             <CompareDock />
             <AuthModal />
-          </div>
+          </LayoutProvider>
         </AppProvider>
       </body>
     </html>

@@ -5,14 +5,17 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   Check,
+  Columns3,
   Copy,
   Plus,
   Sparkles,
   Trash2,
   X,
 } from "lucide-react";
+import PageHeader from "@/components/layout/PageHeader";
 import SlideCanvas from "@/components/SlideCanvas";
 import { useApp } from "@/context/AppContext";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { compilePrompt } from "@/lib/promptCompiler";
 import {
   ALL_SLIDE_TYPES,
@@ -30,6 +33,7 @@ export default function CompareClient({ allPrompts }: CompareClientProps) {
   const {
     compareIds,
     toggleCompare,
+    replaceCompareIds,
     removeCompare,
     clearCompare,
     globalTopic,
@@ -40,23 +44,66 @@ export default function CompareClient({ allPrompts }: CompareClientProps) {
   const [syncSlide, setSyncSlide] = useState<SlideType>("cover");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [clearedByUser, setClearedByUser] = useState(false);
 
   const selectedPrompts = useMemo(() => {
+    if (compareIds.length === 0) {
+      return clearedByUser ? [] : allPrompts.slice(0, 3);
+    }
     const map = new Map(allPrompts.map((p) => [p.id, p]));
     return compareIds
       .map((id) => map.get(id))
       .filter(Boolean) as PromptItem[];
-  }, [allPrompts, compareIds]);
+  }, [allPrompts, compareIds, clearedByUser]);
 
-  const unselectedPrompts = useMemo(
-    () => allPrompts.filter((p) => !compareIds.includes(p.id)),
-    [allPrompts, compareIds]
+  const activeIds = useMemo(
+    () => selectedPrompts.map((p) => p.id),
+    [selectedPrompts]
   );
 
-  const loadPresetTrio = () => {
+  const unselectedPrompts = useMemo(
+    () => allPrompts.filter((p) => !activeIds.includes(p.id)),
+    [allPrompts, activeIds]
+  );
+
+  const isSampleTopic = !globalTopic.trim();
+
+  const handleAddStyle = (prompt: PromptItem) => {
+    setClearedByUser(false);
+    if (compareIds.length === 0 && !clearedByUser) {
+      const next = [...activeIds.slice(0, 2), prompt.id];
+      replaceCompareIds(Array.from(new Set(next)).slice(0, 3));
+      showToast(`已加入对比：${prompt.title}`);
+      return;
+    }
+    toggleCompare(prompt.id, prompt.title);
+  };
+
+  const handleRemoveStyle = (id: string) => {
+    if (compareIds.length === 0) {
+      const remaining = activeIds.filter((itemId) => itemId !== id);
+      if (remaining.length === 0) {
+        setClearedByUser(true);
+        clearCompare();
+      } else {
+        replaceCompareIds(remaining);
+      }
+      return;
+    }
+    if (compareIds.length === 1 && compareIds[0] === id) {
+      setClearedByUser(true);
+    }
+    removeCompare(id);
+  };
+
+  const handleClearAll = () => {
+    setClearedByUser(true);
     clearCompare();
-    const defaults = allPrompts.slice(0, 3);
-    defaults.forEach((p) => toggleCompare(p.id));
+  };
+
+  const loadPresetTrio = () => {
+    setClearedByUser(false);
+    replaceCompareIds(allPrompts.slice(0, 3).map((p) => p.id));
   };
 
   const handleCopy = async (prompt: PromptItem) => {
@@ -75,15 +122,15 @@ export default function CompareClient({ allPrompts }: CompareClientProps) {
       },
       syncSlide
     );
-    try {
-      await navigator.clipboard.writeText(text);
+    const ok = await copyTextToClipboard(text);
+    if (ok) {
       setCopiedId(prompt.id);
       showToast(`已复制「${prompt.title}」提示词`, "success");
       window.setTimeout(() => setCopiedId(null), 1800);
       fetch(`/api/prompts/${prompt.id}/copy`, { method: "POST" }).catch(
         () => {}
       );
-    } catch {
+    } else {
       showToast("复制失败", "error");
     }
   };
@@ -91,38 +138,59 @@ export default function CompareClient({ allPrompts }: CompareClientProps) {
   return (
     <main className="pg-page">
       <div className="pg-container">
-        <header className="pg-subpage-header">
-          <div>
-            <p className="pg-kicker">SIDE-BY-SIDE VISUAL BENCHMARK</p>
-            <h1 className="pg-subpage-title">PPT 风格并排对比台</h1>
-            <p className="pg-subpage-lead">
-              将 2~3 套心仪风格置于同一画布下，同步切换全部 12 种商业页型并填入你的主题，直观比对信息层级、色系张力与适配工具。
-            </p>
-          </div>
-          <div className="pg-subpage-actions">
-            {selectedPrompts.length < 3 && (
-              <button
-                type="button"
-                className="pg-btn pg-btn-secondary"
-                onClick={() => setPickerOpen((v) => !v)}
-                id="pg-compare-add-btn"
-              >
-                <Plus size={15} />
-                <span>添加对比风格 ({selectedPrompts.length}/3)</span>
-              </button>
-            )}
-            {selectedPrompts.length > 0 && (
-              <button
-                type="button"
-                className="pg-btn pg-btn-ghost"
-                onClick={clearCompare}
-              >
-                <Trash2 size={14} />
-                <span>清空</span>
-              </button>
-            )}
-          </div>
-        </header>
+        <PageHeader
+          icon={<Columns3 size={22} />}
+          title="风格并排对比"
+          subtitle="将 2–3 套心仪风格置于同一画布下，同步切换全部 12 种商业页型并填入统一主题，直观比对信息层级、配色方案与适配工具。"
+          actions={
+            <div className="pg-subpage-actions">
+              {selectedPrompts.length < 3 && unselectedPrompts.length > 0 && (
+                <>
+                  <select
+                    id="pg-compare-add-select"
+                    className="pg-select"
+                    aria-label="添加风格到对比"
+                    value=""
+                    onChange={(e) => {
+                      const chosen = unselectedPrompts.find(
+                        (p) => p.id === e.target.value
+                      );
+                      if (chosen) handleAddStyle(chosen);
+                    }}
+                  >
+                    <option value="" disabled>
+                      + 快速添加风格 ({selectedPrompts.length}/3)
+                    </option>
+                    {unselectedPrompts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="pg-btn pg-btn-secondary"
+                    onClick={() => setPickerOpen((v) => !v)}
+                    id="pg-compare-add-btn"
+                  >
+                    <Plus size={15} />
+                    <span>画廊挑选</span>
+                  </button>
+                </>
+              )}
+              {selectedPrompts.length > 0 && (
+                <button
+                  type="button"
+                  className="pg-btn pg-btn-ghost"
+                  onClick={handleClearAll}
+                >
+                  <Trash2 size={14} />
+                  <span>清空</span>
+                </button>
+              )}
+            </div>
+          }
+        />
 
         {/* Sync Controls Bar (All 12 Slide Types) */}
         <section className="pg-compare-toolbar">
@@ -155,6 +223,14 @@ export default function CompareClient({ allPrompts }: CompareClientProps) {
               onChange={(e) => setGlobalTopic(e.target.value)}
               id="pg-compare-topic-input"
             />
+            {isSampleTopic && (
+              <span
+                className="pg-tag pg-tag-scenario"
+                style={{ marginLeft: 8, whiteSpace: "nowrap" }}
+              >
+                示例预览
+              </span>
+            )}
           </div>
         </section>
 
@@ -196,7 +272,7 @@ export default function CompareClient({ allPrompts }: CompareClientProps) {
                   key={p.id}
                   type="button"
                   className="pg-picker-card"
-                  onClick={() => toggleCompare(p.id, p.title)}
+                  onClick={() => handleAddStyle(p)}
                 >
                   <div className="pg-picker-swatch-bar">
                     <span style={{ background: p.visualSpec.palette.bg }} />
@@ -248,7 +324,7 @@ export default function CompareClient({ allPrompts }: CompareClientProps) {
                     <button
                       type="button"
                       className="pg-icon-btn"
-                      onClick={() => removeCompare(p.id)}
+                      onClick={() => handleRemoveStyle(p.id)}
                       title="移出对比"
                       aria-label={`移出 ${p.title}`}
                     >

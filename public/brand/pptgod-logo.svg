@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="36" height="36" fill="none">
+  <defs>
+    <linearGradient id="pptgod-logo-bg" x1="4" y1="2" x2="32" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#54C2FF" />
+      <stop offset="56%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1749D8" />
+    </linearGradient>
+    <linearGradient id="pptgod-logo-rim" x1="2" y1="2" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.72" />
+      <stop offset="50%" stop-color="#BAE6FD" stop-opacity="0.24" />
+      <stop offset="100%" stop-color="#1D4ED8" stop-opacity="0.12" />
+    </linearGradient>
+    <linearGradient id="pptgod-logo-facet" x1="18" y1="2" x2="34" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.24" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="32" height="32" rx="10" fill="url(#pptgod-logo-bg)" />
+  <path d="M18 2H24C29.5228 2 34 6.47715 34 12V18L18 2Z" fill="url(#pptgod-logo-facet)" />
+  <rect x="2.6" y="2.6" width="30.8" height="30.8" rx="9.4" stroke="url(#pptgod-logo-rim)" stroke-width="1.2" />
+  <path
+    fill-rule="evenodd"
+    clip-rule="evenodd"
+    d="M11.5 11.2C11.5 10.2611 12.2611 9.5 13.2 9.5H20.1C23.469 9.5 25.8 11.741 25.8 15C25.8 18.259 23.469 20.5 20.1 20.5H15.5V24.8C15.5 25.7389 14.7389 26.5 13.8 26.5H13.2C12.2611 26.5 11.5 25.7389 11.5 24.8V11.2ZM15.5 13.2V16.8H19.65C20.92 16.8 21.75 16.08 21.75 15C21.75 13.92 20.92 13.2 19.65 13.2H15.5Z"
+    fill="#FFFFFF"
+  />
+  <rect x="18" y="22.8" width="7.4" height="3.3" rx="1.65" fill="#93E2FF" fill-opacity="0.94" />
+</svg>

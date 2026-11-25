@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import SlideCanvas from "@/components/SlideCanvas";
 import { useApp } from "@/context/AppContext";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { buildSampleDeckFromPrompt } from "@/lib/deckGenerator";
 import { exportStandaloneHtmlDeck } from "@/lib/htmlExporter";
 import {
@@ -202,8 +203,8 @@ export default function StudioClient({
   };
 
   const handleCopyPrompt = async () => {
-    try {
-      await navigator.clipboard.writeText(compiledText);
+    const ok = await copyTextToClipboard(compiledText);
+    if (ok) {
       setCopied(true);
       showToast(
         `已复制 ${TOOL_METADATA[params.targetTool].shortName} 成品提示词`,
@@ -219,7 +220,7 @@ export default function StudioClient({
           }
         })
         .catch(() => {});
-    } catch {
+    } else {
       showToast("剪贴板权限受限，请手动全选文本框复制", "error");
     }
   };
@@ -464,9 +465,9 @@ export default function StudioClient({
         {/* Studio Header Bar */}
         <div className="pg-studio-topbar">
           <div className="pg-studio-crumbs">
-            <Link href="/" className="pg-back-link">
+            <Link href="/gallery" className="pg-back-link">
               <ArrowLeft size={15} />
-              <span>画廊</span>
+              <span>风格画廊</span>
             </Link>
             <span className="pg-crumb-sep">/</span>
             {!prompt.isPublic && (

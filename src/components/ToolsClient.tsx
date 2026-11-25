@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -10,15 +11,18 @@ import {
   Download,
   FileUp,
   Palette,
+  Play,
   ShieldCheck,
   Sparkles,
   Upload,
   Wand2,
   Wrench,
 } from "lucide-react";
+import PageHeader from "@/components/layout/PageHeader";
 import AiAmbientAccent from "@/components/AiAmbientAccent";
 import SlideCanvas from "@/components/SlideCanvas";
 import { useApp } from "@/context/AppContext";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { saveDocIntakeHandoff } from "@/lib/docIntakeHandoff";
 import {
   autoFixPaletteContrast,
@@ -31,6 +35,7 @@ import {
   type DocumentAnalysisResult,
   type OutlineDraftItem,
   type PromptItem,
+  type SavedDeck,
   type VisualPalette,
 } from "@/types/prompt";
 import "@/styles/tools.css";
@@ -39,7 +44,13 @@ type ToolTab = "pacing" | "pptx-inspect" | "palette-wcag" | "visual-director";
 
 interface ToolsClientProps {
   styles: PromptItem[];
+  /** Deep-linked tab (`/tools?tab=…`); unknown values fall back to pacing. */
+  initialTab?: string;
+  /** Server-loaded saved decks for the signed-in user (enables instant rehearsal links). */
+  initialDecks?: SavedDeck[];
 }
+
+const TOOL_TABS: ToolTab[] = ["pacing", "pptx-inspect", "palette-wcag", "visual-director"];
 
 interface ParsedPptxSummary {
   fileName: string;
@@ -73,10 +84,33 @@ function countSpeechUnits(text: string): number {
   return cjk + words;
 }
 
-export default function ToolsClient({ styles }: ToolsClientProps) {
+export default function ToolsClient({
+  styles,
+  initialTab,
+  initialDecks = [],
+}: ToolsClientProps) {
   const router = useRouter();
-  const { showToast } = useApp();
-  const [activeTab, setActiveTab] = useState<ToolTab>("pacing");
+  const { user, showToast } = useApp();
+  const [activeTab, setActiveTab] = useState<ToolTab>(() =>
+    TOOL_TABS.includes(initialTab as ToolTab) ? (initialTab as ToolTab) : "pacing"
+  );
+  const [savedDecks, setSavedDecks] = useState<SavedDeck[]>(initialDecks);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    fetch("/api/decks", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && Array.isArray(data.decks)) {
+          setSavedDecks(data.decks);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // 1. Talk-Time & Pacing Calculator
   const [scriptText, setScriptText] = useState(
@@ -227,12 +261,12 @@ export default function ToolsClient({ styles }: ToolsClientProps) {
 
   const handleCopyPaletteCss = async () => {
     const css = `:root {\n  --ppt-bg: ${palette.bg};\n  --ppt-surface: ${palette.surface};\n  --ppt-text: ${palette.text};\n  --ppt-muted: ${palette.muted};\n  --ppt-accent: ${palette.accent};\n  --ppt-border: ${palette.border};\n}`;
-    try {
-      await navigator.clipboard.writeText(css);
+    const ok = await copyTextToClipboard(css);
+    if (ok) {
       setPaletteCopied(true);
       showToast("已复制 CSS 色板变量", "success");
       window.setTimeout(() => setPaletteCopied(false), 1600);
-    } catch {
+    } else {
       showToast("剪贴板不可用", "error");
     }
   };
@@ -279,12 +313,12 @@ export default function ToolsClient({ styles }: ToolsClientProps) {
   }, [activeVdStyle, vdTopic, vdBatch, vdDensity]);
 
   const handleCopyVdPrompt = async () => {
-    try {
-      await navigator.clipboard.writeText(vdPrompt);
+    const ok = await copyTextToClipboard(vdPrompt);
+    if (ok) {
       setVdCopied(true);
       showToast("已复制视觉导演 v2 生图提示词", "success");
       window.setTimeout(() => setVdCopied(false), 1600);
-    } catch {
+    } else {
       showToast("剪贴板不可用", "error");
     }
   };
@@ -336,72 +370,69 @@ export default function ToolsClient({ styles }: ToolsClientProps) {
   return (
     <main className="pg-page">
       <div className="pg-container pg-tools-page">
-        <header className="pg-tools-header">
-          <div>
-            <p className="pg-kicker">PPTGOD LOCAL TOOLBOX</p>
-            <h1 className="pg-subpage-title">PPT 效率工具箱</h1>
-            <p className="pg-tools-sub">
-              纯本地即时运算，不留存私有文件 · 专注汇报前的节奏、可读性与换肤准备
-            </p>
-          </div>
-
-          <div
-            className="pg-tools-tabs"
-            role="tablist"
-            aria-label="切换 PPT 效率工具"
-          >
-            <button
-              type="button"
-              role="tab"
-              id="pg-tool-tab-pacing"
-              aria-selected={activeTab === "pacing"}
-              className={`pg-tools-tab ${activeTab === "pacing" ? "is-active" : ""}`}
-              onClick={() => setActiveTab("pacing")}
+        <PageHeader
+          icon={<Wrench size={22} />}
+          title="PPT 效率工具箱"
+          subtitle="纯本地即时运算，不留存私有文件 · 专注汇报前的节奏、可读性与换肤准备"
+          actions={
+            <div
+              className="pg-tools-tabs"
+              role="tablist"
+              aria-label="切换 PPT 效率工具"
             >
-              <Clock size={14} />
-              <span>时长节拍</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="pg-tool-tab-pptx"
-              aria-selected={activeTab === "pptx-inspect"}
-              className={`pg-tools-tab ${
-                activeTab === "pptx-inspect" ? "is-active" : ""
-              }`}
-              onClick={() => setActiveTab("pptx-inspect")}
-            >
-              <FileUp size={14} />
-              <span>PPTX 体检</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="pg-tool-tab-palette"
-              aria-selected={activeTab === "palette-wcag"}
-              className={`pg-tools-tab ${
-                activeTab === "palette-wcag" ? "is-active" : ""
-              }`}
-              onClick={() => setActiveTab("palette-wcag")}
-            >
-              <Palette size={14} />
-              <span>抽色体检</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="pg-tool-tab-director"
-              aria-selected={activeTab === "visual-director"}
-              className={`pg-tools-tab ${
-                activeTab === "visual-director" ? "is-active" : ""
-              }`}
-              onClick={() => setActiveTab("visual-director")}
-            >
-              <Wand2 size={14} />
-              <span>生图导演词</span>
-            </button>
-          </div>
-        </header>
+              <button
+                type="button"
+                role="tab"
+                id="pg-tool-tab-pacing"
+                aria-selected={activeTab === "pacing"}
+                className={`pg-tools-tab ${activeTab === "pacing" ? "is-active" : ""}`}
+                onClick={() => setActiveTab("pacing")}
+              >
+                <Clock size={14} />
+                <span>时长节拍</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="pg-tool-tab-pptx"
+                aria-selected={activeTab === "pptx-inspect"}
+                className={`pg-tools-tab ${
+                  activeTab === "pptx-inspect" ? "is-active" : ""
+                }`}
+                onClick={() => setActiveTab("pptx-inspect")}
+              >
+                <FileUp size={14} />
+                <span>PPTX 体检</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="pg-tool-tab-palette"
+                aria-selected={activeTab === "palette-wcag"}
+                className={`pg-tools-tab ${
+                  activeTab === "palette-wcag" ? "is-active" : ""
+                }`}
+                onClick={() => setActiveTab("palette-wcag")}
+              >
+                <Palette size={14} />
+                <span>抽色体检</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="pg-tool-tab-director"
+                aria-selected={activeTab === "visual-director"}
+                className={`pg-tools-tab ${
+                  activeTab === "visual-director" ? "is-active" : ""
+                }`}
+                onClick={() => setActiveTab("visual-director")}
+              >
+                <Wand2 size={14} />
+                <span>生图导演词</span>
+              </button>
+            </div>
+          }
+        />
 
         <section
           className="pg-tools-stage"
@@ -500,6 +531,52 @@ export default function ToolsClient({ styles }: ToolsClientProps) {
                       : "节奏均衡，适合大多数 45–90 秒/页的清晰汇报节奏"}
                   </span>
                 </div>
+
+                {savedDecks.length > 0 && (
+                  <div
+                    className="gl-panel gl-panel--default gl-panel--pad-sm gl-panel--radius-md"
+                    style={{ marginTop: 12 }}
+                    aria-label="已保存文稿快速进入演播排练"
+                  >
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: "var(--gl-text)",
+                        marginBottom: 8,
+                      }}
+                    >
+                      打开我的云端文稿直接排练
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {savedDecks.slice(0, 5).map((deck) => (
+                        <Link
+                          key={deck.id}
+                          href={`/deck/${deck.id}?rehearsal=1`}
+                          className="gl-btn gl-btn--secondary gl-btn--sm"
+                          style={{
+                            justifyContent: "space-between",
+                            width: "100%",
+                          }}
+                        >
+                          <span
+                            style={{
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {deck.title}（{deck.slides.length} 页）
+                          </span>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                            <Play size={12} aria-hidden="true" />
+                            <span>开始排练</span>
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

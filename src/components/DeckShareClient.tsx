@@ -22,11 +22,13 @@ import {
 import SlideCanvas from "@/components/SlideCanvas";
 import { useApp } from "@/context/AppContext";
 import { exportStandaloneHtmlDeck } from "@/lib/htmlExporter";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { SLIDE_TYPE_LABELS, type SavedDeck } from "@/types/prompt";
 import "@/styles/deck-share.css";
 
 interface DeckShareClientProps {
   deck: SavedDeck;
+  initialRehearsal?: boolean;
 }
 
 const TIMER_PRESETS: { seconds: number; label: string }[] = [
@@ -45,11 +47,14 @@ function formatClock(totalSeconds: number): string {
   return `${neg ? "-" : ""}${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export default function DeckShareClient({ deck }: DeckShareClientProps) {
+export default function DeckShareClient({
+  deck,
+  initialRehearsal = false,
+}: DeckShareClientProps) {
   const { showToast } = useApp();
   const [activeIndex, setActiveIndex] = useState(0);
   const [showNotes, setShowNotes] = useState(false);
-  const [rehearsalMode, setRehearsalMode] = useState(false);
+  const [rehearsalMode, setRehearsalMode] = useState(initialRehearsal);
   const [targetSeconds, setTargetSeconds] = useState<number>(600);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [timerRunning, setTimerRunning] = useState<boolean>(false);
@@ -220,12 +225,12 @@ export default function DeckShareClient({ deck }: DeckShareClientProps) {
   };
 
   const handleCopyShareUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
+    const ok = await copyTextToClipboard(window.location.href);
+    if (ok) {
       setCopiedUrl(true);
       showToast("已复制演播分享链接", "success");
       window.setTimeout(() => setCopiedUrl(false), 1800);
-    } catch {
+    } else {
       showToast("剪贴板权限受限，请直接复制地址栏链接", "error");
     }
   };

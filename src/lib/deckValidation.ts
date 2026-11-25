@@ -459,6 +459,14 @@ export function sanitizeLlmSlide(
   }
 
   if (isPlainObject(raw.imageSlot)) {
+    const caption = toSafeString(raw.imageSlot.caption);
+    const promptHint = toSafeString(raw.imageSlot.promptHint);
+    const layout =
+      raw.imageSlot.layout === "right"
+        ? ("right" as const)
+        : raw.imageSlot.layout === "left"
+        ? ("left" as const)
+        : undefined;
     const slot: DeckSlideImageSlot = {
       kind:
         raw.imageSlot.kind === "data-url" &&
@@ -466,9 +474,9 @@ export function sanitizeLlmSlide(
           ? "data-url"
           : "svg-preset",
       presetId: toSafeString(raw.imageSlot.presetId) || "swiss-geometry",
-      caption: toSafeString(raw.imageSlot.caption),
-      layout: raw.imageSlot.layout === "right" ? "right" : "left",
-      promptHint: toSafeString(raw.imageSlot.promptHint),
+      ...(layout ? { layout } : {}),
+      ...(caption ? { caption } : {}),
+      ...(promptHint ? { promptHint } : {}),
     };
     if (slot.kind === "data-url" && isValidImageDataUrl(raw.imageSlot.dataUrl)) {
       slot.dataUrl = raw.imageSlot.dataUrl.trim();

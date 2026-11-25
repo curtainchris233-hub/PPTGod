@@ -39,9 +39,9 @@ export default function CreatorProfileClient({
     <main className="pg-page">
       <div className="pg-container">
         <div className="pg-studio-topbar" style={{ paddingBottom: 0 }}>
-          <Link href="/" className="pg-back-link">
+          <Link href="/gallery" className="pg-back-link">
             <ArrowLeft size={15} />
-            <span>返回视觉画廊</span>
+            <span>返回风格画廊</span>
           </Link>
         </div>
 

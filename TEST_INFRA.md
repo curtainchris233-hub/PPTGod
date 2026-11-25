@@ -1,8 +1,8 @@
-# PPTGod v2 — E2E Testing Infrastructure (`TEST_INFRA.md`)
+# PPTGod · Glacier UI 2.0 — E2E Testing Infrastructure (`TEST_INFRA.md`)
 
-> **Authoritative E2E Test Infrastructure Specification** for PPTGod v2.
+> **Authoritative E2E Test Infrastructure Specification** for **PPTGod · Glacier UI 2.0**.
 > Owned exclusively by the E2E Testing Track (`sub_orch_e2e_track`).
-> Derived strictly from user requirements & documented contracts (`ORIGINAL_REQUEST.md`, `PROJECT.md`, `implementation_plan.md`, `product_design.md`, and `spec_miner_survey_3/handoff.md`) — opaque-box and independent of implementation internals.
+> Derived strictly from user requirements & frozen contracts (`ORIGINAL_REQUEST.md`, `PROJECT.md`, `docs/PPTGod_Glacier_UI_2.0_Development_Spec.md`, and frozen API/DB baselines) — standalone, opaque-box, and zero imports from legacy `tests/e2e/*.py`.
 
 ---
 
@@ -10,181 +10,196 @@
 
 | Component | Exact Runtime / Path | Notes |
 |---|---|---|
-| **Python 3** | `/opt/pyenv/shims/python3` (`3.12.16`) | Standard library (`urllib.request`, `http.cookiejar`, `zipfile`, `xml.etree.ElementTree`, `http.server`, `sqlite3`, `json`, `re`, `pathlib`, `tempfile`) — zero extra pip installs required |
+| **Python 3** | `/opt/pyenv/shims/python3` (`3.12.16`) | Pure stdlib (`urllib.request`, `http.cookiejar`, `zipfile`, `xml.etree.ElementTree`, `http.server`, `sqlite3`, `struct`, `zlib`, `json`, `re`, `pathlib`, `tempfile`) — zero extra pip installs |
 | **Browser Automation** | Python Playwright (`playwright.sync_api`, v`1.65.2`) | Preinstalled in pyenv; **Node Playwright is NOT installed — DO NOT `npm install playwright`** |
-| **Browser Binaries** | `PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright` | Headless Chromium (`chromium-1255`) already cached locally; zero runtime downloads |
-| **SQLite CLI** | `/opt/android-sdk/platform-tools/sqlite3` | Used only for optional WAL-safe snapshot (`sqlite3 data/pptgod.db ".backup '<tmp>'"`) — NEVER plain `cp data/pptgod.db` |
-| **Target Server** | `http://localhost:3000` (configurable via `--base-url`) | Next.js 16.4.6 App Router (`npm run start` or `npm run dev`) |
+| **Browser Binaries** | `PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright` | Headless Chromium already cached locally; zero runtime downloads |
+| **SQLite CLI** | `/opt/android-sdk/platform-tools/sqlite3` | Used strictly for WAL-safe snapshot (`sqlite3 data/pptgod.db ".backup '<tmp>'"`) — **NEVER** plain `cp data/pptgod.db` |
+| **Target Server** | **`http://127.0.0.1:3010`** *(default `--base-url`)* | Next.js 16.4.6 App Router started on isolated port `3010`; **port `3000` is strictly refused with exit code `2`** to protect the main session's production preview daemon |
+| **Screenshot Archive** | `/home/antigravity/.gemini/jetski/brain/v1/default/jetski_remote_agents_3p_devbox/d4652d5e-bd2b-44e6-9b6d-5ebd3aabd750/screenshots/glacier_v2/` | 22-shot Glacier UI 2.0 visual parity & RWD archive via `--screenshots-dir` |
 
-### Clean-Database & Zero-Pollution Protocol
-1. **Seeded Accounts (read-only credentials, never deleted):**
-   - **Author A:** `demo@pptgod.studio` / `demo1234` (username: `demo_designer`, id: `user_demo`)
-   - **Author B:** `chen@pptgod.studio` / `ChenStrategy#2026` (username: `chen_strategy`, id: `user_curator_chen`)
-   - **Official Studio:** `studio@pptgod.studio` / `PPTGodOfficial#2026` (username: `pptgod_lab`, id: `user_studio_official`)
-2. **Deterministic Cleanup (`try/finally`):**
-   - Every mutating test registers created resources (prompts, saved decks, comments, like/favorite toggles, profile edits) into a LIFO `CleanupRegistry`.
-   - Every test cleans up in `finally:` blocks even when assertions fail, restoring `demo_designer`'s profile (`displayName`, `bio`, `avatarColor`) and removing all `[E2E-...]` synthetic rows so `data/pptgod.db` remains at the clean 18 curated styles & 5 seed comments state.
-   - Duplicate registration (`409`) tests submit an already-seeded email (`demo@pptgod.studio`) so zero orphan user rows are inserted into `users`.
-3. **Zero `.agents/teamwork/` Pollution:**
-   - Tests, runner outputs, temporary downloads, mock servers, and optional DB backups NEVER write inside `.agents/teamwork/`.
-   - Ephemeral scratch files use `tempfile.TemporaryDirectory(prefix="pptgod_e2e_")` and are removed on exit.
+### Clean-Database, WAL Safety & Session Hygiene Protocol
+1. **Seeded Read-Only Accounts (NEVER deleted; exact profile restore values):**
+   - **Official Studio:** `studio@pptgod.studio` / `PPTGodOfficial#2026` (`user_studio_official`, `pptgod_lab`, `"PPTGod 视觉实验室"`, `#C84B31`, 15 styles)
+   - **Author A (Demo):** `demo@pptgod.studio` / `demo1234` (`user_demo`, `demo_designer`, `"林屿 · 演示设计师"`, `#0F766E`, 12 styles)
+   - **User B (Chen):** `chen@pptgod.studio` / `ChenStrategy#2026` (`user_curator_chen`, `chen_strategy`, `"陈默 · 战略咨询"`, `#1D4ED8`, 9 styles)
+2. **Exact Baseline Table Invariants (enforced by `--backup-db`):**
+   - `users: 3`, `prompts: 36`, `prompt_comments: 5`, `saved_decks: 0`, `prompt_likes: 0`, `prompt_favorites: 0`
+   - `residual_e2e_rows == 0` across **all 3 content tables** (`prompts.title LIKE '[E2E%'`, `saved_decks.title LIKE '[E2E%'`, `prompt_comments.content LIKE '[E2E%'`)
+   - **`sessions_delta <= 0`** (`post["sessions"] - pre["sessions"] <= 0`)
+3. **Deterministic LIFO Cleanup & Automatic Session Logout:**
+   - Every mutating test registers created resources (`prompts`, `saved_decks`, `prompt_comments`, `like`/`favorite` toggles, profile edits) into `CleanupRegistry` (LIFO rollback).
+   - If a test fails, cleanup errors are attached via `exc.add_note(...)` (never masking the primary failure); if the test passed but cleanup failed, `CleanupError` fails the test loudly (zero swallowed errors).
+   - **Session Hygiene:** `TestContext.teardown_sessions()` logs out every tracked authenticated `ApiClient` via `POST /api/auth/logout` AFTER `spec.fn(ctx)` and `CleanupRegistry` finish; `PlaywrightSession.open_page()` inspects `context.cookies()` for `pptgod_session` before `context.close()` and revokes it via `POST /api/auth/logout`, preventing `sessions` table bloat.
+4. **Zero `.agents/teamwork/` Scratch Pollution:**
+   - All temporary backups and scratch probes use `tempfile.TemporaryDirectory(prefix="pptgod_glacier_e2e_")` or `mktemp -d -- "${TMPDIR:-/tmp}/teamwork_probe.XXXXXX"` and are removed cleanly on exit.
 
 ---
 
-## 2. Test Suite File Layout (`tests/e2e/**`)
+## 2. Standalone Package Layout (`tests/e2e/glacier_v2/**`)
+
+Strictly isolated from legacy `tests/e2e/{__init__,config,helpers,run_e2e,tier1..tier10}.py` (ZERO legacy imports):
 
 ```text
-tests/e2e/
-├── __init__.py                   # Package marker & suite version metadata
-├── config.py                     # Seeded accounts, 18 official slugs, 8 slide types, 6 tools, 7 routes, screenshot manifest
-├── helpers.py                    # ApiClient (per-role cookie jars), CleanupRegistry, PptxVerifier, HtmlDeckVerifier,
-│                                 # PlaywrightSession (console/pageerror/5xx capture), MockOpenAIServer, TestRunner primitives
-├── tier1_features.py             # Tier 1: Isolated happy-path feature coverage (API + Browser UI Smoke on all 7 routes)
-├── tier2_boundaries.py           # Tier 2: Boundary, validation, error-handling, BYOK mock LLM & corner-case tests
-├── tier3_security_journeys.py    # Tier 3: ALL 22 Security/Privacy Invariants (S1–S22) + Cross-Feature E2E Journeys
-├── tier4_scenarios_visual.py     # Tier 4: 5+ Real-world personas, Desktop/Mobile responsive checks, Vanilla CSS aesthetic checks & screenshots
-└── run_e2e.py                    # Unified CLI runner
+tests/e2e/glacier_v2/
+├── __init__.py                   # Package version "glacier-v2.0.0" & default base URL metadata
+├── config.py                     # Zero-I/O constants: DEFAULT_BASE_URL=127.0.0.1:3010, FORBIDDEN_PORTS=(3000,),
+│                                 # 3 accounts, 36 styles, exact domain/scenario/style/color/tool counts, 12 SlideTypes,
+│                                 # 20 archetypes, 16 motifs, 5 RWD breakpoints, Glacier tokens, B1-B16 forbidden patterns,
+│                                 # 22-shot Screenshot Manifest, payload factories & 8 pure-stdlib binary fixture builders
+├── helpers.py                    # ApiClient (JSON + post_multipart + auto logout), CleanupRegistry (LIFO, strict likedByMe/
+│                                 # favoritedByMe restore, non-masking), DbHygieneHelper (WAL-safe sqlite3 .backup + closing),
+│                                 # PptxVerifier, HtmlDeckVerifier, MockOpenAIServer (127.0.0.1:0 chat+image+500 scrub),
+│                                 # DelayedFetchProbe (non-blocking browser fetch delay + MutationObserver + passive counter),
+│                                 # BrowserPageGuard (console/pageerror/5xx/404-assets/requestfailed), PlaywrightSession (auto
+│                                 # browser logout), Web Vitals (LCP/CLS/INP w/ takeRecords flush), WCAG 2.2 AA & Frosted Topbar
+│                                 # gradient contrast, Glacier CSS/blur/brand-SVG/focus (resting-snapshot + spread ring)/motion
+│                                 # probes, locate_first(require_visible=...) & locate_attached, TestContext/SuiteRunner
+├── tier1_features.py             # Tier 1 (29 tests): 12 core API happy paths (G1_API_01..12) + 17 Glacier UI route tests
+├── tier2_boundaries.py           # Tier 2 (39 tests): 12 API boundaries + 11 UI guards + 16 Honest Boundaries (B1-B16)
+├── tier3_interactions.py         # Tier 3 (E2E-2): Pairwise cross-feature workflows + S1-S22 privacy/security spot checks
+├── tier4_scenarios_rwd_perf.py   # Tier 4 (E2E-2): 5 personas, 5-breakpoint RWD, Glacier visual/perf, WCAG 2.2 AA, Web Vitals, 22 shots
+└── run_glacier_e2e.py            # Unified CLI runner (default http://127.0.0.1:3010; refuses port 3000 with exit code 2)
 ```
 
 ---
 
-## 3. CLI Runner Interface (`tests/e2e/run_e2e.py`)
+## 3. CLI Runner Contract (`tests/e2e/glacier_v2/run_glacier_e2e.py`)
 
 ```bash
-PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 tests/e2e/run_e2e.py \
-  --base-url http://localhost:3000 \
+PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 \
+  tests/e2e/glacier_v2/run_glacier_e2e.py \
+  --base-url http://127.0.0.1:3010 \
   --tier all \
-  [--screenshots-dir /abs/path/to/screenshots] \
-  [--json-report /abs/path/to/report.json] \
   [--backup-db] \
+  [--screenshots-dir /abs/path/to/screenshots/glacier_v2] \
+  [--json-report /abs/path/to/report.json] \
   [--timeout-ms 15000] \
-  [--filter <substring>]
+  [--filter <substring>] \
+  [--list]
 ```
 
-### CLI Options & Exit Contract
-- `--base-url <url>`: Target PPTGod v2 server URL (default: `http://localhost:3000`).
-- `--tier <1|2|3|4|all>`: Tier selection; supports single tier (`1`, `2`, `3`, `4`), comma-separated list (`1,3`), or `all` (default: `all`).
-- `--screenshots-dir <dir>`: Optional directory where Tier 4 (or standalone screenshot pass) writes crisp desktop (`1440×900`) PNG screenshots of all 8 mandatory views for `walkthrough.md`:
-  1. `01_gallery_home.png` — `/` (18 styles gallery)
-  2. `02_style_matcher_modal.png` — `/` with 30-second `StyleMatcherModal` open (and showing recommendations)
-  3. `03_studio_bento.png` — `/studio/apple-soft-bento-modular` (8-slide filmstrip, 6-tool compiler, reviews)
-  4. `04_generate_workshop.png` — `/generate` with a generated multi-slide deck rendered on 16:9 canvas
-  5. `05_compare_board.png` — `/compare` (side-by-side multi-style compare across 8 slide types)
-  6. `06_create_remix.png` — `/create?fork=swiss-international-grid` (Remix prefill, provenance banner, visibility toggle)
-  7. `07_collections_workspace.png` — `/collections` (logged-in 4-tab workspace)
-  8. `08_creator_profile.png` — `/creator/pptgod_lab` (creator header, impact stats, public portfolio)
-- `--json-report <path>`: Optional path to write structured JSON results (`summary`, `tiers`, `tests[]` with `id`, `tier`, `name`, `status`, `duration_ms`, `error`, `details`).
-- `--backup-db`: Optional WAL-safe backup of `data/pptgod.db` into an ephemeral temp dir via `sqlite3 .backup` before execution, plus post-run count check confirming clean state.
-- `--timeout-ms <ms>`: Per-request HTTP and Playwright action timeout (default: `15000`).
-- `--filter <substring>`: Optional case-insensitive filter matching test ID or name.
-- **Strict Exit Policy:** Exits `0` **ONLY** when `executed > 0` AND `failed == 0` AND `errors == 0`. Never silently skips failed assertions or swallows exceptions. Prints a crisp per-test PASS/FAIL table with tier totals and exact failure diagnostics.
+### CLI Options & Strict Exit Codes
+- `--base-url <url>`: Target server URL (**default: `http://127.0.0.1:3010`**). **Port `3000` is strictly refused with exit code `2`** and a clear stderr error message.
+- `--tier <1|2|3|4|all>`: Single tier, comma-separated list (`1,2`), or `all` (default: `all`). Tiers 1 & 2 are imported unconditionally; Tiers 3 & 4 are imported unconditionally as soon as their module files exist (never masking real `ImportError`/`SyntaxError`).
+- `--backup-db`: Creates a WAL-safe `sqlite3 .backup` snapshot in an ephemeral temp dir before execution, then asserts all 6 baseline content tables unchanged, `residual_e2e_rows == 0`, and `sessions_delta <= 0`.
+- `--screenshots-dir <dir>`: Output folder for Tier 4's 22-shot Glacier UI 2.0 Screenshot Manifest.
+- `--json-report <path>`: Writes structured UTF-8 JSON report (`suite_version`, `started_at`, `finished_at`, `base_url`, `tiers_selected`, `summary`, `tiers`, `db_hygiene`, `tests[]`).
+- `--timeout-ms <ms>`: Positive per-request & Playwright action timeout (default `15000`).
+- `--filter <substring>`: Case-insensitive substring matching test `id`, `name`, or `tags`.
+- `--list`: Prints matching tests grouped by tier with counts and exits `0` without hitting the server or launching Chromium.
+- **Strict Exit Policy:**
+  - `0`: `--list` succeeded OR (`executed > 0` AND `failed == 0` AND `errors == 0` AND (`not --backup-db` OR `db_hygiene.ok`)).
+  - `1`: Any test `FAIL`/`ERROR`, zero matching tests, or `db_hygiene.ok is False`.
+  - `2`: Invalid CLI arguments, protected port `3000` refusal, explicitly requested missing tier, or unreachable target server preflight.
 
 ---
 
-## 4. Four-Tier Systematic Test Design (35 Features + S1–S22)
+## 4. Four-Tier Systematic Test Architecture (`F1–F41`, `B1–B16`)
 
-### Tier 1 — Feature Coverage (Isolated Happy Paths across All Features & 7 Routes)
-- **T1 API Suite:**
-  - Public catalog: `GET /api/prompts` returns `200` with `18` curated styles, all `isPublic === true`, matching the 18 expected official slugs; query filters (`q`, `scenario`, `style`, `color`, `tool` for all 6 tools, `sort=popular|newest|copies`) return accurate filtered sets.
-  - Auth lifecycle: `POST /api/auth/login` (`demo_designer`), `GET /api/auth/me` (returns `user` + `stats` with `published`, `likes`, `favorites`, `decks`), `POST /api/auth/logout`, invalid login (`401`).
-  - Prompt CRUD & Social: `GET /api/prompts/apple-soft-bento-modular` (`200`), `POST /api/prompts/[id]/copy` increments `copiesCount`, `POST /api/prompts/[id]/like` & `favorite` toggle idempotently and restore cleanly.
-  - Comments CRUD: `GET /api/prompts/prompt_swiss_grid/comments` returns seeded reviews; logged-in `POST` with `testedTool: "slidev-marp"`, `rating: 5`, valid content returns `201`; `DELETE` own comment returns `200`.
-  - Sync favorites & Profile: `POST /api/prompts/sync-favorites` merges valid public IDs (`200 { synced }`); `PATCH /api/auth/profile` updates `displayName`/`bio`/`avatarColor` (`200`) and restores original values in `finally`.
-  - Smart Generation Engine: `POST /api/generate` (`mode: "smart"`, `slideCount: 7`, real source text with metrics/quotes) returns `200 { slides, engine: "smart" }` with 7 structured slides, valid `slideType`s, non-empty `speakerNotes`.
-  - Native `.pptx` Export: `POST /api/export/pptx` returns `200`, `Content-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation`, magic header `PK\x03\x04`, size `> 30720` bytes, valid ZIP archive (`testzip() is None`), containing `ppt/slides/slide1.xml`..`slideN.xml`, `ppt/notesSlides/notesSlide1.xml`, and genuine slide title text inside the XML!
-  - Saved Decks CRUD: `POST /api/decks` creates deck (`isPublic: false` default), `GET /api/decks` lists it, `GET /api/decks/[id]` returns it for author, `PUT`/`PATCH /api/decks/[id]` updates content/visibility, `DELETE /api/decks/[id]` cleans up.
-  - Creator Profile API: `GET /api/creators/pptgod_lab` returns `200 { creator, prompts, impact, privateCount: 0 }` with public-only prompts & impact metrics.
-- **T1 Browser UI Smoke Suite (Headless Chromium `1440×900`, `console.error == 0`, `pageerror == 0`):**
-  - `/` (Gallery): 18 style cards rendered, global live topic input updates card canvases, filter & reset work, 30-second **StyleMatcherModal** opens from Hero CTA, completes 3 steps (audience -> lighting -> density), renders Top 3 recommendations with 16:9 `SlideCanvas` & Studio/Generate links.
-  - `/studio/apple-soft-bento-modular`: Cycles all **8 slide types** (`cover`, `agenda`, `process`, `data`, `comparison`, `timeline`, `quote`, `closing`) asserting non-blank 16:9 canvas rendering on each; 5-dimension anatomy highlight interaction; live visual tuning + reset; all **6 target tools** (`claude-html`, `gamma-kimi`, `notebooklm`, `ai-image` single + **6-slide AI-image batch** toggle, `slidev-marp`, `python-pptx`); Quick Launch external links visible; sample `.pptx` & `.html` export buttons functional; per-tool verified reviews section rendered.
-  - `/generate`: Preset material load + smart generate produces multi-slide deck; live style switcher re-skins canvas while preserving content; right WYSIWYG title/notes edit updates 16:9 canvas live; fullscreen roadshow modal opens & closes cleanly; `.pptx` and offline `.html` export verified.
-  - `/compare`: Multi-style synced compare across all 8 slide types, unified topic input, parameter matrix, and「用此风格生成 PPT」CTA.
-  - `/create?fork=swiss-international-grid`: Remix prefill, attribution banner, 8-slide preview tabs, 15 layout archetypes / 11 decorative motifs available, Public/Private visibility toggle visible.
-  - `/collections`: Authenticated 4-tab workspace (`已收藏风格`, `我保存的 PPT 文稿`, `我发布的风格`, `我点赞的`) + Edit Profile modal opens & displays fields.
-  - `/creator/pptgod_lab`: Avatar, bio, public impact cards, public portfolio grid rendered.
+### Tier 1 — Isolated Happy Paths (`tier1_features.py` — 29 Tests)
+- **Tier 1A Core APIs (`G1_API_01..12` — 12 tests):**
+  - `G1_API_01`: `GET /api/health` (`status == "ok"`, `catalogCount == 36`, `dbMode == "wal"`).
+  - `G1_API_02`: `GET /api/prompts` (36 official slugs + `color=dark` (6), `tool=slidev-marp` (9), `scenario=科研基金` (2), `style=商务咨询` (5), `q=Bento`, `sort=popular|newest|copies`).
+  - `G1_API_03`: `POST /api/auth/login` (`HttpOnly` cookie), `GET /api/auth/me` (`stats.{published,likes,favorites,decks}`), `POST /api/auth/logout`.
+  - `G1_API_04`: `POST/GET/PUT/PATCH/DELETE /api/prompts` CRUD (slug preservation + `CleanupRegistry`).
+  - `G1_API_05`: Prompt `like`/`favorite`/`copy` & `sync-favorites` with restore.
+  - `G1_API_06`: Prompt `comments` seeded read + `slidev-marp` 5-star POST + DELETE.
+  - `G1_API_07`: `PATCH /api/auth/profile` (+ restore) & `GET /api/creators/pptgod_lab` (15 public prompts, `privateCount == 0`).
+  - `G1_API_08`: `POST /api/parse-document` across pure-stdlib `.md`, `.txt`, `.docx`, `.pptx` (`existing-pptx`, `beautify-1to1`, 4-slide `parsedOutline`), and `.pdf`.
+  - `G1_API_09`: `POST /api/outline` (10 slides) & smart `POST /api/generate` honoring edited outline title.
+  - `G1_API_10`: `POST /api/polish` across all 3 strict actions (`executive`, `metrics`, `notes`) preserving `id`, `slideType`, `imageSlot`.
+  - `G1_API_11`: Saved Decks CRUD (default private, `PUT` rename, `POST` duplicate omitting `id`, `PATCH` visibility) + 12-slide native `.pptx` export (`PptxVerifier`: `PK\x03\x04`, `slideMasters`, `slide1..12.xml`, `notesSlide`, native `<a:tbl>`, `<c:barChart>` & `<c:doughnutChart>`, `ppt/media/`, `brandFooter`).
+  - `G1_API_12`: `/robots.txt`, `/sitemap.xml` (incl. `/gallery`, `/tools`), and `/studio/apple-soft-bento-modular/opengraph-image` PNG.
+- **Tier 1B Glacier UI 2.0 Routes (`G1_UI_01`, `G1_UI_01B`, `G1_UI_02..15`, `G1_UI_15B` — 17 tests, `1440×900`, `BrowserPageGuard` 0 errors):**
+  - `G1_UI_01`: `/` Dashboard Bento (`8:4`, `9:3`, `4:8`), H1 with ONLY `"AI 创作"` in `#2563EB`, 3-Tab switching, live 3-style `SlideCanvas` topic sync, 2×3 recommended styles, 4 Quick Tools.
+  - `G1_UI_01B`: `/?q=Bento&domain=business-tech` server-side redirect to `/gallery?q=Bento&domain=business-tech`.
+  - `G1_UI_02`: `AppShell` sticky `64px` Topbar, Sidebar `220px ↔ 64px` collapse/expand, Topbar search → `/gallery?q=`, all Sidebar nav links HTTP `200`.
+  - `G1_UI_03`: `/gallery` 36 cards, live domain capsules (`科研与学术` → 6 + URL sync), search/reset, `2px solid #2563EB` selection, copy prompt, guest `localStorage` favorite.
+  - `G1_UI_04`: `/gallery` Style Detail `Drawer` (16:9 multi-slide switcher, hex swatches, `Esc`), `StyleMatcherModal`, and `DocIntakeWorkbench`.
+  - `G1_UI_05`: `/generate` Workshop 4-step `Stepper`, live 16:9 `示例预览`, `.md` upload parsed card, `OutlineDraftPanel` edit/add/confirm → Editor.
+  - `G1_UI_06`: `/generate` Editor full-bleed auto-collapsed sidebar, topbar controls, slide tree (`大纲`↔`幻灯片`, `+ 新建幻灯片`), zoom, fullscreen presenter.
+  - `G1_UI_07`: `/generate` Editor `仅换版式不动字` (preserves title & `sourceStatus`), Speaker Notes + `AI 讲稿生成`, `AI 助手` (`高管精炼` + Undo), `DeckSpecTweaker` `brandFooter` live update.
+  - `G1_UI_08`: Design Audit (`/generate?panel=audit` auto-open, 100-pt score, `jump-slide` issue jump, `#pg-audit-autofix-notes-btn` recovery, deliberate low-contrast `#1A1A1A` → `#pg-audit-autofix-contrast-btn` recovery).
+  - `G1_UI_09`: `/collections` honest rail, real KPI (`1`), Grid/List toggle, search/sort, Rename (`PUT` via `role="dialog"`), Visibility (`PATCH`), Export PPTX, Duplicate (`POST`), Delete confirmation `Dialog` (`DELETE` → count `1`), all 3 community tabs (`我收藏的`/`我发布的`/`我点赞的`).
+  - `G1_UI_10`: `/compare` 3-column top-aligned same-content sync across 5 slide types, unified topic, remove-1 & add-back.
+  - `G1_UI_11`: `/studio` redirect + `/studio/apple-soft-bento-modular` 12-slide filmstrip, 5-dim anatomy pin, live tweaker + reset, all 6 target tools (`TOOL_MARKERS`) + 6/12-slide `ai-image` batch, `.html`/`.pptgod.json` downloads, copy prompt & authenticated comment CRUD.
+  - `G1_UI_12`: `/deck/[id]?rehearsal=1` Rehearsal Cockpit timer ticking, `#pg-rehearsal-notes-text` strict A+ (`after_px > before_px`), next-slide preview, slide-2 `ArrowRight` advance, export & clone links.
+  - `G1_UI_13`: `/create?fork=swiss-international-grid` Remix banner, hidden `#pg-extract-image-input` 40×40 PNG palette extractor, WCAG autofix, `.pptgod.json` PortableStylePack import, visibility radios, publish + cleanup.
+  - `G1_UI_14`: `/tools?tab=pacing|pptx-inspect|palette-wcag|visual-director` strict `aria-selected="true"` + panel verification, saved-deck rehearsal launcher, synthetic `.pptx` inspection.
+  - `G1_UI_15`: `AuthModal` Register+Login tabs & demo login, `SettingsModal` (editable profile + local-only BYOK), `HelpModal` searchable FAQ (`10\s*MB`), and Glacier 404 `not-found`.
+  - `G1_UI_15B`: `/creator/pptgod_lab` public creator portfolio & exact 15 deduplicated published styles.
 
-### Tier 2 — Boundary & Corner Cases
-- **Validation Boundaries (API):**
-  - `POST /api/prompts`: empty title, 1-char title, >60-char title, short summary (<8 chars), missing `promptAnatomy` dimensions -> `400`.
-  - `POST /api/prompts/[id]/comments`: 3-char content (`<4`) -> `400`; 501-char content (`>500`) -> `400`; out-of-range rating (`0`, `99`) -> clamped to `[1, 5]` or rejected with `400` cleanly.
-  - `POST /api/generate`: empty `topic` -> `400`; `slideCount: 2` clamped to `5`; `slideCount: 99` clamped to `8`; empty `sourceText` succeeds cleanly with fallback copy.
-  - BYOK `mode: "llm"` boundaries:
-    1. Missing `apiKey` -> `400` with clear guidance.
-    2. Invalid/unreachable `apiBase` or upstream HTTP `500` -> `502` structured JSON error (no server crash).
-    3. **Genuine local mock OpenAI-compatible HTTP server (`127.0.0.1:<ephemeral>`)**: verifies `POST /api/generate` forwards `Authorization: Bearer <test-key>` to `${apiBase}/chat/completions`, parses valid strict JSON `{"slides": [...]}` from `choices[0].message.content`, and returns `200 { engine: "llm", slides: [...] }`.
-    4. Mock LLM returning malformed non-JSON content -> clean `502`/`500` JSON error (never hangs or crashes).
-- **Export & Canvas Corner Cases:**
-  - `POST /api/export/pptx`:
-    1. `bars: []` empty array on a `data` slide -> succeeds (`200`, valid `.pptx` ZIP, zero crash).
-    2. Dark theme (`keynote-obsidian-stage`) with `rgba(...)` border/surface colors -> succeeds (`200`, valid `.pptx` ZIP, no invalid hex crash).
-    3. Special Chinese + punctuation/slash title (`"2026 Q4/战略复盘：AI「核心」增长 & 100%"`) -> succeeds (`200`, safe RFC 5987 `Content-Disposition`, valid `.pptx` ZIP).
-    4. Empty `slides: []` or missing `visualSpec` -> `400`.
-  - Browser `/generate` corner cases:
-    1. Deleting slides down to 1 remaining slide triggers last-slide guard (cannot delete to 0 slides, zero errors).
-    2. Switching a `cover` slide's type to `data`, `timeline`, `quote`, `comparison`, `process` (where subfields may be missing/empty) renders cleanly without `NaN` SVG coordinates or console/page errors.
-- **Auth, Routing & Selection Guards:**
-  - Nonexistent prompt slug (`/api/prompts/nonexistent-slug-xyz`, `/studio/nonexistent-slug-xyz`) -> `404`.
-  - Nonexistent creator username (`/api/creators/nonexistent_user_xyz`, `/creator/nonexistent_user_xyz`) -> `404`.
-  - Unauthenticated mutations (`POST /api/prompts`, `PUT /api/prompts/[id]`, `DELETE /api/prompts/[id]`, `POST /api/prompts/[id]/like`, `favorite`, `comments`, `POST /api/prompts/sync-favorites`, `PATCH /api/auth/profile`, `POST /api/decks`, `PATCH/PUT/DELETE /api/decks/[id]`) -> `401`.
-  - Duplicate registration email (`POST /api/auth/register` with `demo@pptgod.studio`) -> `409` (non-mutating!).
-  - Browser `/compare` or Gallery compare dock: attempting to add a 4th style triggers the >3 compare guard (count stays <= 3).
+### Tier 2 — Boundaries, Guards & Honest Boundaries `B1–B16` (`tier2_boundaries.py` — 39 Tests)
+- **Tier 2A API Boundaries (`G2_API_01..12` — 12 tests):** `>10MB` rejection, `.doc`/`.png`/`.exe`/`0-byte`/corrupt `.pptx` `400`, scanned PDF `isScannedPdf: true`, prompt/comment validation, generate/outline clamping (`5..20`), BYOK SSRF blocks across all 4 LLM/image routes, `MockOpenAIServer` (`valid_json`, `fenced_json`, `http_500`, `malformed_text` with canary key scrubbing), `PATCH` vs `PUT` deck contract, strict `/api/polish` enum, dark PPTX RGBA & empty bars & RFC 5987 CJK filename, `401`/`404`/`409` auth guards, `>50` slides / SVG dataUrl / `>650k` image caps.
+- **Tier 2B Browser UI Boundaries (`G2_UI_01..11` — 11 tests):** Invalid uploads (diff/alert-scoped error check, never matching static B8 copy) & scanned PDF (`expect_response`) preserving typed draft, empty-topic sample fallback, zero-result search + `清除筛选` on `/gallery` & seeded `/collections`, Guest vs Authenticated `0-deck` empty states, Editor last-slide delete guard (`final_cnt == 1`) + zero-`NaN` SVG across all 12 `SLIDE_TYPES`, 56-char CJK title clamping (viewport + container bounds), non-blocking `DelayedFetchProbe` anti-double-submit lock (`is_locked is True` + `1` backend request), 502 error retry preserving draft, anonymous private deck URL isolation + zero browser errors, Compare Max-3 guard + warning toast.
+- **Tier 2C Explicit Honest-Boundary Anti-Fake Suite (`G2_HONEST_01..16` — 16 tests, 1-to-1 for `B1–B16`):**
 
-### Tier 3 — Cross-Feature Combinations & ALL 22 Security/Privacy Invariants (S1–S22)
-- **Complete Security & Privacy Invariants Suite (Anonymous + Author A `demo_designer` + User B `chen_strategy`):**
-  - **S1:** Private prompt (`isPublic: false`) excluded from `GET /api/prompts` (default, search `q`, filters) for Anonymous & User B.
-  - **S2:** Private prompt included in `GET /api/prompts?scope=mine` for Author A with `isPublic === false`.
-  - **S3:** User B likes & favorites Author A's public prompt -> Author A flips it to `isPublic: false` -> User B's `GET /api/prompts?scope=favorites` and `scope=liked` EXCLUDE it!
-  - **S4:** `GET /api/prompts/[privateId]` and `[privateSlug]` return `404` for Anonymous & User B.
-  - **S5:** `GET /api/prompts/[privateId]` returns `200` with `isPublic === false` for Author A.
-  - **S6:** SSR `GET /studio/[privateSlug]` returns HTTP `404` for Anonymous & User B AND response HTML/`<title>` does NOT contain the private prompt's title!
-  - **S7:** SSR `GET /studio/[privateSlug]` returns HTTP `200` for Author A (renders private badge & Edit link).
-  - **S8:** SSR `GET /`, `GET /compare`, `GET /creator/demo_designer` exclude Author A's private prompt for Anonymous & User B (absent from HTML/cards and public impact counts).
-  - **S9:** SSR `GET /creator/demo_designer` & `GET /api/creators/demo_designer` for Author A exclude private prompt from public `prompts[]` and public `impact` counters while returning `privateCount >= 1` ONLY to Author A (`privateCount === 0` for Anonymous/User B).
-  - **S10:** `GET/POST/DELETE /api/prompts/[privateId]/comments` and `POST /api/prompts/[privateId]/{like,favorite,copy}` return `404` for User B (and `404` or `401` for Anonymous), without leaking comments or incrementing counters.
-  - **S11:** Author A gets `200` on `GET /api/prompts/[privateId]/comments` and `POST /api/prompts/[privateId]/copy`.
-  - **S12:** User B calling `POST /api/prompts/sync-favorites` with Author A's private prompt ID silently ignores it (`synced: 0`, `savesCount` unchanged).
-  - **S13:** `PUT /api/prompts/[id]`, `PATCH /api/prompts/[id]`, `DELETE /api/prompts/[id]`: Anonymous -> `401`; User B -> `403` (or `404` when private); Author A -> `200`.
-  - **S14:** Public Prompt B remixed from Prompt A -> Author A sets Prompt A to `isPublic: false` -> Anonymous & User B fetching Prompt B do NOT receive Prompt A's private `remixedFrom` title/slug!
-  - **S15:** `POST /api/decks` without `isPublic` saves with `isPublic === false` by default.
-  - **S16:** Private deck `GET /api/decks/[id]` returns **`403`** for Anonymous & User B.
-  - **S17:** Private deck `GET /api/decks/[id]` returns `200` (`isPublic: false`) for Author A.
-  - **S18:** Author A flips deck to `isPublic: true` -> `GET /api/decks/[id]` returns `200` (`isPublic: true`) for Anonymous & User B; User B calling `POST /api/decks` with Author A's public deck `id` creates a **non-destructive clone** owned by User B (new ID, Author A's original deck untouched).
-  - **S19:** `PATCH /api/decks/[id]`, `PUT /api/decks/[id]`, `DELETE /api/decks/[id]`: Anonymous -> `401`; User B -> `403`; Author A -> `200`.
-  - **S20:** `GET /api/decks`: Anonymous -> `{ decks: [] }`; Author A -> only Author A's decks; User B -> never sees Author A's decks.
-  - **S21:** `DELETE /api/prompts/[id]/comments?commentId=...`: Anonymous -> `401`; User B (non-comment-author) -> `403`; Comment author -> `200`.
-  - **S22:** BYOK `apiKey` sent to `POST /api/generate` (`mode: "llm"` with local mock server): API key is forwarded ONLY to `${apiBase}/chat/completions`, NEVER returned in `/api/generate` response body/headers, and NEVER persisted anywhere in `data/pptgod.db` (verified via read-only scan of JSON response and optional DB check).
-- **End-to-End Cross-Feature User Journeys (Playwright + API):**
-  - **Journey A (Guest Local Favorites -> Login Auto-Sync -> `/collections`):** Unauthenticated visitor favorites a style (stored in `localStorage`), logs in via demo login, verifies `POST /api/prompts/sync-favorites` fires automatically, `localStorage` key clears, and the style appears in `/collections` -> 「已收藏风格」.
-  - **Journey B (Matcher -> Studio -> Remix -> Author Edit -> Visibility Flip -> Creator Profile):** Complete 30s StyleMatcherModal -> enter recommended Studio -> click Remix (`/create?fork=...`) -> publish public remix -> verify `remixedFrom` provenance -> click Edit (`/create?edit=...`) -> update title & flip to Private -> confirm hidden from `/creator/demo_designer` public gallery & visible in `/collections` 「我发布的风格」 -> cleanup delete.
-  - **Journey C (Studio -> `/generate?style=...` -> Re-skin -> Edit -> Save Deck -> `/collections` -> Reopen `/generate?deck=...` -> Export `.pptx` & `.html`):** Full dual-core creation, editing, cloud save (private default), reload from `/collections`, toggle public share, verify native `.pptx` and offline `.html` exports, cleanup delete.
+| Test ID | Boundary | Enforced Anti-Fake / Honest Contract |
+|---|---|---|
+| `G2_HONEST_01` | **B1** | Zero `PPTGod Pro`, `立即升级`, `升级 Pro`, `解锁高级风格与更多额度`, `解锁更强大的 AI 创作能力` |
+| `G2_HONEST_02` | **B2** | Zero Topbar notification bell / unread dot (`[aria-label*="通知"]`, `[title*="通知"]`, `[class*="lucide-bell"]`) across all routes & Editor |
+| `G2_HONEST_03` | **B3** | Zero fake `意见反馈` / `提交反馈` controls across `aside, nav, footer` & zero `form[action*="feedback"]` |
+| `G2_HONEST_04` | **B4** | Zero `与我共享` / `协作项目` / `协作中`; real `公开分享`/`私有` verified on BOTH private and `PATCH`-flipped public decks |
+| `G2_HONEST_05` | **B5** | Zero `回收站`; Delete opens permanent-deletion confirmation `role="dialog"` |
+| `G2_HONEST_06` | **B6** | Zero `项目分组` / `新建分组` / `添加分组` / `全部分组` custom folder UI |
+| `G2_HONEST_07` | **B7** | Zero hardcoded `42` KPI variants (`全部项目 (42)`, `总项目数 42`, etc.) or fake recent titles; positively asserts KPI `0` & empty CTA at 0-deck baseline |
+| `G2_HONEST_08` | **B8** | Dropzone discloses `10MB` + all 5 real formats (`PDF`/`DOCX`/`PPTX`/`MD`/`TXT`) and makes zero dropzone image/OCR claims (`图片`/`JPG`/`PNG`/`OCR`) |
+| `G2_HONEST_09` | **B9** | Strict `示例预览\|示例文稿` badge on `/generate` (never matching quick-chip `"试试示例"`) & `示例` badge on `/compare` |
+| `G2_HONEST_10` | **B10** | Non-blocking `DelayedFetchProbe` asserts in-flight loading feedback appeared AND contains zero fabricated `%` (`(?<!\d)(?:100\|[1-9]\d?)%`) or numeric `aria-valuenow` across non-slide DOM |
+| `G2_HONEST_11` | **B11** | Honest `16:9` ratio with zero fake `4:3` or `9:16` / `竖屏` options/buttons/radios |
+| `G2_HONEST_12` | **B12** | Zero unimplemented Editor `形状` / `表格` / `动画` / `切换` controls or tabs; independently requires BOTH `本页编辑` AND `页面与主题` + `设计体检` |
+| `G2_HONEST_13` | **B13** | Editor `AI 助手` exposes all 3 real `/api/polish` actions, zero fake freeform chat input, and previews without overwriting until `确认应用` (`放弃` keeps original) |
+| `G2_HONEST_14` | **B14** | Zero fake `AI 语音演练` / `语音评分` / `停顿分析` / `麦克风录音评分`; positively verifies honest teleprompter/timer wording |
+| `G2_HONEST_15` | **B15** | Unconditional `#pg-param-lang` (`zh`→`en`→`bilingual`) alters compiled Studio prompt; Smart generation on `/generate` succeeds cleanly |
+| `G2_HONEST_16` | **B16** | Live 36 DOM `SlideCanvas` cards (zero raster slide mockups) & all 6 `#pg-domain-tab-*` badges match real DB counts (`36/11/5/6/9/7`) |
 
-### Tier 4 — Real-World Application Scenarios, Visual/Aesthetic Discipline & Screenshots
-- **5+ Realistic End-to-End Personas / Workloads:**
-  1. **Executive Board Q4 Review Deck:** Q4經營复盘 preset -> McKinsey/Consulting or Financial style -> edit executive KPIs & bars -> save private deck -> export `.pptx` & verify edited KPI appears in `ppt/slides/slide*.xml` -> cleanup.
-  2. **AI Product Launch Keynote Deck:** AI企业知识库 preset -> `apple-soft-bento-modular` / `keynote-obsidian-stage` live re-skin -> add `quote` slide -> edit speaker notes -> export `.pptx` & `.html` and verify notes in `ppt/notesSlides/` and `.html` -> cleanup.
-  3. **Academic Thesis Defense Deck:** 人工智能学术答辩 preset -> academic style -> 8-slide structure check (`process`, `timeline`, `data`) -> `.pptx` structural validation -> cleanup.
-  4. **Brand Style Curator Remix + Per-Tool Review Workflow:** Remix `swiss-international-grid` -> customize palette/anatomy -> publish -> submit per-tool `claude-html` 5-star review -> verify on Studio & Creator Profile -> cleanup.
-  5. **Privacy-First Enterprise Confidential Deck Workflow:** Create private prompt + private deck -> verify zero leakage to Anonymous & User B across API + SSR -> toggle deck to Public Share -> User B views & non-destructively clones -> cleanup both decks & prompt.
-- **Responsive Viewport Verification (`1440×900` Desktop & `390×844` Mobile):**
-  - Visit all 7 routes on both viewports asserting `document.documentElement.scrollWidth <= window.innerWidth + 2`, `console.error == 0`, and `pageerror == 0`.
-- **Aesthetic & Stack Discipline Verification:**
-  - Static check (read-only): `package.json` contains zero `tailwindcss` dependency; `src/` stylesheets contain zero `@tailwind` directives.
-  - Computed-style Browser check across rendered routes: zero elements using gradient text (`-webkit-background-clip: text` / `background-clip: text` with transparent text fill), zero neon multi-glow box-shadows on editorial chrome, and warm archival paper background (`#f5f2eb` / `rgb(245, 242, 235)`) preserved on `body`.
-- **Screenshot Capture (`--screenshots-dir`):**
-  - Captures all 8 required desktop (`1440×900`) PNG screenshots cleanly for M6's `walkthrough.md`.
+### Tier 3 — Cross-Feature Pairwise Interactions & S1–S22 Privacy (`tier3_interactions.py` — E2E-2)
+- `G3_WF_01`: Full `/` → `/generate` Workshop → Outline → Editor layout-only switch → `/api/polish` + Undo/Redo → 100-pt Audit autofix → Cloud Save → `/collections` Rename (`PUT`) & Duplicate (`POST`) → `/deck/[id]?rehearsal=1` → Verified `.pptx`/`.html` → Cleanup.
+- `G3_WF_02`: `/gallery` URL-synced filters + reload → Detail Drawer → Compare 12-slide sync → `/studio/[slug]` → `/generate?handoff=1`.
+- `G3_WF_03`: Guest local favs → Demo Login auto-sync → `/collections` + `SettingsModal` profile edit & restore.
+- `G3_SEC_01..06`: Complete S1–S22 privacy/ownership spot checks across `/gallery`, `/`, `/collections`, `/studio/[slug]`, `/deck/[id]`, remix redaction, non-destructive clone, and S22 read-only SQLite secret scan.
+
+### Tier 4 — 5 Personas, 5-Breakpoint RWD, Glacier Visual/Perf, WCAG 2.2 AA, Web Vitals & 22 Screenshots (`tier4_scenarios_rwd_perf.py` — E2E-2)
+- **5 Personas (`G4_PER_01..05`):** Executive Q4 Board Review, Academic Thesis Defense (`来源核验清单`), Existing `.pptx`/`.docx` `beautify-1to1`, Brand Style Creator Remix + Review, Confidential Enterprise Private Deck Lifecycle.
+- **5-Breakpoint RWD Matrix (`G4_RWD_01..05`):** `390×844`, `768×1024`, `1024×768`, `1440×900`, `1920×1080` across `/`, `/gallery`, `/generate`, `/collections`, `/compare`, `/studio/apple-soft-bento-modular`, `/tools` (`scrollWidth <= innerWidth + 2`, `>= 44px` mobile touch targets, drawerized tablet inspector, `max-width: 1600px` at 1920px vs full-bleed Editor).
+- **Glacier Visual & Performance Discipline (`G4_VIS_01..06`):** Zero TailwindCSS/PostCSS, Glacier `--gl-*` tokens (`#F0F6FC`, `#2563EB`, `#14243C`, `--ease-apple`, 5 font vars on `<html>`), `:focus-visible` & `prefers-reduced-motion` + compositor-only `@keyframes`, scoped `backdrop-filter` (zero blur on dense card grids), `public/brand/` SVG non-overlap + 16:9 `SlideCanvas` ratios, zero functional emojis in chrome.
+- **WCAG 2.2 AA & Keyboard (`G4_A11Y_01..04`):** `>= 4.5:1` normal text / `>= 3.0:1` large text & UI borders, **Frosted Topbar composited contrast over BOTH light (`#F0F6FC`) AND dark (`keynote-obsidian-stage` `#090C11`) scrolled `SlideCanvas` cards**, logical Tab order, Dialog/Drawer focus trap + `Esc` + focus restore, 100% icon-button `aria-label` & form `<label>` coverage.
+- **Core Web Vitals (`G4_PERF_01..02`):** Production-measured **`LCP <= 2500ms`**, **`INP <= 200ms`**, **`CLS <= 0.1`**, `0` console/page/404-asset/5xx errors.
 
 ---
 
-## 5. Resilient Selector & Contract Strategy (Parallel Development Safety)
+## 5. Complete 22-Shot Glacier UI 2.0 Screenshot Manifest (`--screenshots-dir`)
 
-Because the E2E Testing Track builds `tests/e2e/**` in parallel with Implementation Milestones M1–M5:
-1. **API & Route Tests** assert strictly against the frozen contracts in `PROJECT.md § Interface Contracts` and `implementation_plan.md`.
-2. **Playwright UI Locators** prioritize resilient, semantic, accessible selectors:
-   - Role + accessible text/name (`page.get_by_role("button", name=re.compile(...))`, `get_by_role("link", ...)`, `get_by_role("tab", ...)`).
-   - Route URLs and `href` prefix matching (`a[href*="/generate?style="]`, `a[href*="/create?fork="]`, `a[href*="/create?edit="]`, `a[href*="/creator/"]`).
-   - Documented semantic Chinese/English labels from `product_design.md` & `implementation_plan.md` (with flexible regex alternatives where wording could vary slightly, e.g. `r"智能选词|选词顾问|30\s*秒"`).
-   - Known stable v1 DOM IDs (`#pg-global-topic-input`, `#pg-demo-login-btn`) used as prioritized fallbacks alongside accessible locators.
-3. **Validation Before M6 Integration:**
-   - Syntax & bytecode check: `/opt/pyenv/shims/python3 -m py_compile tests/e2e/*.py`
-   - Static AST audit (no bare `except: pass`, no hardcoded fake PASS returns, no forbidden writes to `.agents/teamwork/` or `src/`).
-   - Self-test harness (staged in `mktemp -d` during verification) exercising `run_e2e.py`, `ApiClient`, `CleanupRegistry`, `PptxVerifier`, `HtmlDeckVerifier`, `MockOpenAIServer`, and Playwright Chromium launch against a local mock HTTP server to prove real PASS *and* real FAIL detection!
+| # | Filename | Route & State | Viewport | Auth | Baseline |
+|---|---|---|---|---|---|
+| 1 | `01_dashboard_1440.png` | `/` (clean loaded Dashboard) | `1440×900` | Guest | PNG-1 |
+| 2 | `02_gallery_1440.png` | `/gallery` (1st card selected w/ 2px blue border) | `1440×900` | Guest | PNG-2 |
+| 3 | `03_gallery_drawer_1440.png` | `/gallery` (Style Detail `Drawer` open) | `1440×900` | Guest | Gallery Drawer |
+| 4 | `04_workshop_create_1440.png` | `/generate` (Workshop wizard w/ `示例预览`) | `1440×900` | Guest | PNG-3 |
+| 5 | `05_editor_workspace_1440.png` | `/generate` (Editor w/ deck + notes + inspector) | `1440×900` | Guest | PNG-4 |
+| 6 | `06_editor_audit_1440.png` | `/generate?panel=audit` (`DeckAuditDrawer` open) | `1440×900` | Guest | Audit |
+| 7 | `07_projects_1440.png` | `/collections` (logged-in w/ temp E2E decks) | `1440×900` | Demo | PNG-5 |
+| 8 | `08_projects_empty_1440.png` | `/collections` (honest 0-deck EmptyState) | `1440×900` | Demo | EmptyState |
+| 9 | `09_compare_1440.png` | `/compare` (3-col synced comparison) | `1440×900` | Guest | Compare |
+| 10 | `10_studio_1440.png` | `/studio/apple-soft-bento-modular` | `1440×900` | Guest | Studio |
+| 11 | `11_rehearsal_1440.png` | `/deck/[tempId]?rehearsal=1` | `1440×900` | Demo | Rehearsal |
+| 12 | `12_create_1440.png` | `/create?fork=swiss-international-grid` | `1440×900` | Demo | Create |
+| 13 | `13_tools_1440.png` | `/tools?tab=pacing` | `1440×900` | Guest | Tools |
+| 14 | `14_creator_1440.png` | `/creator/pptgod_lab` | `1440×900` | Guest | Creator |
+| 15 | `15_rwd_dashboard_390.png` | `/` | `390×844` | Guest | RWD 390 |
+| 16 | `16_rwd_dashboard_768.png` | `/` | `768×1024` | Guest | RWD 768 |
+| 17 | `17_rwd_dashboard_1024.png` | `/` | `1024×768` | Guest | RWD 1024 |
+| 18 | `18_rwd_dashboard_1920.png` | `/` | `1920×1080` | Guest | RWD 1920 |
+| 19 | `19_rwd_gallery_390.png` | `/gallery` | `390×844` | Guest | RWD 390 |
+| 20 | `20_rwd_gallery_1024.png` | `/gallery` | `1024×768` | Guest | RWD 1024 |
+| 21 | `21_rwd_editor_768.png` | `/generate` (Editor stage) | `768×1024` | Guest | RWD 768 |
+| 22 | `22_rwd_projects_390.png` | `/collections` | `390×844` | Demo | RWD 390 |
+
+---
+
+## 6. Resilient Accessible Locator Strategy (Parallel Track Safety)
+
+Because the E2E suite is authored concurrently with Implementation Milestones M1–M3, all Playwright interactions use prioritized resilient helpers (`locate_first`, `locate_attached`, `click_resilient`, `fill_resilient`, `assert_any_visible`):
+1. **Priority 1 — Accessible Roles & Semantic Labels:** `get_by_role("button"|"link"|"tab"|"textbox"|"dialog", name=re.compile(...))`, `get_by_placeholder(...)`, `get_by_label(...)`.
+2. **Priority 2 — Structural & `data-*` Contracts:** `href` prefixes (`a[href^="/gallery"]`, `a[href*="/generate?deck="]`), `article[data-prompt-slug]`, `[data-layout-chip]`, `[data-timer-preset]`, `input[type="file"]` (always resolved via `locate_attached` / `require_visible=False`).
+3. **Priority 3 — Frozen `#pg-*` / `#create-*` Hooks (`PROJECT.md § Interface Contracts`):** `#pg-nav-login-btn`, `#pg-nav-logout-btn`, `#pg-demo-login-btn`, `#pg-domain-tabs`, `#pg-domain-tab-*`, `#pg-gallery-search`, `#pg-reset-filters-btn`, `#pg-open-matcher-btn`, `#pg-open-doc-intake-btn`, `#pg-doc-upload-input`, `#pg-gen-topic`, `#pg-gen-outline-btn`, `#pg-gen-run-btn`, `#pg-outline-editor`, `#pg-gen-undo-btn`, `#pg-gen-redo-btn`, `#pg-slide-type-select`, `#pg-edit-slide-title`, `#pg-edit-source-status`, `#pg-polish-executive-btn`, `#pg-deck-tweaker-toggle`, `#pg-deck-bg-input`, `#pg-deck-footer-input`, `#pg-deck-audit-toggle`, `#pg-deck-audit-panel`, `#pg-deck-audit-score`, `#pg-audit-autofix-contrast-btn`, `#pg-audit-autofix-notes-btn`, `#pg-compiled-prompt-output`, `#pg-param-lang`, `#pg-tool-tab-*`, `#pg-rehearsal-*`, `#pg-rehearsal-notes-text`, `#pg-extract-image-input`, `#pg-import-style-json-input`, `#pg-extracted-swatches`.

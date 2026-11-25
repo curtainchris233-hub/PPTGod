@@ -1,69 +1,111 @@
-# Project: PPTGod v2
+# Project: PPTGod · Glacier UI 2.0 全站视觉重构
 
-> **Single Source of Truth** for PPTGod v2 architecture, feature inventory, milestone decomposition, interface contracts, security invariants, and exclusive file ownership.
-> Authoritative upstream documents:
-> - `/home/antigravity/curtainchris233-hub/PPTGod/.agents/teamwork/ORIGINAL_REQUEST.md`
-> - `/home/antigravity/.gemini/jetski/brain/v1/default/jetski_remote_agents_3p_devbox/d4652d5e-bd2b-44e6-9b6d-5ebd3aabd750/implementation_plan.md`
-> - `/home/antigravity/.gemini/jetski/brain/v1/default/jetski_remote_agents_3p_devbox/d4652d5e-bd2b-44e6-9b6d-5ebd3aabd750/product_design.md`
+> **Single Source of Truth** for PPTGod Glacier UI 2.0 architecture, complete feature inventory (`F1–F41`), honest mockup-vs-backend boundaries (`B1–B16`), milestone decomposition, interface contracts, exclusive file ownership, and verification gates.
+>
+> **Authoritative Upstream Documents**:
+> - Verbatim User Request: `/home/antigravity/curtainchris233-hub/PPTGod/.agents/teamwork/ORIGINAL_REQUEST.md`
+> - Primary Development Spec: `/home/antigravity/curtainchris233-hub/PPTGod/docs/PPTGod_Glacier_UI_2.0_Development_Spec.md`
+> - Complementary Design Spec: `/home/antigravity/curtainchris233-hub/PPTGod/docs/PPTGod_UI_Design_Spec.md`
+> - Phase 0 Survey Reports:
+>   - Spec & 5-PNG Visual Inventory: `.agents/teamwork/spec_miner_survey_1/spec_inventory.md` & `handoff.md`
+>   - Frontend, Routes & CSS Audit: `.agents/teamwork/explorer_survey_2/handoff.md`
+>   - Backend APIs, SQLite WAL & E2E Audit: `.agents/teamwork/explorer_survey_3/handoff.md`
+> - **5 UI Reference Screenshots (MUST inspect directly via `view_file`)**:
+>   1. `/home/antigravity/E3354A27-4F04-4F81-B95A-89DEE68D2E1C.png` — Dashboard (`/`, primary visual baseline)
+>   2. `/home/antigravity/60D7FB7A-4C99-4108-9CE3-AA397AF04BD9.png` — Style Gallery (`/gallery`)
+>   3. `/home/antigravity/2BFDA63D-63B3-40F3-A762-341CFDBCA0E9.png` — Creation Workshop (`/generate` wizard)
+>   4. `/home/antigravity/3FA2BA18-157F-473A-A3FE-3A2635E88FF1.png` — Presentation Editor (`/generate` editor)
+>   5. `/home/antigravity/6E0BCE7C-EAB4-4066-A19C-C6CDD83E661D.png` — My Projects (`/collections`)
 
 ---
 
 ## Architecture
 
-- **Tech Stack (Strict)**: Next.js `16.4.6` App Router, React `19.3.0`, TypeScript `^5` (`strict: true`), **100% Pure Vanilla CSS (ZERO TailwindCSS, ZERO PostCSS)**, SQLite via `better-sqlite3` (WAL mode), native `.pptx` export via `pptxgenjs` (`^4.0.1`), icons via `lucide-react`.
-- **Aesthetic System**: Warm archival paper editorial design (`--bg-canvas: #f5f2eb`, `--bg-surface: #ffffff`, `--ink-primary: #171615`, `--accent: #c84b31`). **Strict visual prohibitions**: NO TailwindCSS, NO gradient text, NO neon glow borders, NO grid/mesh backgrounds.
-- **Dual-Core Product Loop**:
-  1. **Visual Prompt Discovery & Cross-Tool Compiler**: `/` (Gallery + 30s Smart Style Matcher) -> `/studio/[slug]` (8-slide filmstrip, 5-dim anatomy, live token tuning, 6-tool compiler + 6-slide AI-image batch + Quick Launch + sample `.pptx`/`.html` export + per-tool reviews) -> `/compare` (8-slide synced compare) -> `/create` (create / `?fork=` Remix / `?edit=` author update + Public/Private visibility).
-  2. **Online PPT Generation & Delivery Workshop**: `/generate` (dual engine: zero-config Smart Semantic Engine + BYOK OpenAI/DeepSeek-compatible LLM; 18+ style live re-skinning; left slide tree; center 16:9 `SlideCanvas` + speaker notes; right WYSIWYG editor; `.pptx` / `.html` export + cloud `saved_decks` with Private-by-default / Public share link).
-  3. **Community & Personal Space**: `/collections` (4 tabs: Favorites, Saved Decks, Published Styles [public+private], Liked + Edit Profile modal), `/creator/[username]` (public portfolio & impact metrics + owner private-drafts link), automatic guest `localStorage` favorite merge on login.
-- **Data Persistence**: SQLite at `data/pptgod.db` (WAL mode; idempotent migration from existing v1 DB preserving 3 users, 1 session, 12 v1 prompts while adding 6 new v2 styles -> 18 total, 5 seed comments, `prompts.remixed_from_id`, `prompts.is_public` [default `1`], `saved_decks.is_public` [default `0`], `prompt_comments`, `saved_decks`).
-- **Modular Vanilla CSS Strategy (Zero Parallel Collisions)**:
-  - Shared tokens & base layout/component adjustments live in `src/app/globals.css` (owned exclusively by **M2**).
-  - Feature-specific v2 Vanilla CSS lives in dedicated stylesheets under `src/styles/` (`matcher.css`, `studio-v2.css`, `generate.css`, `community.css`) imported directly by their owning components, reusing `:root` variables from `globals.css`.
+- **Git Branch Mandate**: Strictly develop and commit cleanly per milestone on `feat/glacier-ui-2.0` (branched from `main` `66d0087`). **NEVER modify `main`**. Use scoped `git add <owned-paths>` per milestone.
+- **Tech Stack (Strict)**: Next.js `16.4.6` (App Router), React `19.3.0`, TypeScript `5.9.3` (`strict: true`), **100% Pure Vanilla CSS (ZERO TailwindCSS, ZERO PostCSS, ZERO second UI framework)**, `lucide-react` (`^1.79.0`, stroke 1.75–2px, zero functional emojis), SQLite WAL (`better-sqlite3`, `data/pptgod.db`), `pptxgenjs`, `mammoth`, `unpdf`.
+- **Visual System — Glacier UI 2.0 (70% Utility / 20% Glacier Glass / 10% AI Tech Accent)**:
+  - Canonical tokens in `src/styles/glacier-tokens.css` (`--gl-*` namespace + safe legacy bridge in `src/app/globals.css`):
+    - `--gl-bg: #F0F6FC`, `--gl-bg-subtle: #E7F1FB`, `--gl-surface: #FFFFFF`, `--gl-glass: rgba(255, 255, 255, 0.78)`, `--gl-surface-hover: #F5F9FE`
+    - `--gl-primary: #2563EB`, `--gl-primary-hover: #1D4ED8`, `--gl-primary-light: #E2EDFF`, `--gl-cyan: #38BDF8`
+    - `--gl-primary-gradient: linear-gradient(135deg, #409BFF 0%, #2563EB 65%, #1749D8 100%)`
+    - `--gl-page-gradient: linear-gradient(145deg, #F8FBFF, #EAF3FC)`
+    - `--gl-text: #14243C`, `--gl-text-secondary: #52657B`, `--gl-muted: #64748B`, `--gl-border: #D9E5F1`, `--gl-border-interactive: #71828D`, `--gl-border-glass: rgba(255, 255, 255, 0.9)`
+    - `--gl-success: #15803D`, `--gl-warning: #B45309`, `--gl-danger: #B91C1C`, `--gl-focus: #2563EB`
+    - `--gl-radius-sm: 8px`, `--gl-radius-md: 12px`, `--gl-radius-lg: 16px`, `--gl-radius-xl: 20px`
+    - `--gl-shadow-sm: 0 2px 8px rgba(36, 72, 120, 0.06)`, `--gl-shadow-md: 0 8px 24px rgba(36, 72, 120, 0.09)`, `--gl-shadow-primary: 0 5px 16px rgba(37, 99, 235, 0.20)`
+    - `--gl-topbar-h: 64px`, `--gl-sidebar-w: 220px`, `--gl-sidebar-collapsed-w: 64px`, `--ease-apple: cubic-bezier(0.22, 1, 0.36, 1)`
+  - **CSS Isolation**: Do NOT overwrite legacy `--radius-sm/md/lg` or `--shadow-sm/md` destructively while unmigrated pages rely on them; build all new Glacier layout/UI/page modules strictly with `--gl-*` / `.gl-*`, bridge legacy color/border/nav vars in `globals.css`, fix undefined `var(--border-subtle)`, add global `:focus-visible`, and preserve `prefers-reduced-motion` + `content-visibility: auto` on gallery cards + compositor-only `pg*` keyframes.
+  - **Fonts**: Keep all 5 `next/font/google` variables on `<html>` (`--font-sans`, `--font-serif`, `--font-mono`, `--font-cjk-sans`, `--font-cjk-serif`) because `SlideCanvas` depends on them. Glacier App UI uses Sans (`Plus Jakarta Sans` + `Noto Sans SC`) and Mono (`JetBrains Mono`); Serif is restricted strictly to slide templates inside `SlideCanvas`.
+  - **Glass Blur Budget**: `@supports (backdrop-filter: blur(12px))` ONLY on `Topbar`, floating modals/drawers/popovers, and hero primary panels — NEVER on 36-card gallery lists or dense project grids.
+  - **Glacier Visual Assets (`public/brand/`)**: Low-contrast abstract snow-peak SVG (`public/brand/glacier-hero-peaks.svg`) and brand mark (`public/brand/pptgod-logo.svg`) confined strictly to top-right hero bands (`/`, `/gallery`, `/collections`, `/generate` creation), `pointer-events: none`, `aria-hidden="true"`, never covering text or acting as full-screen wallpaper.
+- **Route Architecture Shift**:
+  - `/` (`src/app/page.tsx`) → **Glacier Bento Dashboard** (PNG-1: 8:4 AI Creation + Upload, 9:3 Same-Content 3-Style `SlideCanvas` + 2×3 Recommended Styles, 4:8 Real Recent Projects + 4 Quick Tools). Backward compatibility: if `/` receives legacy filter query params (`q`, `domain`, `scenario`, `style`, `color`, `tool`, `sort`), server-redirect to `/gallery?...`.
+  - `/gallery` *(NEW `src/app/gallery/page.tsx`)* → **Style Gallery** (PNG-2: 36+ real `VisualSpec` templates, live-count domain capsules, URL-synced multi-facet filters, 4-col grid, 2px blue selected border, favorites, Detail Drawer, Compare dock, `StyleMatcherModal`, `DocIntakeWorkbench`).
+  - `/generate` → **Dual-Mode Creation Workshop & Presentation Editor** (`?mode=create|editor`, `?panel=audit`, preserving `?style=`, `?topic=`, `?deck=`, `?handoff=1`, `?intake=1`):
+    - Creation Stage (PNG-3): 4-step left stepper, 60:40 brief + 10MB/5-ext upload & parsed files list vs live 16:9 `示例预览` preview, bottom style rail, fixed params bar, editable `OutlineDraftPanel`, honest stage progress/retry.
+    - Editor Stage (PNG-4): Full-bleed viewport, auto-collapsible global sidebar, dedicated editor topbar, left `大纲 | 幻灯片` tree, center 16:9 stage + honest real-capability toolbar + zoom/pager + speaker notes w/ real `AI 讲稿生成`, right `本页编辑` & `页面与主题` + real `/api/polish` `AI 助手` (preview + confirm apply), 100-pt `DeckAuditDrawer`.
+  - `/collections` → **My Projects & Personal Space** (PNG-5: honest filter rail, real computed KPIs, search/visibility/sort/Grid-List view, 4-col `ProjectCard` w/ 16:9 cover + Open/Present/Rename(`PUT`)/Duplicate(`POST`)/Visibility(`PATCH`)/Export PPTX/Delete-confirm(`DELETE`), honest empty states, preserved Favorites/Published/Liked/Profile Edit tabs).
+  - Secondary & Auxiliary Routes (all upgraded to Glacier UI 2.0): `/compare`, `/studio` (redirect to top style) & `/studio/[slug]`, `/deck/[id]` (with `?rehearsal=1`), `/create`, `/tools` (with `?tab=pacing|pptx-inspect|palette-wcag|visual-director` + saved-deck rehearsal launcher), `/creator/[username]`, plus unified Glacier `AuthModal`, `SettingsModal`, and `HelpModal`.
+- **Zero-Regression Backend & Data Core (STRICTLY PRESERVED)**:
+  - All 22 API route handlers (`src/app/api/**`), all 17 domain modules (`src/lib/**`), `src/types/prompt.ts`, SQLite WAL `data/pptgod.db` (7 tables, 36 styles, 3 users, 5 comments), all 22 security/privacy invariants (`S1–S22`), `SlideCanvas.tsx` + `src/components/slide-canvas/**`, and `src/app/studio/[slug]/opengraph-image.tsx` are **FROZEN / READ-ONLY**.
 
 ---
 
 ## Feature Inventory
 
-Every feature from Step 0 Survey (`explorer_survey_1`, `explorer_survey_2`, `spec_miner_survey_3`) is assigned to a milestone (zero unassigned features):
+Every feature from Phase 0 Survey (`spec_miner_survey_1`, `explorer_survey_2`, `explorer_survey_3`) is assigned to a milestone (zero unassigned features):
 
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | Idempotent SQLite v1→v2 Migration | Add `prompts.remixed_from_id`, `prompts.is_public` (default 1), `saved_decks.is_public` (default 0), `prompt_comments`, `saved_decks`, post-ALTER `idx_prompts_public`; preserve existing WAL DB rows | M1 | survey_1, survey_3 |
-| 2 | 18-Style Official Seed Library + Seed Comments | 18 cross-industry curated styles (incl. 6 v2 styles) + 3 seed users + 5 initial per-tool reviews via `INSERT OR IGNORE` | M1 | survey_1, survey_3 |
-| 3 | Domain Type Definitions v2 | Add `isPublic: boolean` to `PromptItem` & `SavedDeck`, optional author fields on `RemixOrigin`, export `UserStats` with `decks` | M1 | survey_1, survey_2, survey_3 |
-| 4 | 8 Standard 16:9 Slide Types Rendering | `SlideCanvas.tsx` renders all 8 `SlideType`s (`cover`, `agenda`, `process`, `data`, `comparison`, `timeline`, `quote`, `closing`) with non-blank visuals & dynamic SVG bar chart scaling | M2 | survey_2, survey_3 |
-| 5 | New Layout Archetypes & Decorative Motifs | Render `soft-bento`, `financial-terminal`, `clinical-clean` archetypes and `bento-dots`, `editorial-drop`, `hairline-rule` motifs in `SlideCanvas.tsx` | M2 | survey_2, survey_3 |
-| 6 | Custom `slideData` Live Binding | Optional `slideData?: Partial<DeckSlideItem>`, `pageIndex?`, `totalPages?` in `SlideCanvas.tsx` with safe fallbacks & index keys | M2 | survey_2, survey_3 |
-| 7 | 5-Dimension Anatomy Visual Highlight Overlay | Preserve interactive 5-dim highlight overlay across all 8 slide types in `SlideCanvas.tsx` | M2 | survey_2, survey_3 |
-| 8 | Gallery Hero & Global Live Topic Preview | Live global topic input + preset pills updating all cards + quick `/generate` CTA carrying `globalTopic` | M3 | survey_2, survey_3 |
-| 9 | Multi-Dimensional Filter, Search & Sort | Filter by search `q`, scenario, style, color, 6 target tools, sort (`popular`/`newest`/`copies`), reset filters; sync on `syncVersion` | M3 | survey_2, survey_3 |
-| 10 | 30-Second Smart Style Matcher (`StyleMatcherModal`) | Hero-triggered 3-step wizard (audience/scenario -> lighting -> density) scoring public styles -> Top 3 with live 16:9 `SlideCanvas` & Studio/Generate CTAs | M3 | survey_2, survey_3 |
-| 11 | Upgraded `PromptCard` v2 | `CARD_SLIDE_TYPES` tabs, clickable author link `/creator/[username]`, Remix badge, Private lock badge, optional Edit button, dual CTAs (`定制提示词` & `生成 PPT`) | M2 | survey_2, survey_3 |
-| 12 | Studio 8-Slide Filmstrip & Fullscreen Presentation | All 8 `ALL_SLIDE_TYPES` in filmstrip (4x2 grid) and fullscreen presenter + viewer-aware `generateMetadata` | M3 | survey_2, survey_3 |
-| 13 | Studio Live Visual Parameter Fine-Tuning | Live accent/bg/density/radius tuning + reset reflected in `SlideCanvas`, compiler, and sample exports | M3 | survey_2, survey_3 |
-| 14 | Studio Action Bar & Provenance | Generate PPT CTA, Remix CTA (`/create?fork=[slug]`), author-only Edit CTA (`/create?edit=[slug]`), private lock badge, Remix provenance link, clickable creator card | M3 | survey_2, survey_3 |
-| 15 | 6-Tool Prompt Compiler, 6-Slide AI-Image Batch & Quick Launch | All 6 `TOOL_METADATA` tools, `aiImageBatchMode` toggle (single vs 6-slide pack), copy counter, External AI Quick Launch links, `.md` download | M3 | survey_1, survey_2, survey_3 |
-| 16 | Studio Sample `.pptx` & Interactive `.html` Export | Direct Studio buttons exporting sample deck via `buildSampleDeckFromPrompt` + `POST /api/export/pptx` and `exportStandaloneHtmlDeck` | M3 | survey_2, survey_3 |
-| 17 | Studio Community Per-Tool Verified Reviews | List/submit/delete reviews (`GET/POST/DELETE /api/prompts/[id]/comments`) with tested tool selector, 1–5 star picker, author link | M3 | survey_1, survey_2, survey_3 |
-| 18 | Workshop `/generate` Config Panel, 18+ Style Switcher & 3 Presets | Live re-skinning across 18+ styles (preserving slides), topic/subtitle/audience/count (5–8), raw material + 3 `SOURCE_MATERIAL_PRESETS`, `?style=`/`?topic=`/`?deck=` params | M4 | survey_2, survey_3 |
-| 19 | Dual-Engine PPT Generation (`smart` + BYOK `llm`) | Zero-config Smart Semantic Engine + BYOK OpenAI/DeepSeek LLM UI & hardened `POST /api/generate` (scheme check, timeout, safe JSON parse) | M1, M4 | survey_1, survey_2, survey_3 |
-| 20 | Workshop `/generate` Left Multi-Slide Filmstrip Tree | Thumbnail tree: select, add slide (choose type), delete slide (last-slide guard), move up/down, switch `SlideType` (all 8) | M4 | survey_2, survey_3 |
-| 21 | Workshop `/generate` Center 16:9 Stage, Speaker Notes & Fullscreen | Live `<SlideCanvas slideData={activeSlide} />`, synced speaker notes textarea, fullscreen roadshow modal | M4 | survey_2, survey_3 |
-| 22 | Workshop `/generate` Right WYSIWYG Slide Property Editor | Live editors for title, subtitle, sectionTag, steps, kpis, bars (sanitized numbers), comparison left/right, quote/author | M4 | survey_2, survey_3 |
-| 23 | Workshop Multi-Format Delivery Bar (`.pptx`, `.html`, Cloud Save + Visibility) | Native `.pptx` export (guarded empty bars & alpha-composited dark borders), offline `.html` export (safe >4 bar chart), cloud save (`isPublic: false` default) + share link copy + clone banner for foreign public decks | M1, M4 | survey_1, survey_2, survey_3 |
-| 24 | Compare `/compare` 8-Slide Synced Compare & Generate CTA | All 8 `ALL_SLIDE_TYPES` synced, unified topic, parameter matrix, per-column「用此风格生成 PPT」CTA, public-only pool | M5 | survey_2, survey_3 |
-| 25 | Create `/create` New Style + 8-Slide Preview + 15 Archetypes/11 Motifs + Visibility | Visual builder with 8 preview tabs, all 15 archetypes & 11 motifs, prominent Public (default) vs Private visibility toggle | M5 | survey_2, survey_3 |
-| 26 | Create `/create?fork=[slug]` Remix Mode with Provenance | Prefill visualSpec/anatomy/tags from source style, attribution banner, persist `remixedFromId` via `POST /api/prompts` | M1, M5 | survey_1, survey_2, survey_3 |
-| 27 | Create `/create?edit=[slug]` Author Edit Mode | Load author's own style (incl. private), verify ownership, save via `PUT /api/prompts/[id]` | M1, M5 | survey_1, survey_2, survey_3 |
-| 28 | Personal Space `/collections` 4-Tab Workspace | 4 tabs (`已收藏风格`, `我保存的 PPT 文稿` [edit/toggle-share/copy-link/pptx/delete], `我发布的风格` [`scope=mine` + All/Public/Private filter + Edit/Delete], `我点赞的`) | M5 | survey_2, survey_3 |
-| 29 | Personal Space `/collections` Edit User Profile Modal | Modal updating `displayName`, `bio`, `avatarColor` via `PATCH /api/auth/profile` & refreshing `AppContext` | M5 | survey_2, survey_3 |
-| 30 | Guest Local Favorites Auto-Sync to Cloud on Login | `AppContext` auto-syncs `localFavoriteIds` via `POST /api/prompts/sync-favorites` (visibility-guarded), clears `localStorage`, increments `syncVersion`, shows toast; fixes React 19 `toggleLocalFavorite` bug | M1, M2 | survey_1, survey_2, survey_3 |
-| 31 | Creator Profile `/creator/[username]` Public Portfolio & Impact Card | Public avatar, bio, 4 public-only impact stats, public portfolio grid, owner-only private drafts link (`privateCount`) | M1, M5 | survey_1, survey_2, survey_3 |
-| 32 | Upgraded Navbar, AuthModal & CompareDock | 4 primary nav links (`视觉画廊`, `在线生成 PPT`, `并排对比`, `我的空间`) + `+ 发布风格` + user menu linking to `/collections` & `/creator/[username]` | M2 | survey_2, survey_3 |
-| 33 | Complete REST API Surface & 22 Security Invariants (S1–S22) | All 16+ API routes enforcing visibility, ownership (`401`/`403`/`404`), author access on private comments/copy, private remix origin guard, deck `403` & `PATCH`/`PUT` | M1 | survey_1, survey_3 |
-| 34 | Pure Vanilla CSS Editorial Design System & Responsive Layout | Zero TailwindCSS, warm archival paper aesthetic, no gradient text / neon borders / grid bg, responsive desktop & mobile | M2, M3, M4, M5, M6 | survey_2, survey_3 |
-| 35 | E2E Suite (Tiers 1–4), Tier 5 Hardening, Port 3000 Live Server & `walkthrough.md` | Full `tsc`/`lint`/`build`, API `curl`+`jq`, Python Playwright E2E (0 console/page errors, `.pptx` `PK\x03\x04` >30KB), live `:3000` server, screenshots + `walkthrough.md` | E2E Track, M6 | survey_3 |
+| F1 | Glacier Design Tokens (`src/styles/glacier-tokens.css`) | All 17 Glacier colors, 2 gradients, 3 shadows, 5 radii, 4px grid, `:focus-visible`, `prefers-reduced-motion`, `--border-subtle` fix, `--ease-apple` preservation (100% Vanilla CSS, zero Tailwind) | M1 | survey_1, survey_2, survey_3 |
+| F2 | Typography & Lucide Icon System | Plus Jakarta Sans + Noto Sans SC + JetBrains Mono on UI; preserve all 5 `next/font` vars on `<html>` for `SlideCanvas`; serif templates-only; Lucide 1.75–2px icons, zero functional emojis | M1 | survey_1, survey_2 |
+| F3 | `public/brand/` Glacier SVG Assets | Lightweight low-contrast `glacier-hero-peaks.svg` (top-right hero bands only, `pointer-events: none`, never covering text) & `pptgod-logo.svg` ice-blue `P` mark | M1 | survey_1, survey_2 |
+| F4 | Scoped `backdrop-filter` Performance Policy | `@supports (backdrop-filter: blur(12px))` strictly on Topbar, modals/drawers/popovers & hero panels; solid `#FFFFFF` + `content-visibility: auto` on dense card grids | M1 | survey_1, survey_2, survey_3 |
+| F5 | `AppShell` + `Topbar` (`64px`) + `LayoutContext` | Sticky 64px frosted topbar with brand, synced nav active pill, global search → `/gallery?q=`, user/login (`#pg-nav-login-btn`/`#pg-nav-logout-btn`), NO fake notification bell; contrast verified over light & dark slides | M1 | survey_1, survey_2, survey_3 |
+| F6 | Collapsible `Sidebar` (`220px ↔ 64px`) + `MobileNavDrawer` | Desktop collapsible rail w/ tooltips, auto-collapsible in Editor, `<1024px`/`<768px` drawer w/ focus trap & Esc close; NO fake Pro card or feedback form; all nav links route to real workflows | M1 | survey_1, survey_2 |
+| F7 | `GlacierPanel` & Button Suite | `GlacierPanel` (`default`/`solid`/`floating`), `Button` (`primary` gradient / `secondary` / `ghost` / `danger`), `IconButton` (mandatory `aria-label` + tooltip); full 8-state coverage | M1 | survey_1, survey_2 |
+| F8 | Glacier Form Controls & Navigation Primitives | `TextInput`, `Textarea`, `Select`, `Tabs` (`role="tablist"` + arrow nav), `FilterChip` (`aria-pressed`), explicit `<label>` & `aria-invalid`/`aria-describedby` | M1 | survey_1, survey_2 |
+| F9 | `UploadDropzone` (Real 10MB / 5-Format Validation) | Drag/drop + click enforcing real `.pdf/.docx/.pptx/.md/.txt` & `≤10MB`, per-file parse status/remove/error without losing typed draft, shared anti-double-submit lock | M1 | survey_1, survey_2, survey_3 |
+| F10 | Overlay, Feedback & Progress Primitives + Glacier `AuthModal`/`CompareDock`/`not-found` | `Dialog`, `Drawer` (focus trap + Esc + focus restore), `Toast` (`aria-live`), `EmptyState`, `Skeleton` (CLS-safe), `Stepper`, `Progress` (no fake `%`), restyled `AuthModal` (keeping `#pg-demo-login-btn`) & `CompareDock` | M1 | survey_1, survey_2, survey_3 |
+| F11 | `SlidePreviewFrame` (`SlideCanvas` Isolation) | Fixed 16:9 wrapper around unchanged `SlideCanvas`, external selection/chrome borders, optional honest `示例预览` badge, loading/error fallback | M1 | survey_1, survey_2 |
+| F12 | `/` Dashboard Hero Band | H1 `"你好，开始用 AI 创作你的演示文稿吧"` (ONLY `AI 创作` in `#2563EB`), subtitle, top-right glacier SVG, backward-compat server redirect to `/gallery?...` when legacy filter params present | M1 | survey_1, survey_2 |
+| F13 | `/` Dashboard Row 1 (`8:4`): AI Creation 3-Tab + Upload Panel | `AI 生成`/`资料转 PPT`/`从模板新建` tabs, topic textarea, slideCount (5–20), audience, language (scoped honestly), advanced settings, single primary gradient CTA; right `UploadDropzone` wired to `/api/parse-document` sharing submit lock | M1 | survey_1, survey_2, survey_3 |
+| F14 | `/` Dashboard Row 2 (`9:3`): Same-Content 3-Style Live Compare + `2×3` Recommended Styles | 3 real 16:9 `SlideCanvas` cards (`01 商务专业`/`02 清新学术`/`03 创意科技`) synced to identical topic w/ radio select & `更多对比 →` (`/compare`); 2×3 mini real templates & `更多风格 →` (`/gallery`) | M1 | survey_1, survey_2 |
+| F15 | `/` Dashboard Row 3 (`4:8`): Real Recent Projects + 4 Quick Tools | Up to 3 real `/api/decks` items (+ local unsaved draft fallback) or honest empty CTA when 0/guest; 4 working Quick Tool cards (`进入创作工坊`, `设计体检`, `演讲排练` labeled honestly as `演播提词与倒计时排练`, `提示词工作室`) | M1 | survey_1, survey_2, survey_3 |
+| F16 | `/gallery` Dedicated Route & Glacier Hero + SEO | New `src/app/gallery/page.tsx` loading 36+ DB styles server-side, Glacier hero + mountain SVG; add `/gallery` & `/tools` to `robots.ts` & `sitemap.ts` | M2 | survey_1, survey_2 |
+| F17 | `/gallery` Dynamic Category Capsules, Multi-Facet Filters & URL Sync | Live-computed domain counts (`#pg-domain-tabs`, `#pg-domain-tab-*`), Scenario/Style/Color/Tool selects, search (`#pg-gallery-search`), sort (`popular`/`newest`/`copies`), bidirectional URL query sync, zero-result `清除筛选`, `StyleMatcherModal` (`#pg-open-matcher-btn`) & `DocIntakeWorkbench` | M2 | survey_1, survey_2, survey_3 |
+| F18 | `/gallery` 4-Col `StyleCard` Grid + Selection + Favorites + Quick Actions | 4/3/2/1 responsive grid (`content-visibility: auto`, no blur on cards), 16:9 `SlideCanvas` (`article[data-prompt-slug]`), `2px solid #2563EB` selected border + check badge, DB/guest favorites, `预览`/`使用风格`/`复制提示词`/`加入对比` | M2 | survey_1, survey_2, survey_3 |
+| F19 | `/gallery` Style Detail `Drawer` | Multi-slide-type 16:9 `SlideCanvas` switcher (all 12 types), palette hex swatches, typography/archetype metadata, `使用此风格`, `加入对比`, `提示词工作室`, `复制提示词` | M2 | survey_1, survey_2 |
+| F20 | `/generate` Creation Workshop: 4-Step Vertical `Stepper` & `useDeckWorkshop` Hook | Extract `/generate` state/undo/draft/handoff/API logic into `src/hooks/useDeckWorkshop.ts`; 4-step left rail (`内容与资料` → `选择风格` → `AI 生成` → `预览与优化`); preserve `?style=`, `?topic=`, `?deck=`, `?handoff=1`, `?intake=1`, `?mode=create\|editor`, `?panel=audit` | M2 | survey_1, survey_2, survey_3 |
+| F21 | `/generate` Workshop: `60:40` Input/Upload + Live `示例预览` | Topic textarea + char count + quick sample chips + 10MB/5-ext `UploadDropzone` + per-file parsed status cards (sequential `/api/parse-document`, 6-type triage); right 16:9 `SlideCanvas` w/ mandatory `示例预览` badge + 4–5 page thumbnails + fullscreen preview | M2 | survey_1, survey_2, survey_3 |
+| F22 | `/generate` Workshop: Bottom Style Strip & Fixed Params Bar | Domain-filtered real style cards w/ 2px blue selected border; fixed params bar (`页数 5–20`, honest locked `16:9`, scoped language, `高级设置` for Smart vs BYOK / audience / evidenceDensity / `beautify-1to1`, `先看大纲` & `开始生成`) | M2 | survey_1, survey_2, survey_3 |
+| F23 | `/generate` Workshop: Editable Outline Confirmation & Honest Progress / Retry | Glacier-restyled `OutlineDraftPanel` (titles, summaries, 12 slide types, reorder, add/delete, sourceStatus badges); real stage progress without fake `%`; failure retry preserves all inputs | M2 | survey_1, survey_2, survey_3 |
+| F24 | `/collections` My Projects Hero, Honest Filter Rail & Real Stat Cards | Glacier hero + mountain SVG; integrated honest left filter rail (`全部项目`, `最近编辑`, `我收藏的风格`, `公开分享`, `我发布的风格`, `我点赞的` — ZERO fake shared/trash/Pro/custom folders); real computed KPI cards + `+ 新建演示文稿` | M2 | survey_1, survey_2, survey_3 |
+| F25 | `/collections` Search, Filter, Sort, Grid/List View & 4-Col `ProjectCard` CRUD | Search, visibility filter, sort, Grid/List toggle; 16:9 `SlideCanvas` cover, 2-line title, honest `公开`/`私有` badge, overflow actions: Open (`/generate?deck=`), Present (`/deck/[id]`), Rename (`PUT /api/decks/[id]`), Duplicate (`POST /api/decks` w/o `id`), Visibility (`PATCH`), Export PPTX, Delete w/ confirm `Dialog` (`DELETE`) | M2 | survey_1, survey_2, survey_3 |
+| F26 | `/collections` Honest Empty States & Preserved Community Space | Distinct guest vs 0-deck vs 0-match empty states; preserves Favorites, Published Styles (All/Public/Private + Edit/Delete), Liked Styles, and Profile Edit modal (`PATCH /api/auth/profile`) | M2 | survey_1, survey_2, survey_3 |
+| F27 | `/generate` Editor: Full-Bleed Mode & Dedicated Editor Topbar | Auto-collapsible global sidebar (`LayoutContext.editorFullBleed`); editor topbar w/ back arrow, editable title, honest Save Status (`保存中`/`已保存`/`未保存草稿`/`失败`), Undo/Redo (`#pg-gen-undo-btn`/`#pg-gen-redo-btn`), Save, Present, primary `导出 PPTX`, overflow menu (HTML/Marp/Checklist/Audit/Share) | M3 | survey_1, survey_2, survey_3 |
+| F28 | `/generate` Editor: Left Slide Tree (`210–240px`) + `大纲`/`幻灯片` Toggle | Toggle between compact text outline and numbered 16:9 thumbnails; 2px blue active ring; drag/button reorder, duplicate, delete (min-1 guard + undoable); sticky `+ 新建幻灯片` | M3 | survey_1, survey_2, survey_3 |
+| F29 | `/generate` Editor: Center 16:9 Stage + Honest Real-Capability Toolbar + Pager/Zoom | `#E7F1FB` backdrop, white-framed 16:9 `SlideCanvas`, real-capability toolbar (`16:9`, `换版式不动字`, `配图管理`, `数据与内容`, `品牌主题`, `设计体检 [XX分]` — ZERO fake 形状/表格/动画/切换); bottom pager, fullscreen, CSS scale zoom (`50%–150%`/Fit) | M3 | survey_1, survey_2, survey_3 |
+| F30 | `/generate` Editor: Bottom Collapsible Speaker Notes + Real `AI 讲稿生成` | Live char count, undoable textarea, `AI 讲稿生成` button wired to `POST /api/polish` (`action: "notes"`) | M3 | survey_1, survey_2, survey_3 |
+| F31 | `/generate` Editor: Right Properties Panel (`300–340px`, 2 Real Tabs) | `本页编辑` (`SlidePropertyInspector`: 12-layout `仅换版式不动字`, structured fields, `ImageSlotManager`, source status) + `页面与主题` (`DeckSpecTweaker`: theme swap, palette, WCAG contrast badge + autofix, radius, `brandFooter`); drawerized `<1024px`; NO fake `动画`/`切换` tabs | M3 | survey_1, survey_2, survey_3 |
+| F32 | `/generate` Editor: Right `AI 助手` Wired to `/api/polish` | 3 real actions (`高管精炼 executive`, `补充量化标尺 metrics`, `优化演讲稿 notes`) + before/after preview card w/ explicit `确认应用` (commits to Undo stack) & `放弃`; honest Smart vs BYOK guidance (NO fake freeform chat) | M3 | survey_1, survey_2, survey_3 |
+| F33 | Design Audit (`设计体检`) Glacier UI & Real Entry Points | Sidebar `设计体检` & Dashboard Quick Tool open real `/generate?panel=audit` (`DeckAuditDrawer` w/ `deckLinter.ts` 100-pt score, 4 real categories, jump-to-slide, contrast/notes autofix) and `/tools?tab=pptx-inspect` | M3 | survey_1, survey_2, survey_3 |
+| F34 | Rehearsal Cockpit (`/deck/[id]`) Glacier Restyle & Honest Entry | Glacier-harmonized theater & split Rehearsal Cockpit (`?rehearsal=1` auto-open), current + next slide, teleprompter A+/A-, 5 timer presets + overtime alert, keyboard/touch nav; ZERO fake voice/WPM/pause analysis; sidebar/dashboard `演讲排练` routes to real deck rehearsal or `/tools?tab=pacing` launcher | M3 | survey_1, survey_2, survey_3 |
+| F35 | Style Comparator (`/compare`) Glacier Restyle | Top-aligned 2–3 col same-content `SlideCanvas` comparison synced across 12 slide types, palette/font specs, add/replace/remove, mobile single-canvas switcher, honest `示例` label, preserved `#pg-compare-*` IDs | M3 | survey_1, survey_2, survey_3 |
+| F36 | Prompt Studio (`/studio` + `/studio/[slug]`) Glacier Restyle | Add `/studio/page.tsx` redirect to top style; Glacier 2-col workbench with 12-slide filmstrip, 5-dim anatomy, live tweaker, 6-tool `promptCompiler.ts` + 6/12-slide batch, copy/sample exports/remix/edit/comments, preserved `#pg-*` IDs | M3 | survey_1, survey_2, survey_3 |
+| F37 | Secondary Pages (`/create`, `/tools`, `/creator/[username]`) Glacier Restyle | Full Glacier upgrade preserving Image-to-Style palette extractor + WCAG autofix + `.pptgod.json` + visibility radio (`/create`), 4-tab toolbox w/ `?tab=` & saved-deck rehearsal launcher (`/tools`), public creator portfolio & impact cards (`/creator/[username]`) | M3 | survey_1, survey_2, survey_3 |
+| F38 | Glacier `SettingsModal` & `HelpModal` | Wired from Sidebar footer: Settings = real profile edit (`PATCH /api/auth/profile`) + browser-local BYOK defaults (never written to SQLite, S22 preserved); Help = searchable FAQ (10MB/5-ext, Smart vs BYOK, exports, keyboard shortcuts) | M3 | survey_1, survey_2, survey_3 |
+| F39 | 5-Breakpoint Responsive Verification (`390/768/1024/1440/1920px`) | Zero unintended horizontal scroll, dedicated responsive grids, drawerized editor inspector `<1024px`, full-width mobile CTAs, ≥44px touch targets across all routes | M4, E2E | survey_1, survey_3 |
+| F40 | WCAG 2.2 AA & Full Keyboard Operability | ≥4.5:1 text / ≥3:1 non-text contrast (incl. frosted Topbar over light & dark templates), visible `:focus-visible`, logical Tab order, modal/drawer focus trap + Esc + focus restore, non-color-only state cues | M4, E2E | survey_1, survey_3 |
+| F41 | Core Web Vitals, Zero Console Errors, Clean SQLite WAL & Full E2E Regression + Tier-5 Hardening | Production-measured LCP ≤2.5s, INP ≤200ms, CLS ≤0.1, 0 console/page errors; 100% pass on migrated 109+ legacy E2E suite (`tests/e2e/run_e2e.py`) + new Glacier UI 2.0 4-Tier E2E suite (`TEST_READY.md`) + Tier-5 adversarial hardening on port `3010` (`--backup-db`, 0 residual `[E2E%` rows) | M4, E2E | survey_1, survey_3 |
+
+---
+
+## Honest Boundary Rules (`B1–B16`, ZERO-TOLERANCE)
+
+All agents MUST strictly enforce these verified boundaries (see `.agents/teamwork/spec_miner_survey_1/spec_inventory.md §4` and `.agents/teamwork/explorer_survey_3/handoff.md §1.4`):
+- **OMIT COMPLETELY**: `PPTGod Pro` billing/upgrade card (`B1`), topbar notification bell & unread dot (`B2`), fake `意见反馈` submission form (`B3`), `与我共享`/`协作项目`/`协作中` badges (`B4`), `回收站` trash bin (`B5`), custom `项目分组 +` folder creation (`B6`), fake `%` generation progress (`B10`), unimplemented freeform Editor `形状`/`表格`/`动画`/`切换` tools & tabs (`B12`), fake mic/voice/WPM analysis (`B14`), image OCR claims in document dropzone (`B8`).
+- **WIRE HONESTLY TO REAL DATA/APIS**: Replace `与我共享` with real `公开分享` (`isPublic`) (`B4`), compute all counts/KPIs/recent projects live from DB with honest empty states (`B7`, `B16`), enforce real `10 MB` & 5 extensions (`.pdf/.docx/.pptx/.md/.txt`) (`B8`), show mandatory `示例预览` badge before generation (`B9`), lock aspect display honestly to `16:9 (宽屏)` (`B11`), wire Editor `AI 助手` to real `POST /api/polish` (`executive`/`metrics`/`notes`) with preview + confirm (`B13`), relabel Quick Tool #3 to `演播提词与倒计时排练` (`B14`), wire Projects Rename via `PUT /api/decks/[id]` and Duplicate via `POST /api/decks` omitting `id`, and scope `language` honestly to Prompt Studio / BYOK LLM (`B15`).
 
 ---
 
@@ -71,152 +113,103 @@ Every feature from Step 0 Survey (`explorer_survey_1`, `explorer_survey_2`, `spe
 
 | # | Name | Track | Scope | Dependencies | Status | Sub-Orch Conv ID |
 |---|------|-------|-------|--------------|--------|------------------|
-| E2E | E2E Testing Track | E2E Testing | Design `TEST_INFRA.md`, build opaque-box Tiers 1–4 suite (`tests/e2e/**`), publish `TEST_READY.md` | none | IN_PROGRESS | bcaa84233f35b7a861c699195b347e1d |
-| M1 | Backend Data Model, Migrations & REST APIs | Implementation | `src/types/prompt.ts`, `src/lib/*`, `src/app/api/**` + all 22 security invariants S1–S22 | none | IN_PROGRESS | 0fb4d1fe96e318ebdf9d05b8d872134b |
-| M2 | Visual Engine v2 & Shared App Shell | Implementation | `SlideCanvas.tsx` (8 types + `slideData` + archetypes/motifs), `AppContext`, `Navbar`, `layout`, `PromptCard`, base `globals.css` | M1 | PLANNED | — |
-| M3 | Gallery Smart Matcher & Prompt Studio v2 | Implementation | `StyleMatcherModal.tsx`, `GalleryClient.tsx`, `/studio/[slug]`, `StudioClient.tsx`, `src/styles/{matcher,studio-v2}.css` | M1, M2 | PLANNED | — |
-| M4 | Online PPT Generation Workshop (`/generate`) | Implementation | `/generate/page.tsx`, `GenerateClient.tsx`, `src/styles/generate.css` | M1, M2 | PLANNED | — |
-| M5 | Community Pages (Create/Compare/Collections/Creator) | Implementation | `/create`, `/compare`, `/collections`, `/creator/[username]`, `src/styles/community.css` | M1, M2 | PLANNED | — |
-| M6 | Final Milestone (Tiers 1–4 E2E + Tier 5 Hardening + Server + Walkthrough) | Implementation | Phase 1: Tiers 1–4 pass; Phase 2: Tier 5 adversarial hardening; live `:3000` server; `walkthrough.md` with screenshots | M1–M5, E2E (`TEST_READY.md`) | PLANNED | — |
+| E2E | Glacier UI 2.0 E2E Testing Track | E2E Testing | Update `TEST_INFRA.md`, build standalone Python Playwright Glacier UI 2.0 68-case suite (`tests/e2e/glacier_v2/**`), fix `verify_html` typo & headless Chromium stability | none | DONE (68/68 PASS) | c143ae9bd04c33660354fd457590aeba |
+| M1 | Phase 1: Glacier Design System, Brand Assets, Global AppShell, UI Kit & `/` Dashboard | Implementation | Features `F1–F15`; M1a (Tokens/Brand/Shell/UI Kit/Auth/CompareDock, `2c0fcb8`) → M1b (`/` Dashboard, `d6ff232`) | none | DONE | 5ce5ae67b41f26bb5109ee4adf21d52e |
+| M2 | Phase 2: `/gallery` Style Gallery, `/generate` Creation Workshop & `/collections` My Projects | Implementation | Features `F16–F26`; M2a (`/gallery`, `13d71c4`) → M2c (`/collections`, `ddef671`) → M2b (`/generate` Workshop, `0abfeb0`) | M1 | DONE | — |
+| M3 | Phase 3: `/generate` Presentation Editor & All Secondary Pages | Implementation | Features `F27–F38`; M3a (`/generate` Editor + `AI 助手` + `设计体检`, `0abfeb0`) → M3b/M3c (`/compare`, `/studio`, `/deck/[id]`, `/create`, `/tools`, `/creator/[username]`, Settings/Help, `93ffb29`) | M1, M2 | DONE | — |
+| M4 | Phase 4 (Final Milestone): 5-Breakpoint Responsive/A11y/Perf & 68/68 Glacier E2E Verification | Implementation | Features `F39–F41`; 5-breakpoint verification (`0px` overflow, LCP `420–1080ms`, CLS `≤0.0003`), `tsc`/`lint`/`build` 0 errors, Glacier E2E **68/68 PASS** + `[DB HYGIENE PASS]` (`sessions_delta=0`), README updated | M1–M3, E2E | DONE | — |
 
 ---
 
 ## Interface Contracts
 
-### 1. Domain Types (`src/types/prompt.ts`)
-```ts
-export interface RemixOrigin {
-  id: string;
-  slug: string;
-  title: string;
-  authorUsername?: string;
-  authorDisplayName?: string;
-}
+### 1. Frozen Backend & Core Engine Contracts (DO NOT MODIFY)
+- `src/app/api/**` (22 route handlers + `_validation.ts`), `src/lib/**` (17 modules), `src/types/prompt.ts`, `src/components/SlideCanvas.tsx`, `src/components/slide-canvas/**`, `src/app/studio/[slug]/opengraph-image.tsx`.
+- Critical API idioms for frontend consumers:
+  - **Rename Deck**: `PUT /api/decks/[id]` sending full deck with updated `title` (`PATCH /api/decks/[id]` ONLY accepts `{ isPublic: boolean }`).
+  - **Duplicate Deck**: `POST /api/decks` omitting `id` (`isPublic: false`).
+  - **AI Polish**: `POST /api/polish` strictly accepts `action ∈ {"executive", "metrics", "notes"}`.
+  - **Document Parse**: `POST /api/parse-document` accepts 1 file/POST (`file` field), `.pdf/.docx/.pptx/.md/.txt`, `≤ 10 MB`.
+  - **Privacy / Security (`S1–S22`)**: Private prompts/decks strictly isolated; BYOK `apiKey` never persisted in SQLite or echoed in responses.
 
-export interface UserStats {
-  published: number;
-  likes: number;
-  favorites: number;
-  decks: number;
-}
-
-// PromptItem MUST include:
-//   isPublic: boolean;
-//   remixedFrom?: RemixOrigin | null;
-//   commentsCount: number;
-
-// SavedDeck MUST include:
-//   isPublic: boolean;
-```
-
-### 2. SQLite Schema & Idempotent Migration (`src/lib/db.ts`)
-- `prompts` table includes `remixed_from_id TEXT DEFAULT NULL` and `is_public INTEGER NOT NULL DEFAULT 1`.
-- `saved_decks` table includes `is_public INTEGER NOT NULL DEFAULT 0`.
-- Post-DDL `PRAGMA table_info(...)` additive `ALTER TABLE` migrations MUST run **BEFORE** `CREATE INDEX IF NOT EXISTS idx_prompts_public ON prompts(is_public);` so live v1 `data/pptgod.db` upgrades without error.
-- `listPrompts(options)` defaults to `p.is_public = 1`. When `includePrivateForAuthorId` is passed, allows `(p.is_public = 1 OR p.author_id = ?)`; optional `visibility?: "all" | "public" | "private"` filters further.
-- `getPromptBySlugOrId(slugOrId, viewerId)` returns `null` if `row.is_public === 0 && row.author_id !== (viewerId ?? "")`.
-- `PROMPT_SELECT_FRAGMENT` joins `LEFT JOIN prompts ro ON ro.id = p.remixed_from_id AND (ro.is_public = 1 OR ro.author_id = ?)` and `LEFT JOIN users rou ON rou.id = ro.author_id` so private remix origins never leak to non-authors.
-- `updatePrompt(id, data, viewerId)` updates editable fields + `is_public` + `updated_at` (preserving `slug`).
-- `getCreatorByUsername(username, viewerId)` returns `{ creator, prompts, impact, privateCount }` where `prompts` & `impact` include ONLY `is_public = 1` prompts and `privateCount` is populated ONLY when `viewerId === creator.id` (else `0`).
-
-### 3. REST API Contracts (`src/app/api/**`)
-| Endpoint | Method | Auth | Request / Query | Success | Errors |
-|---|---|---|---|---|---|
-| `/api/prompts` | `GET` | Optional | `?q=&scenario=&style=&color=&tool=&sort=popular\|newest\|copies&scope=mine\|favorites\|liked` | `200 { prompts }` (`scope=mine` includes own private; `favorites`/`liked` exclude foreign private; default `is_public = 1`) | — |
-| `/api/prompts` | `POST` | Required | `{ title, englishTitle?, summary, scenario, styleCategory, colorFamily, recommendedTools, tags, visualSpec, promptAnatomy, customNotes?, sampleTopic?, sampleSubtitle?, remixedFromId?: string \| null, isPublic?: boolean }` (`isPublic` default `true`) | `201 { prompt }` | `400`, `401`, `500` |
-| `/api/prompts/[id]` | `GET` | Optional | ID or slug | `200 { prompt }` | `404` |
-| `/api/prompts/[id]` | `PUT` | Owner | Full editable fields + `isPublic?: boolean` | `200 { prompt }` | `400`, `401`, `403`, `404`, `500` |
-| `/api/prompts/[id]` | `PATCH` | Owner | `{ isPublic: boolean }` | `200 { prompt }` | `400`, `401`, `403`, `404` |
-| `/api/prompts/[id]` | `DELETE` | Owner | — | `200 { ok: true }` | `401`, `403`, `404` |
-| `/api/prompts/[id]/like` | `POST` | Required | — | `200 { liked, likesCount }` | `401`, `404` |
-| `/api/prompts/[id]/favorite` | `POST` | Required | — | `200 { favorited, savesCount }` | `401`, `404` |
-| `/api/prompts/[id]/copy` | `POST` | Optional | Viewer-aware lookup | `200 { copiesCount }` | `404` |
-| `/api/prompts/[id]/comments` | `GET` | Optional | Viewer-aware lookup | `200 { comments }` | `404` |
-| `/api/prompts/[id]/comments` | `POST` | Required | `{ testedTool, rating (1-5), content (4-500) }` | `201 { comments }` | `400`, `401`, `404` |
-| `/api/prompts/[id]/comments` | `DELETE` | Owner | `?commentId=...` | `200 { comments }` | `400`, `401`, `403`, `404` |
-| `/api/prompts/sync-favorites` | `POST` | Required | `{ promptIds: string[] }` (only `is_public = 1 OR author_id = ?`) | `200 { synced }` | `401`, `500` |
-| `/api/decks` | `GET` | Optional | — | `200 { decks }` (`[]` if unauth) | — |
-| `/api/decks` | `POST` | Required | `{ id?, title, subtitle?, audience?, promptId, promptSlug, promptTitle, visualSpec, slides, isPublic?: boolean }` (default `false`; clones if foreign `id`) | `201`/`200 { deck }` | `400`, `401`, `500` |
-| `/api/decks/[id]` | `GET` | Optional | Enforces `!deck.isPublic && deck.authorId !== viewer?.id => 403` | `200 { deck }` | `403`, `404` |
-| `/api/decks/[id]` | `PATCH` | Owner | `{ isPublic: boolean }` | `200 { deck }` | `400`, `401`, `403`, `404` |
-| `/api/decks/[id]` | `PUT` | Owner | Full deck update + optional `isPublic` | `200 { deck }` | `400`, `401`, `403`, `404` |
-| `/api/decks/[id]` | `DELETE` | Owner | — | `200 { ok: true }` | `401`, `403`, `404` |
-| `/api/generate` | `POST` | None | `{ topic, subtitle?, audience?, sourceText?, scenario?, slideCount (5-8), mode: "smart"\|"llm", apiBase?, apiKey?, model? }` | `200 { slides, engine }` | `400`, `502`, `500` |
-| `/api/export/pptx` | `POST` | None | `{ title?, subtitle?, audience?, styleName?, visualSpec, slides }` | `200` binary `.pptx` (`PK\x03\x04`) | `400`, `500` |
-| `/api/auth/{login,register,logout,me,profile}` | Various | Per route | `PATCH /profile`: `{ displayName?, bio?, avatarColor? }` | `{ user, stats }` | `400`, `401`, `409` |
-| `/api/creators/[username]` | `GET` | Optional | Path `username` | `200 { creator, prompts, impact, privateCount }` | `404` |
-
-### 4. Security & Privacy Invariants (S1–S22)
-All 22 security invariants defined in `.agents/teamwork/spec_miner_survey_3/handoff.md §4.3.B` are binding across both API and SSR layers:
-- Private prompts (`prompts.is_public = 0`): excluded from public list, compare, creator public gallery/impact, foreign favorites/likes, and foreign sync-favorites; `404` on foreign `GET /api/prompts/[id]`, `/studio/[slug]`, comments, copy; `200` for author on `scope=mine`, Studio, comments, copy, edit; `403`/`404` for non-author `PUT`/`PATCH`/`DELETE`; hidden if remix origin turns private.
-- Private decks (`saved_decks.is_public = 0`, default on create): **`403`** on foreign/anonymous `GET /api/decks/[id]`, `PATCH`, `PUT`, `DELETE`; `200` for author; `200` for all when `is_public = 1` (foreign save creates a non-destructive clone).
-- BYOK LLM `apiKey`: forwarded only to `${apiBase}/chat/completions`, NEVER persisted to DB, NEVER returned in responses, NEVER logged.
-
-### 5. Frontend Shared Component Contracts (`M2 ↔ M3/M4/M5`)
-- `SlideCanvas` props:
+### 2. Shared Frontend Context Contracts (`M1 ↔ M2/M3`)
+- **`AppContext` (`src/context/AppContext.tsx`)**: Freeze ALL existing exported properties (`user`, `stats`, `authLoading`, `syncVersion`, `refreshAuth`, `setAuthData`, `logout`, `authModalOpen`, `authModalTab`, `openAuthModal`, `closeAuthModal`, `compareIds`, `toggleCompare`, `replaceCompareIds`, `removeCompare`, `clearCompare`, `localFavoriteIds`, `toggleLocalFavorite`, `globalTopic`, `setGlobalTopic`, `toast`, `showToast`).
+- **`LayoutContext` (`src/context/LayoutContext.tsx`, NEW in M1)**:
   ```ts
-  export interface SlideCanvasProps {
-    spec: VisualSpec;
-    slideType: SlideType;
-    topic: string;
-    subtitle: string;
-    audience?: string;
-    slideCount?: number;
-    englishTitle?: string;
-    scenario?: string;
-    highlightDimension?: AnatomyDimension | null;
-    slideData?: Partial<DeckSlideItem>;
-    pageIndex?: number;
-    totalPages?: number;
-    className?: string;
+  export interface LayoutContextValue {
+    sidebarCollapsed: boolean;
+    setSidebarCollapsed: (collapsed: boolean) => void;
+    toggleSidebar: () => void;
+    mobileDrawerOpen: boolean;
+    setMobileDrawerOpen: (open: boolean) => void;
+    editorFullBleed: boolean;
+    setEditorFullBleed: (enabled: boolean) => void;
+    settingsModalOpen: boolean;
+    openSettingsModal: () => void;
+    closeSettingsModal: () => void;
+    helpModalOpen: boolean;
+    openHelpModal: () => void;
+    closeHelpModal: () => void;
   }
   ```
-- `AppContext` (`useApp()`) exports: existing properties PLUS `stats: UserStats | null` (including `decks: number`) and `syncVersion: number` (incremented after guest `localFavoriteIds` auto-sync completes on login).
-- `PromptCard` props: existing properties (`prompt`, `liveTopic?`, `onUpdatePrompt?`, `onDeletePrompt?`, `showDelete?`) PLUS `showEdit?: boolean` (renders Edit link `/create?edit=[slug]` when `true`).
+- **Stylesheet Import Order in `src/app/layout.tsx`**:
+  1. `import "@/styles/glacier-tokens.css";`
+  2. `import "@/styles/glacier-layout.css";`
+  3. `import "@/styles/glacier-ui.css";`
+  4. `import "./globals.css";`
+- **Z-Index Ladder**: `0` decorative peaks → `20` share topbar → `30` Sidebar → `40` Topbar → `50` CompareDock → `55` MobileDrawerBackdrop → `60` MobileNavDrawer → `80` Dialog/Drawer/AuthModal → `90` FullscreenPresenter → `100` Toast.
+- **Stable DOM Hooks to Preserve (E2E Compatibility)**:
+  - Auth/Nav: `#pg-nav-login-btn`, `#pg-nav-logout-btn`, `#pg-nav-create-btn`, `#pg-demo-login-btn`.
+  - Gallery (`/gallery`): `#pg-domain-tabs`, `#pg-domain-tab-*`, `#pg-gallery-search`, `#pg-global-topic-input`, `#pg-reset-filters-btn`, `#pg-open-matcher-btn`, `#pg-style-matcher-modal`, `#pg-toggle-adv-filters`, `#pg-adv-filter-drawer`, `#pg-hero-doc-input`, `#pg-open-doc-intake-btn`, `#pg-doc-intake-modal`, `article[data-prompt-slug]`, `.pg-card`.
+  - Workshop & Editor (`/generate`): `#pg-doc-upload-input`, `#pg-doc-upload-badge`, `#pg-gen-topic`, `#pg-gen-style-select`, `#pg-gen-outline-btn`, `#pg-gen-run-btn`, `#pg-outline-editor`, `.pg-outline-row`, `#pg-outline-add-btn`, `#pg-outline-confirm-btn`, `#pg-gen-undo-btn`, `#pg-gen-redo-btn`, `#pg-slide-type-select`, `[data-layout-chip="..."]`, `#pg-edit-slide-title`, `#pg-edit-source-status`, `#pg-edit-source-note`, `#pg-polish-executive-btn`, `#pg-deck-tweaker-toggle`, `#pg-deck-tweaker-panel`, `#pg-deck-bg-input`, `#pg-deck-footer-input`, `#pg-deck-audit-toggle`, `#pg-deck-audit-panel`, `#pg-deck-audit-score`, `#pg-audit-autofix-contrast-btn`, `#pg-audit-autofix-notes-btn`, `#pg-gen-export-html-btn`, `#pg-gen-export-md-btn`, `#pg-export-prompt-modal`, `#pg-export-tab-*`, `#pg-draft-restore-banner`, `#pg-draft-restore-btn`, `#pg-handoff-badge`, `.pg-slide-outer`, `.pg-slide-stage`.
+  - Studio/Compare/Create/Deck/Tools: `#pg-compiled-prompt-output`, `#pg-tool-tab-*`, `#pg-studio-*`, `#pg-param-topic`, `#pg-param-audience`, `#pg-compare-*`, `#create-*`, `#pg-extract-image-input`, `#pg-wcag-*`, `#pg-deck-share-stage`, `#pg-share-*`, `#pg-rehearsal-*`, `#pg-teleprompter-font-inc`, `#pg-pace-*`, `#pg-tools-*`.
 
 ---
 
 ## Code Layout & Exclusive File Ownership
 
-No two concurrent milestones may ever write to the same file:
-
-- **M1 (`sub_orch_m1_backend`)**:
-  - `src/types/prompt.ts`
-  - `src/lib/db.ts`, `src/lib/seedData.ts`, `src/lib/promptCompiler.ts`, `src/lib/deckGenerator.ts`, `src/lib/htmlExporter.ts`, `src/lib/auth.ts`, `src/lib/password.ts`
-  - `src/app/api/**`
-- **M2 (`sub_orch_m2_canvas_shell`)**:
-  - `src/components/SlideCanvas.tsx`
-  - `src/context/AppContext.tsx`
-  - `src/components/Navbar.tsx`
-  - `src/app/layout.tsx`
-  - `src/components/PromptCard.tsx`
-  - `src/app/globals.css`
-- **M3 (`sub_orch_m3_gallery_studio`)**:
-  - `src/components/StyleMatcherModal.tsx` *(NEW)*
-  - `src/components/GalleryClient.tsx`
-  - `src/app/studio/[slug]/page.tsx`
-  - `src/components/StudioClient.tsx`
-  - `src/styles/matcher.css` *(NEW)*, `src/styles/studio-v2.css` *(NEW)*
-- **M4 (`sub_orch_m4_generate`)**:
-  - `src/app/generate/page.tsx` *(NEW)*
-  - `src/components/GenerateClient.tsx` *(NEW)*
-  - `src/styles/generate.css` *(NEW)*
-- **M5 (`sub_orch_m5_community`)**:
-  - `src/app/create/page.tsx`, `src/components/CreateClient.tsx`
-  - `src/app/compare/page.tsx`, `src/components/CompareClient.tsx`
-  - `src/app/collections/page.tsx`, `src/components/CollectionsClient.tsx`
-  - `src/app/creator/[username]/page.tsx` *(NEW)*, `src/components/CreatorProfileClient.tsx` *(NEW)*
-  - `src/styles/community.css` *(NEW)*
 - **E2E Testing Track (`sub_orch_e2e_track`)**:
-  - `TEST_INFRA.md`, `TEST_READY.md`, `tests/e2e/**`
-- **M6 (`sub_orch_m6_final`)**:
-  - Runs sequentially after M1–M5 + E2E Track complete; authorized to fix any cross-cutting integration bugs, add Tier 5 adversarial tests under `tests/e2e/`, run production build & live `:3000` server, and write `/home/antigravity/.gemini/jetski/brain/v1/default/jetski_remote_agents_3p_devbox/d4652d5e-bd2b-44e6-9b6d-5ebd3aabd750/walkthrough.md`.
+  - `TEST_INFRA.md`, `TEST_READY.md`, `tests/e2e/glacier_v2/**` (DOES NOT touch `tests/e2e/tier1..tier10.py`, `helpers.py`, `config.py`, `run_e2e.py`, or `src/**` during M1–M3).
+- **M1 (`sub_orch_m1_phase1`)**:
+  - `public/brand/**`
+  - `src/styles/glacier-tokens.css`, `src/styles/glacier-layout.css`, `src/styles/glacier-ui.css`, `src/styles/dashboard.css`, `src/app/globals.css` (token bridge + body wash + `:focus-visible` + dark pill fix)
+  - `src/context/LayoutContext.tsx`
+  - `src/components/layout/{AppShell,Topbar,Sidebar,MobileNavDrawer,PageHeader}.tsx`
+  - `src/components/ui/**`
+  - `src/components/presentation/SlidePreviewFrame.tsx`
+  - `src/components/dashboard/**`
+  - `src/components/AuthModal.tsx`, `src/components/CompareDock.tsx`
+  - `src/app/layout.tsx`, `src/app/page.tsx`, `src/app/not-found.tsx`
+- **M2 (`sub_orch_m2_phase2`)**:
+  - `src/app/gallery/page.tsx`, `src/app/robots.ts`, `src/app/sitemap.ts`
+  - `src/components/GalleryClient.tsx`, `src/components/PromptCard.tsx`, `src/components/StyleMatcherModal.tsx`, `src/components/DocIntakeWorkbench.tsx`, `src/components/presentation/{StyleCard,StyleDetailDrawer}.tsx`
+  - `src/styles/gallery.css`, `src/styles/matcher.css`, `src/styles/doc-intake.css`
+  - `src/hooks/useDeckWorkshop.ts`, `src/app/generate/page.tsx`, `src/components/GenerateClient.tsx`, `src/components/generate/{WorkshopWizard,OutlineDraftPanel}.tsx`, `src/styles/generate.css` (wizard sections)
+  - `src/app/collections/page.tsx`, `src/components/CollectionsClient.tsx`, `src/components/projects/**`, `src/styles/projects.css`
+- **M3 (`sub_orch_m3_phase3`)**:
+  - `src/components/generate/{DeckEditorWorkspace,EditorAiAssistant,SlideTreeSidebar,SlidePropertyInspector,ImageSlotManager,DeckSpecTweaker,DeckAuditDrawer,ExportPromptModal}.tsx`, `src/styles/generate.css` (editor sections), `src/components/GenerateClient.tsx` (editor mode integration)
+  - `src/app/compare/page.tsx`, `src/components/CompareClient.tsx`, `src/styles/compare.css`
+  - `src/app/studio/page.tsx`, `src/app/studio/[slug]/page.tsx`, `src/components/StudioClient.tsx`, `src/styles/studio-v2.css`
+  - `src/app/deck/[id]/page.tsx`, `src/components/DeckShareClient.tsx`, `src/styles/deck-share.css`
+  - `src/app/create/page.tsx`, `src/components/CreateClient.tsx`
+  - `src/app/tools/page.tsx`, `src/components/ToolsClient.tsx`, `src/styles/tools.css`
+  - `src/app/creator/[username]/page.tsx`, `src/components/CreatorProfileClient.tsx`, `src/styles/community.css`
+  - `src/components/layout/{SettingsModal,HelpModal}.tsx`, `src/components/layout/AppShell.tsx` (mount Settings/Help modals)
+- **M4 (`sub_orch_m4_final`)**:
+  - Migrates legacy `tests/e2e/{config,helpers,run_e2e,tier1..tier10}.py`, adds Tier-5 adversarial tests, applies cross-cutting responsive/a11y/perf fixes across frontend files, and captures final screenshots.
 
 ---
 
-## Build, Concurrency & Environment Rules
+## Build, Port, SQLite WAL & Screenshot Environment Rules
 
-1. **Typecheck / Lint during parallel milestones (M3/M4/M5)**: Always use `npx tsc --noEmit --incremental false` and `npx eslint <files>` / `npm run lint` — **DO NOT run `npm run build` concurrently** across parallel milestones (avoids `.next/` write races). Sequential milestones (M1, M2, M6) run full `npx tsc --noEmit --incremental false && npm run lint && npm run build`.
-2. **Playwright Runtime**: Node Playwright is NOT installed. Use preinstalled **Python Playwright (`1.65.2`)** at `/opt/pyenv/shims/python3` with `PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright` (headless Chromium already cached — zero downloads, DO NOT `npm install playwright`).
-3. **SQLite WAL Backup Hygiene**: `data/pptgod.db` runs in WAL mode. Any backup MUST use `sqlite3 data/pptgod.db ".backup '<path>'"` (NEVER plain `cp data/pptgod.db`). Always clean up synthetic test records (prompts, decks, comments, profile edits) after API/E2E runs so `data/pptgod.db` remains clean with the 18 curated styles and 5 seed comments.
-4. **No Scratch Files in `.agents/teamwork/`**: `.agents/teamwork/` holds ONLY agent metadata `.md` files (never source code, scripts, test data, or screenshots). Ad-hoc verifier probes MUST use a per-probe temp dir (`mktemp -d -- "${TMPDIR:-/tmp}/teamwork_probe.XXXXXX"` with `chmod 700`) and delete it before reporting.
+1. **Port Isolation (HARD CONSTRAINT)**: Port `3000` is occupied by the main session's production preview daemon — **NEVER stop, probe-kill, bind, or run tests against port `3000`**. All temporary verification servers MUST use port `3010` (`./node_modules/.bin/next start --port 3010 --hostname 127.0.0.1`) and be cleanly terminated after verification!
+2. **Playwright Runtime**: Use preinstalled **Python Playwright (`1.65.2`)** at `/opt/pyenv/shims/python3` with `PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright`. **DO NOT `npm install playwright`**.
+3. **Build & Verification Commands**:
+   - Typecheck: `npx tsc --noEmit --incremental false`
+   - Lint: `npm run lint`
+   - Build: `npm run build` (Implementation Track ONLY; E2E Track NEVER runs `npm run build` concurrently)
+   - E2E Execution: `PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 <runner> --base-url http://127.0.0.1:3010 --backup-db`
+4. **SQLite WAL Cleanliness**: `data/pptgod.db` is shared with port `3000` in WAL mode. Any backup MUST use `/opt/android-sdk/platform-tools/sqlite3 data/pptgod.db ".backup '<tmp>'"`. All mutating tests MUST clean up via LIFO `CleanupRegistry` leaving `0` residual `[E2E%` rows (`users: 3`, `prompts: 36`, `prompt_comments: 5`, `saved_decks: 0`).
+5. **Screenshot Archive Path**: Save all phase and final acceptance screenshots in `/home/antigravity/.gemini/jetski/brain/v1/default/jetski_remote_agents_3p_devbox/d4652d5e-bd2b-44e6-9b6d-5ebd3aabd750/screenshots/glacier_v2/`.
+6. **Clean Scoped Git Commits**: Always verify `git branch --show-current` is `feat/glacier-ui-2.0`. Stage ONLY milestone-owned files (`git add <paths>`) — NEVER `git add -A` when another track has in-progress files!
+7. **No Scratch Files in `.agents/teamwork/`**: `.agents/teamwork/` holds ONLY agent metadata `.md` files. Temporary verifier scripts/probes MUST use `mktemp -d -- "${TMPDIR:-/tmp}/teamwork_probe.XXXXXX"` (`chmod 700`) and remove it before reporting.
