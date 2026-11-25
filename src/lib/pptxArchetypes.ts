@@ -29,6 +29,11 @@ export interface PptxThemeTokens {
   isEditorial: boolean;
   isTerminal: boolean;
   isAcademic: boolean;
+  isChalkboard: boolean;
+  isScientific: boolean;
+  isCivic: boolean;
+  isPmo: boolean;
+  isPolaroid: boolean;
   isRounded: boolean;
 }
 
@@ -44,7 +49,7 @@ export interface CardBox {
 
 /**
  * Draws an archetype-aware card (brutalist hard offset shadow, Bento rounded corners,
- * Bauhaus thicker borders, or crisp editorial rectangle).
+ * scientific transparent evidence block, chalk dashed frame, or crisp editorial rectangle).
  */
 export function addStyledCard(
   pptx: PptxGenJS,
@@ -52,10 +57,11 @@ export function addStyledCard(
   tokens: PptxThemeTokens,
   box: CardBox
 ): void {
-  const fill = box.fill ?? tokens.cSurface;
+  const fill = box.fill ?? (tokens.isScientific ? tokens.cBg : tokens.cSurface);
   const borderColor = box.borderColor ?? tokens.cBorder;
   const borderWidth =
-    box.borderWidth ?? (tokens.isBrutalist ? 2 : tokens.isBauhaus ? 1.5 : 1);
+    box.borderWidth ?? (tokens.isBrutalist ? 2 : tokens.isBauhaus || tokens.isChalkboard ? 1.5 : 1);
+  const lineDash = tokens.isChalkboard ? ("dash" as const) : undefined;
 
   if (tokens.isBrutalist) {
     slide.addShape(pptx.ShapeType.rect, {
@@ -77,7 +83,7 @@ export function addStyledCard(
       h: box.h,
       rectRadius: r,
       fill: { color: fill },
-      line: { color: borderColor, width: borderWidth },
+      line: { color: borderColor, width: borderWidth, dashType: lineDash },
     });
   } else {
     slide.addShape(pptx.ShapeType.rect, {
@@ -86,7 +92,7 @@ export function addStyledCard(
       w: box.w,
       h: box.h,
       fill: { color: fill },
-      line: { color: borderColor, width: borderWidth },
+      line: { color: borderColor, width: borderWidth, dashType: lineDash },
     });
   }
 }
@@ -328,6 +334,135 @@ export function addArchetypeMotif(
       fill: { color: tokens.cBorder },
       line: { color: tokens.cBorder, width: 0 },
     });
+    return;
+  }
+
+  if (motif === "chalk-frame") {
+    slide.addShape(pptx.ShapeType.roundRect, {
+      x: 0.14,
+      y: 0.12,
+      w: 9.72,
+      h: 5.32,
+      rectRadius: 0.06,
+      fill: { color: tokens.cBg, transparency: 100 },
+      line: { color: tokens.cBorder, width: 1.4, dashType: "dash" },
+    });
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0.35,
+      y: 5.54,
+      w: 9.3,
+      h: 0.085,
+      fill: { color: "8B5E3C" },
+      line: { color: "8B5E3C", width: 0 },
+    });
+    return;
+  }
+
+  if (motif === "citation-axis") {
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 0.04,
+      fill: { color: tokens.cAccent },
+      line: { color: tokens.cAccent, width: 0 },
+    });
+    [1.25, 2.5, 3.75, 5.0, 6.25, 7.5, 8.75].forEach((tx) => {
+      slide.addShape(pptx.ShapeType.line, {
+        x: tx,
+        y: 0.04,
+        w: 0,
+        h: 0.1,
+        line: { color: tokens.cBorder, width: 0.9 },
+      });
+    });
+    slide.addShape(pptx.ShapeType.line, {
+      x: 0.24,
+      y: 0.35,
+      w: 0,
+      h: 4.9,
+      line: { color: tokens.cBorder, width: 0.75 },
+    });
+    return;
+  }
+
+  if (motif === "redgold-ribbon") {
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 0.075,
+      fill: { color: tokens.cAccent },
+      line: { color: tokens.cAccent, width: 0 },
+    });
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0,
+      y: 0.095,
+      w: 10,
+      h: 0.025,
+      fill: { color: tokens.cChart2 },
+      line: { color: tokens.cChart2, width: 0 },
+    });
+    slide.addShape(pptx.ShapeType.line, {
+      x: 0.45,
+      y: 5.48,
+      w: 9.1,
+      h: 0,
+      line: { color: tokens.cChart2, width: 1 },
+    });
+    return;
+  }
+
+  if (motif === "status-dots") {
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 0.055,
+      fill: { color: tokens.cAccent },
+      line: { color: tokens.cAccent, width: 0 },
+    });
+    ["16A34A", "D97706", "DC2626"].forEach((col, i) => {
+      slide.addShape(pptx.ShapeType.ellipse, {
+        x: 9.15 + i * 0.17,
+        y: 0.18,
+        w: 0.1,
+        h: 0.1,
+        fill: { color: col },
+        line: { color: col, width: 0 },
+      });
+    });
+    return;
+  }
+
+  if (motif === "film-sprocket") {
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 9.72,
+      y: 0,
+      w: 0.28,
+      h: 5.625,
+      fill: { color: tokens.cBorder, transparency: 72 },
+      line: { color: tokens.cBorder, width: 0 },
+    });
+    for (let i = 0; i < 10; i++) {
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x: 9.79,
+        y: 0.22 + i * 0.52,
+        w: 0.14,
+        h: 0.24,
+        rectRadius: 0.04,
+        fill: { color: tokens.cBg },
+        line: { color: tokens.cBorder, width: 0.75 },
+      });
+    }
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0.18,
+      y: 0.18,
+      w: 9.44,
+      h: 5.26,
+      fill: { color: tokens.cBg, transparency: 100 },
+      line: { color: tokens.cBorder, width: 0.75 },
+    });
   }
 }
 
@@ -341,7 +476,7 @@ export interface CoverData {
 }
 
 /**
- * Renders distinct high-craft native cover layouts matching the 15 LayoutArchetypes.
+ * Renders distinct high-craft native cover layouts matching all 20 LayoutArchetypes.
  */
 export function renderArchetypeCover(
   pptx: PptxGenJS,
@@ -350,6 +485,460 @@ export function renderArchetypeCover(
   data: CoverData
 ): void {
   const { sectionTag, title, subtitle, audience, styleName, total } = data;
+
+  if (tokens.isChalkboard) {
+    slide.addShape(pptx.ShapeType.roundRect, {
+      x: 0.55,
+      y: 0.55,
+      w: 2.35,
+      h: 0.34,
+      rectRadius: 0.05,
+      fill: { color: tokens.cAccentSoft },
+      line: { color: tokens.cAccent, width: 1, dashType: "dash" },
+    });
+    slide.addText(`${sectionTag} · 板书微课`, {
+      x: 0.55,
+      y: 0.55,
+      w: 2.35,
+      h: 0.34,
+      fontSize: 10,
+      bold: true,
+      align: "center",
+      valign: "middle",
+      color: tokens.cAccent,
+      fontFace: tokens.fontBody,
+    });
+    slide.addText(title, {
+      x: 0.55,
+      y: 1.25,
+      w: 5.65,
+      h: 1.75,
+      fontSize: 30,
+      bold: true,
+      color: tokens.cText,
+      fontFace: tokens.fontHeading,
+      valign: "middle",
+    });
+    slide.addShape(pptx.ShapeType.line, {
+      x: 0.55,
+      y: 3.12,
+      w: 5.4,
+      h: 0,
+      line: { color: tokens.cAccent, width: 2, dashType: "dash" },
+    });
+    slide.addText(subtitle, {
+      x: 0.55,
+      y: 3.3,
+      w: 5.6,
+      h: 0.9,
+      fontSize: 13.5,
+      color: tokens.cMuted,
+      fontFace: tokens.fontBody,
+    });
+    slide.addText(`授课对象：${audience}   ·   共 ${total} 页`, {
+      x: 0.55,
+      y: 4.78,
+      w: 5.6,
+      h: 0.32,
+      fontSize: 10,
+      color: tokens.cMuted,
+      fontFace: "Consolas",
+    });
+
+    addStyledCard(pptx, slide, tokens, { x: 6.45, y: 0.55, w: 3.05, h: 4.55 });
+    slide.addText("CHALKBOARD LESSON PLAN", {
+      x: 6.65,
+      y: 0.75,
+      w: 2.65,
+      h: 0.28,
+      fontSize: 9.5,
+      bold: true,
+      color: tokens.cAccent,
+      fontFace: "Consolas",
+    });
+    ["01 情境导入 · 驱动设问", "02 原理拆解 · 阶梯板书", "03 互动演练 · 随堂验证", "04 归纳巩固 · 知识闭环"].forEach(
+      (item, idx) => {
+        slide.addText(item, {
+          x: 6.65,
+          y: 1.25 + idx * 0.78,
+          w: 2.65,
+          h: 0.58,
+          fontSize: 12,
+          bold: true,
+          color: tokens.cText,
+          fontFace: tokens.fontBody,
+        });
+      }
+    );
+    return;
+  }
+
+  if (tokens.isScientific) {
+    slide.addText(`${sectionTag.toUpperCase()} · SCIENTIFIC EVIDENCE DECK`, {
+      x: 0.55,
+      y: 0.45,
+      w: 5.5,
+      h: 0.28,
+      fontSize: 9.5,
+      bold: true,
+      color: tokens.cAccent,
+      fontFace: "Consolas",
+    });
+    slide.addText(`OKABE-ITO CVD-SAFE · ${total} SLIDES`, {
+      x: 6.3,
+      y: 0.45,
+      w: 3.15,
+      h: 0.28,
+      fontSize: 9,
+      align: "right",
+      color: tokens.cMuted,
+      fontFace: "Consolas",
+    });
+    slide.addShape(pptx.ShapeType.line, {
+      x: 0.55,
+      y: 0.82,
+      w: 8.9,
+      h: 0,
+      line: { color: tokens.cBorder, width: 0.9 },
+    });
+    slide.addText(title, {
+      x: 0.55,
+      y: 1.28,
+      w: 8.7,
+      h: 1.65,
+      fontSize: 32,
+      bold: true,
+      color: tokens.cText,
+      fontFace: tokens.fontHeading,
+      valign: "middle",
+    });
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0.55,
+      y: 3.15,
+      w: 0.06,
+      h: 0.75,
+      fill: { color: tokens.cAccent },
+      line: { color: tokens.cAccent, width: 0 },
+    });
+    slide.addText(subtitle, {
+      x: 0.78,
+      y: 3.15,
+      w: 8.2,
+      h: 0.75,
+      fontSize: 14,
+      color: tokens.cMuted,
+      fontFace: tokens.fontBody,
+      valign: "middle",
+    });
+    slide.addShape(pptx.ShapeType.line, {
+      x: 0.55,
+      y: 4.5,
+      w: 8.9,
+      h: 0,
+      line: { color: tokens.cBorder, width: 0.9 },
+    });
+    slide.addText(`AUDIENCE / PANEL: ${audience}`, {
+      x: 0.55,
+      y: 4.65,
+      w: 5.8,
+      h: 0.35,
+      fontSize: 10.5,
+      bold: true,
+      color: tokens.cText,
+      fontFace: tokens.fontBody,
+    });
+    [tokens.cChart1, tokens.cChart2, tokens.cChart3, tokens.cChart4].forEach((c, i) => {
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 7.85 + i * 0.38,
+        y: 4.72,
+        w: 0.24,
+        h: 0.2,
+        fill: { color: c },
+        line: { color: c, width: 0 },
+      });
+    });
+    return;
+  }
+
+  if (tokens.isCivic) {
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 3.25,
+      y: 0.75,
+      w: 3.5,
+      h: 0.36,
+      fill: { color: tokens.cAccent },
+      line: { color: tokens.cAccent, width: 0 },
+    });
+    slide.addText(`★  ${sectionTag} · 专项工作汇报  ★`, {
+      x: 3.25,
+      y: 0.75,
+      w: 3.5,
+      h: 0.36,
+      fontSize: 10.5,
+      bold: true,
+      align: "center",
+      valign: "middle",
+      color: "FFFFFF",
+      fontFace: tokens.fontBody,
+    });
+    slide.addText(title, {
+      x: 0.9,
+      y: 1.5,
+      w: 8.2,
+      h: 1.55,
+      fontSize: 33,
+      bold: true,
+      align: "center",
+      valign: "middle",
+      color: tokens.cText,
+      fontFace: tokens.fontHeading,
+    });
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 4.2,
+      y: 3.16,
+      w: 1.6,
+      h: 0.05,
+      fill: { color: tokens.cChart2 },
+      line: { color: tokens.cChart2, width: 0 },
+    });
+    slide.addText(subtitle, {
+      x: 1.2,
+      y: 3.38,
+      w: 7.6,
+      h: 0.75,
+      fontSize: 14,
+      align: "center",
+      color: tokens.cMuted,
+      fontFace: tokens.fontBody,
+    });
+    slide.addShape(pptx.ShapeType.line, {
+      x: 0.75,
+      y: 4.65,
+      w: 8.5,
+      h: 0,
+      line: { color: tokens.cBorder, width: 0.9 },
+    });
+    slide.addText(`汇报对象：${audience}    |    ${styleName}    |    共 ${total} 页`, {
+      x: 0.8,
+      y: 4.78,
+      w: 8.4,
+      h: 0.32,
+      fontSize: 10.5,
+      align: "center",
+      color: tokens.cMuted,
+      fontFace: tokens.fontBody,
+    });
+    return;
+  }
+
+  if (tokens.isPmo) {
+    slide.addShape(pptx.ShapeType.roundRect, {
+      x: 0.55,
+      y: 0.52,
+      w: 2.1,
+      h: 0.32,
+      rectRadius: 0.04,
+      fill: { color: tokens.cAccent },
+      line: { color: tokens.cAccent, width: 0 },
+    });
+    slide.addText(`PMO · ${sectionTag}`, {
+      x: 0.55,
+      y: 0.52,
+      w: 2.1,
+      h: 0.32,
+      fontSize: 9.5,
+      bold: true,
+      align: "center",
+      valign: "middle",
+      color: "FFFFFF",
+      fontFace: "Consolas",
+    });
+    slide.addText("● OVERALL: ON TRACK", {
+      x: 2.8,
+      y: 0.52,
+      w: 2.4,
+      h: 0.32,
+      fontSize: 9.5,
+      bold: true,
+      valign: "middle",
+      color: "16A34A",
+      fontFace: "Consolas",
+    });
+    slide.addText(title, {
+      x: 0.55,
+      y: 1.25,
+      w: 5.5,
+      h: 1.75,
+      fontSize: 29,
+      bold: true,
+      color: tokens.cText,
+      fontFace: tokens.fontHeading,
+      valign: "middle",
+    });
+    slide.addText(subtitle, {
+      x: 0.55,
+      y: 3.15,
+      w: 5.5,
+      h: 0.95,
+      fontSize: 13,
+      color: tokens.cMuted,
+      fontFace: tokens.fontBody,
+    });
+    slide.addText(`评审方：${audience}   ·   ${total} SLIDES`, {
+      x: 0.55,
+      y: 4.78,
+      w: 5.5,
+      h: 0.3,
+      fontSize: 10,
+      color: tokens.cMuted,
+      fontFace: "Consolas",
+    });
+
+    addStyledCard(pptx, slide, tokens, { x: 6.3, y: 0.65, w: 3.2, h: 4.35 });
+    slide.addText("PROJECT HEALTH MATRIX (RAG)", {
+      x: 6.5,
+      y: 0.84,
+      w: 2.8,
+      h: 0.28,
+      fontSize: 9.5,
+      bold: true,
+      color: tokens.cAccent,
+      fontFace: "Consolas",
+    });
+    [
+      { label: "进度里程碑", status: "ON TRACK", col: "16A34A" },
+      { label: "研发质量", status: "99.2% PASS", col: "16A34A" },
+      { label: "跨部门依赖", status: "WATCH", col: "D97706" },
+      { label: "预算控制", status: "-4.2% SAVE", col: "2563EB" },
+    ].forEach((r, idx) => {
+      const ry = 1.32 + idx * 0.85;
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 6.5,
+        y: ry,
+        w: 0.08,
+        h: 0.64,
+        fill: { color: r.col },
+        line: { color: r.col, width: 0 },
+      });
+      slide.addText(r.label, {
+        x: 6.7,
+        y: ry + 0.04,
+        w: 1.5,
+        h: 0.56,
+        fontSize: 11.5,
+        bold: true,
+        valign: "middle",
+        color: tokens.cText,
+        fontFace: tokens.fontBody,
+      });
+      slide.addText(r.status, {
+        x: 8.15,
+        y: ry + 0.04,
+        w: 1.15,
+        h: 0.56,
+        fontSize: 9.5,
+        bold: true,
+        align: "right",
+        valign: "middle",
+        color: r.col,
+        fontFace: "Consolas",
+      });
+    });
+    return;
+  }
+
+  if (tokens.isPolaroid) {
+    slide.addShape(pptx.ShapeType.roundRect, {
+      x: 0.55,
+      y: 0.72,
+      w: 2.35,
+      h: 0.34,
+      rectRadius: 0.17,
+      fill: { color: tokens.cAccentSoft },
+      line: { color: tokens.cAccent, width: 0 },
+    });
+    slide.addText(`35MM · ${sectionTag} · 2026`, {
+      x: 0.55,
+      y: 0.72,
+      w: 2.35,
+      h: 0.34,
+      fontSize: 9.5,
+      bold: true,
+      align: "center",
+      valign: "middle",
+      color: tokens.cAccent,
+      fontFace: "Consolas",
+    });
+    slide.addText(title, {
+      x: 0.55,
+      y: 1.38,
+      w: 5.2,
+      h: 1.75,
+      fontSize: 31,
+      bold: true,
+      color: tokens.cText,
+      fontFace: tokens.fontHeading,
+      valign: "middle",
+    });
+    slide.addText(subtitle, {
+      x: 0.55,
+      y: 3.28,
+      w: 5.1,
+      h: 0.9,
+      fontSize: 13.5,
+      color: tokens.cMuted,
+      fontFace: tokens.fontBody,
+    });
+    slide.addText(`STORY FOR · ${audience} · ${total} FRAMES`, {
+      x: 0.55,
+      y: 4.72,
+      w: 5.1,
+      h: 0.32,
+      fontSize: 10,
+      color: tokens.cMuted,
+      fontFace: "Consolas",
+    });
+
+    // Polaroid frame on right
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 6.05,
+      y: 0.65,
+      w: 3.25,
+      h: 4.3,
+      fill: { color: "FFFFFF" },
+      line: { color: tokens.cBorder, width: 1 },
+    });
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 6.27,
+      y: 0.88,
+      w: 2.81,
+      h: 3.05,
+      fill: { color: tokens.cAccentSoft },
+      line: { color: tokens.cBorder, width: 0.75 },
+    });
+    slide.addText(`FRAME 01 / ${String(total).padStart(2, "0")}`, {
+      x: 6.35,
+      y: 1.75,
+      w: 2.65,
+      h: 0.36,
+      fontSize: 11,
+      bold: true,
+      align: "center",
+      color: tokens.cAccent,
+      fontFace: "Consolas",
+    });
+    slide.addText("ISO 400 · WARM FILM · 2026", {
+      x: 6.27,
+      y: 4.25,
+      w: 2.81,
+      h: 0.35,
+      fontSize: 9.5,
+      align: "center",
+      color: tokens.cMuted,
+      fontFace: "Consolas",
+    });
+    return;
+  }
 
   if (tokens.isKeynote) {
     slide.addShape(pptx.ShapeType.roundRect, {

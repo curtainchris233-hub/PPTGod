@@ -285,6 +285,187 @@ export function renderDecorativeMotif(ctx: SlideRenderContext) {
     );
   }
 
+  if (motif === "chalk-frame") {
+    return (
+      <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        <div
+          style={{
+            position: "absolute",
+            inset: "12px",
+            border: `2px dashed ${palette.border}`,
+            borderRadius: "6px",
+            opacity: 0.72,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: "28px",
+            right: "28px",
+            bottom: "0",
+            height: "6px",
+            background: "#8B5E3C",
+            borderRadius: "3px 3px 0 0",
+            opacity: 0.9,
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (motif === "citation-axis") {
+    return (
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 960 540"
+        preserveAspectRatio="none"
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+        }}
+      >
+        <line x1="0" y1="3" x2="960" y2="3" stroke={palette.accent} strokeWidth="3" />
+        {[120, 240, 360, 480, 600, 720, 840].map((x) => (
+          <line
+            key={x}
+            x1={x}
+            y1="3"
+            x2={x}
+            y2="11"
+            stroke={palette.border}
+            strokeWidth="1.2"
+          />
+        ))}
+        <line x1="22" y1="36" x2="22" y2="504" stroke={palette.border} strokeWidth="1" opacity="0.65" />
+      </svg>
+    );
+  }
+
+  if (motif === "redgold-ribbon") {
+    return (
+      <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: "6px",
+            background: palette.accent,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: "8px",
+            left: 0,
+            right: 0,
+            height: "2px",
+            background: palette.chartColors[1] || "#B45309",
+            opacity: 0.85,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            bottom: "10px",
+            left: "44px",
+            right: "44px",
+            height: "1.5px",
+            background: palette.chartColors[1] || "#B45309",
+            opacity: 0.45,
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (motif === "status-dots") {
+    return (
+      <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: "4px",
+            background: palette.accent,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: "18px",
+            right: "28px",
+            display: "flex",
+            gap: "6px",
+            alignItems: "center",
+          }}
+        >
+          {["#16A34A", "#D97706", "#DC2626"].map((c) => (
+            <span
+              key={c}
+              style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "999px",
+                background: c,
+                display: "inline-block",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (motif === "film-sprocket") {
+    return (
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 960 540"
+        preserveAspectRatio="none"
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+        }}
+      >
+        <rect x="936" y="0" width="24" height="540" fill={palette.border} opacity="0.22" />
+        {[24, 72, 120, 168, 216, 264, 312, 360, 408, 456, 504].map((y) => (
+          <rect
+            key={y}
+            x="942"
+            y={y}
+            width="12"
+            height="20"
+            rx="3"
+            fill={palette.bg}
+            stroke={palette.border}
+            strokeWidth="1"
+            opacity="0.7"
+          />
+        ))}
+        <rect
+          x="16"
+          y="16"
+          width="908"
+          height="508"
+          fill="none"
+          stroke={palette.border}
+          strokeWidth="1"
+          opacity="0.55"
+        />
+      </svg>
+    );
+  }
+
   return null;
 }
 
@@ -430,6 +611,11 @@ export function renderFooter(ctx: SlideRenderContext) {
     isAcademic,
     isTerminal,
     isClinical,
+    isChalkboard,
+    isScientific,
+    isCivic,
+    isPmo,
+    isPolaroid,
     effectiveTotalPages,
     currentPageLabel,
   } = ctx;
@@ -448,7 +634,17 @@ export function renderFooter(ctx: SlideRenderContext) {
       }}
     >
       <span>
-        {isConsulting
+        {isChalkboard
+          ? `CLASSROOM LESSON · 护眼黑板板书微课 · ${audience}`
+          : isScientific
+          ? `Nature Methods Okabe-Ito CVD-Safe · Evidence Deck · ${topic.slice(0, 22)}`
+          : isCivic
+          ? `规范专题工作汇报 · ${audience} · 2026`
+          : isPmo
+          ? `PMO DELIVERY GOVERNANCE · RAG STATUS ON TRACK · ${audience}`
+          : isPolaroid
+          ? `35MM ANALOG LOG · ${englishTitle.toUpperCase()} · ${audience}`
+          : isConsulting
           ? "Source: Internal Benchmark & Market Intelligence · Confidential"
           : isTerminal
           ? "LIVE TERMINAL TELEMETRY · DATA VERIFIED 2026"

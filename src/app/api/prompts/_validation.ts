@@ -33,6 +33,11 @@ const VALID_ARCHETYPES = new Set<LayoutArchetype>([
   "soft-bento",
   "financial-terminal",
   "clinical-clean",
+  "chalkboard-class",
+  "scientific-figure",
+  "civic-redgold",
+  "pmo-rag-grid",
+  "polaroid-zine",
 ]);
 
 const VALID_TYPOGRAPHY_MOODS = new Set<TypographyMood>([
@@ -57,6 +62,11 @@ const VALID_MOTIFS = new Set<DecorativeMotif>([
   "hard-offset",
   "ribbon-accent",
   "bento-dots",
+  "chalk-frame",
+  "citation-axis",
+  "redgold-ribbon",
+  "status-dots",
+  "film-sprocket",
   "none",
 ]);
 

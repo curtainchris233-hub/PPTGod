@@ -60,10 +60,10 @@ ACCOUNT_OFFICIAL = SeedAccount(
     display_name="PPTGod 视觉实验室",
     bio="专注演示文稿设计系统与跨工具提示词工程研究",
     avatar_color="#C84B31",
-    seeded_prompt_count=9,
-    baseline_likes=4095,
-    baseline_saves=3502,
-    baseline_copies=12990,
+    seeded_prompt_count=15,
+    baseline_likes=6416,
+    baseline_saves=5592,
+    baseline_copies=19940,
 )
 
 ACCOUNT_DEMO = SeedAccount(
@@ -74,10 +74,10 @@ ACCOUNT_DEMO = SeedAccount(
     display_name="林屿 · 演示设计师",
     bio="探索结构化叙事与高信息密度幻灯片美学（体验演示账号）",
     avatar_color="#0F766E",
-    seeded_prompt_count=6,
-    baseline_likes=2107,
-    baseline_saves=1719,
-    baseline_copies=5860,
+    seeded_prompt_count=12,
+    baseline_likes=4278,
+    baseline_saves=3693,
+    baseline_copies=11970,
 )
 
 ACCOUNT_CHEN = SeedAccount(
@@ -88,10 +88,10 @@ ACCOUNT_CHEN = SeedAccount(
     display_name="陈默 · 战略咨询",
     bio="10 年管理咨询与商业计划书视觉架构师",
     avatar_color="#1D4ED8",
-    seeded_prompt_count=3,
-    baseline_likes=1357,
-    baseline_saves=1173,
-    baseline_copies=4490,
+    seeded_prompt_count=9,
+    baseline_likes=3764,
+    baseline_saves=3394,
+    baseline_copies=12050,
 )
 
 SEED_ACCOUNTS: tuple[SeedAccount, ...] = (
@@ -101,10 +101,11 @@ SEED_ACCOUNTS: tuple[SeedAccount, ...] = (
 )
 
 # ---------------------------------------------------------------------------
-# 18 Official Seeded Public Styles & Baseline Filter Counts
+# 36 Official Seeded Public Styles & Baseline Filter Counts (PPTGod v5)
 # ---------------------------------------------------------------------------
 
 OFFICIAL_STYLES: tuple[tuple[str, str], ...] = (
+    # Core Business, Tech, Design & Editorial (18 original)
     ("prompt_swiss_grid", "swiss-international-grid"),
     ("prompt_mckinsey_exec", "mckinsey-executive-insight"),
     ("prompt_keynote_obsidian", "keynote-obsidian-stage"),
@@ -123,6 +124,25 @@ OFFICIAL_STYLES: tuple[tuple[str, str], ...] = (
     ("prompt_pedagogy_course", "structured-pedagogy-course"),
     ("prompt_industrial_cyber", "industrial-cybernetics-orange"),
     ("prompt_parisian_couture", "parisian-couture-lookbook"),
+    # v5 Full-Domain Expansion: Teaching (4), Research (4), Workplace/Civic (5), Lifestyle (5)
+    ("prompt_chalkboard_lesson", "chalkboard-classic-lesson"),
+    ("prompt_k12_storybook", "k12-pastel-storybook"),
+    ("prompt_steam_gridbook", "steam-inquiry-gridbook"),
+    ("prompt_open_class_cyan", "open-class-competition-cyan"),
+    ("prompt_nsfc_grant", "nsfc-grant-defense-bluered"),
+    ("prompt_nature_okabe", "nature-okabe-ito-evidence"),
+    ("prompt_journal_club", "journal-club-paper-reading"),
+    ("prompt_humanities_archive", "humanities-archival-seminar"),
+    ("prompt_pmo_rag", "pmo-rag-milestone-board"),
+    ("prompt_civic_redgold", "civic-party-red-gold"),
+    ("prompt_agile_linear", "agile-sprint-okr-linear"),
+    ("prompt_esg_lean", "esg-green-lean-quality"),
+    ("prompt_star_promotion", "star-career-promotion-pitch"),
+    ("prompt_kodak_travel", "kodak-analog-travelogue"),
+    ("prompt_sage_wedding", "champagne-sage-wedding"),
+    ("prompt_indie_bookstore", "indie-bookstore-literary"),
+    ("prompt_avocado_lifestyle", "avocado-organic-lifestyle"),
+    ("prompt_morandi_portfolio", "morandi-creator-portfolio"),
 )
 
 OFFICIAL_STYLE_IDS: tuple[str, ...] = tuple(item[0] for item in OFFICIAL_STYLES)
@@ -131,45 +151,54 @@ OFFICIAL_SLUG_BY_ID: dict[str, str] = dict(OFFICIAL_STYLES)
 OFFICIAL_ID_BY_SLUG: dict[str, str] = {slug: pid for pid, slug in OFFICIAL_STYLES}
 
 BASELINE_TOOL_COUNTS: dict[str, int] = {
-    "claude-html": 18,
-    "gamma-kimi": 16,
-    "ai-image": 13,
-    "notebooklm": 10,
-    "slidev-marp": 3,
-    "python-pptx": 2,
+    "claude-html": 36,
+    "gamma-kimi": 33,
+    "ai-image": 22,
+    "notebooklm": 18,
+    "slidev-marp": 9,
+    "python-pptx": 9,
 }
 
 BASELINE_SCENARIO_COUNTS: dict[str, int] = {
     "产品发布": 3,
     "咨询汇报": 2,
     "品牌提案": 4,
-    "文化创意": 1,
-    "学术答辩": 2,
+    "文化创意": 2,
+    "学术答辩": 4,
+    "科研基金": 2,
     "年度总结": 1,
     "技术分享": 2,
     "商业路演": 2,
-    "教育培训": 1,
+    "教育培训": 2,
+    "课堂教学": 3,
+    "项目汇报": 3,
+    "政务党建": 1,
+    "个人述职": 2,
+    "生活纪实": 3,
 }
 
 BASELINE_STYLE_COUNTS: dict[str, int] = {
-    "极简主义": 2,
-    "商务咨询": 3,
-    "科技未来": 3,
-    "编辑部杂志": 2,
-    "新中式美学": 1,
+    "极简主义": 4,
+    "商务咨询": 5,
+    "科技未来": 5,
+    "编辑部杂志": 4,
+    "新中式美学": 2,
     "包豪斯几何": 1,
-    "学术期刊": 2,
-    "暖调人文": 2,
+    "学术期刊": 5,
+    "暖调人文": 3,
     "野兽派海报": 1,
-    "现代Bento": 1,
+    "现代Bento": 3,
+    "课堂板书": 1,
+    "政务红金": 1,
+    "胶片手账": 1,
 }
 
 BASELINE_COLOR_COUNTS: dict[str, int] = {
-    "light": 6,
-    "dark": 4,
-    "warm": 4,
+    "light": 14,
+    "dark": 6,
+    "warm": 8,
     "vivid": 3,
-    "earth": 1,
+    "earth": 5,
 }
 
 # 5 Seeded Comments
@@ -304,6 +333,11 @@ LAYOUT_ARCHETYPES: tuple[str, ...] = (
     "soft-bento",
     "financial-terminal",
     "clinical-clean",
+    "chalkboard-class",
+    "scientific-figure",
+    "civic-redgold",
+    "pmo-rag-grid",
+    "polaroid-zine",
 )
 
 DECORATIVE_MOTIFS: tuple[str, ...] = (
@@ -317,6 +351,11 @@ DECORATIVE_MOTIFS: tuple[str, ...] = (
     "hard-offset",
     "ribbon-accent",
     "bento-dots",
+    "chalk-frame",
+    "citation-axis",
+    "redgold-ribbon",
+    "status-dots",
+    "film-sprocket",
     "none",
 )
 
@@ -329,9 +368,15 @@ SCENARIOS: tuple[str, ...] = (
     "年度总结",
     "品牌提案",
     "学术答辩",
+    "科研基金",
     "技术分享",
     "教育培训",
+    "课堂教学",
     "文化创意",
+    "项目汇报",
+    "政务党建",
+    "个人述职",
+    "生活纪实",
 )
 
 ANATOMY_DIMENSIONS: tuple[str, ...] = (

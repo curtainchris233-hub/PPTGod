@@ -19,8 +19,14 @@
 
 .pg-matcher-steps {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1.55fr 1fr 1fr;
   gap: 12px;
+}
+
+.pg-matcher-options--2col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .pg-matcher-block {
@@ -175,6 +181,12 @@
 @media (max-width: 820px) {
   .pg-matcher-steps,
   .pg-matcher-results-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .pg-matcher-options--2col {
     grid-template-columns: 1fr;
   }
 }

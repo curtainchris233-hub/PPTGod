@@ -178,6 +178,39 @@ function buildMotifOverlayHtml(
     }</svg></div>`;
   }
 
+  if (motif === "chalk-frame") {
+    return `<div class="motif-layer" aria-hidden="true"><div style="position:absolute;inset:12px;border:2px dashed ${esc(palette.border)};border-radius:6px;opacity:0.72;"></div><div style="position:absolute;left:28px;right:28px;bottom:0;height:6px;background:#8B5E3C;border-radius:3px 3px 0 0;opacity:0.9;"></div></div>`;
+  }
+
+  if (motif === "citation-axis") {
+    const ticks = [120, 240, 360, 480, 600, 720, 840]
+      .map(
+        (x) =>
+          `<line x1="${x}" y1="3" x2="${x}" y2="11" stroke="${esc(palette.border)}" stroke-width="1.2"/>`
+      )
+      .join("");
+    return `<div class="motif-layer" aria-hidden="true"><svg viewBox="0 0 960 540" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;"><line x1="0" y1="3" x2="960" y2="3" stroke="${esc(palette.accent)}" stroke-width="3"/>${ticks}<line x1="22" y1="36" x2="22" y2="504" stroke="${esc(palette.border)}" stroke-width="1" opacity="0.65"/></svg></div>`;
+  }
+
+  if (motif === "redgold-ribbon") {
+    const gold = esc(palette.chartColors[1] || "#B45309");
+    return `<div class="motif-layer" aria-hidden="true"><div style="position:absolute;top:0;left:0;right:0;height:6px;background:${esc(palette.accent)};"></div><div style="position:absolute;top:8px;left:0;right:0;height:2px;background:${gold};opacity:0.85;"></div><div style="position:absolute;bottom:10px;left:44px;right:44px;height:1.5px;background:${gold};opacity:0.45;"></div></div>`;
+  }
+
+  if (motif === "status-dots") {
+    return `<div class="motif-layer" aria-hidden="true"><div style="position:absolute;top:0;left:0;right:0;height:4px;background:${esc(palette.accent)};"></div><div style="position:absolute;top:18px;right:28px;display:flex;gap:6px;"><span style="width:8px;height:8px;border-radius:999px;background:#16A34A;display:block;"></span><span style="width:8px;height:8px;border-radius:999px;background:#D97706;display:block;"></span><span style="width:8px;height:8px;border-radius:999px;background:#DC2626;display:block;"></span></div></div>`;
+  }
+
+  if (motif === "film-sprocket") {
+    const holes = [24, 72, 120, 168, 216, 264, 312, 360, 408, 456, 504]
+      .map(
+        (y) =>
+          `<rect x="942" y="${y}" width="12" height="20" rx="3" fill="${esc(palette.bg)}" stroke="${esc(palette.border)}" stroke-width="1" opacity="0.7"/>`
+      )
+      .join("");
+    return `<div class="motif-layer" aria-hidden="true"><svg viewBox="0 0 960 540" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;"><rect x="936" y="0" width="24" height="540" fill="${esc(palette.border)}" opacity="0.22"/>${holes}<rect x="16" y="16" width="908" height="508" fill="none" stroke="${esc(palette.border)}" stroke-width="1" opacity="0.55"/></svg></div>`;
+  }
+
   return "";
 }
 
@@ -259,6 +292,116 @@ export function exportStandaloneHtmlDeck(options: {
     const coverTitle = esc(safeTextVal(s.title) || title);
     const coverSub = esc(safeTextVal(s.subtitle) || subtitle);
     const coverTag = esc(safeTextVal(s.sectionTag) || styleName);
+
+    if (archetype === "chalkboard-class") {
+      return `
+        <div class="cover-bento" style="grid-template-columns:1.45fr 0.9fr;">
+          <div style="display:flex;flex-direction:column;justify-content:space-between;padding:8px 4px;">
+            <span class="badge" style="border:1px dashed var(--accent);">${coverTag} · 板书微课</span>
+            <div>
+              <h1 style="border-bottom:2.5px dashed var(--accent);padding-bottom:12px;">${coverTitle}</h1>
+              <p class="subtitle" style="max-width:100%;margin-top:12px;">${coverSub}</p>
+            </div>
+            <span class="mono-meta">授课对象：${esc(audience)} · ${total} SLIDES</span>
+          </div>
+          <div class="card" style="border-style:dashed;display:flex;flex-direction:column;justify-content:space-between;">
+            <div class="mono-tag accent">CHALKBOARD LESSON PLAN</div>
+            <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+              <div><strong>01 情境导入</strong> · 提出课堂驱动问题</div>
+              <div><strong>02 原理拆解</strong> · 阶梯板书与例题推导</div>
+              <div><strong>03 互动演练</strong> · 随堂提问与分组探究</div>
+              <div><strong>04 归纳巩固</strong> · 知识树复盘与拓展</div>
+            </div>
+            <span class="mono-meta" style="color:var(--accent);">★ 护眼高对比板书规范</span>
+          </div>
+        </div>
+      `;
+    }
+
+    if (archetype === "scientific-figure") {
+      return `
+        <div class="slide-cover">
+          <div class="cover-top" style="border-bottom:1px solid var(--border);padding-bottom:12px;">
+            <span class="mono-tag accent">${coverTag} · SCIENTIFIC EVIDENCE DECK</span>
+            <span class="mono-meta">OKABE-ITO CVD-SAFE · ${total} SLIDES</span>
+          </div>
+          <div class="cover-main">
+            <h1>${coverTitle}</h1>
+            <p class="subtitle" style="border-left:3.5px solid var(--accent);padding-left:14px;">${coverSub}</p>
+          </div>
+          <div class="cover-foot">
+            <div><small>AUDIENCE / PANEL</small><strong>${esc(audience)}</strong></div>
+            <div class="swatches">
+              ${safeChartColors.map((c) => `<span style="background:${esc(c)}"></span>`).join("")}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (archetype === "civic-redgold") {
+      const gold = esc(safeChartColors[1] || "#B45309");
+      return `
+        <div class="slide-cover cover-keynote">
+          <span class="badge" style="background:var(--accent);color:#fff;border-radius:3px;letter-spacing:0.12em;">★ ${coverTag} · 专项工作汇报 ★</span>
+          <h1>${coverTitle}</h1>
+          <div style="width:120px;height:3px;background:linear-gradient(90deg,var(--accent),${gold});margin:4px auto 12px;"></div>
+          <p class="subtitle">${coverSub}</p>
+          <div class="keynote-meta">
+            <span>汇报对象：${esc(audience)}</span>
+            <span>${esc(styleName)} · 共 ${total} 页</span>
+          </div>
+        </div>
+      `;
+    }
+
+    if (archetype === "pmo-rag-grid") {
+      return `
+        <div class="cover-bento" style="grid-template-columns:1.4fr 1fr;">
+          <div style="display:flex;flex-direction:column;justify-content:space-between;">
+            <div style="display:flex;gap:10px;align-items:center;">
+              <span class="badge" style="background:var(--accent);color:#fff;">PMO · ${coverTag}</span>
+              <span class="mono-meta" style="color:#16A34A;font-weight:700;">● ON TRACK</span>
+            </div>
+            <div>
+              <h1>${coverTitle}</h1>
+              <p class="subtitle" style="max-width:100%;">${coverSub}</p>
+            </div>
+            <span class="mono-meta">评审方：${esc(audience)} · ${total} SLIDES</span>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;gap:8px;">
+            <div class="mono-tag accent">PROJECT HEALTH MATRIX (RAG)</div>
+            <div style="border-left:3px solid #16A34A;padding:6px 10px;background:var(--bg);font-size:12px;"><strong>进度里程碑</strong> · ON TRACK</div>
+            <div style="border-left:3px solid #16A34A;padding:6px 10px;background:var(--bg);font-size:12px;"><strong>研发质量</strong> · 99.2% PASS</div>
+            <div style="border-left:3px solid #D97706;padding:6px 10px;background:var(--bg);font-size:12px;"><strong>跨部门依赖</strong> · WATCH</div>
+            <div style="border-left:3px solid #2563EB;padding:6px 10px;background:var(--bg);font-size:12px;"><strong>预算投入</strong> · -4.2% SAVE</div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (archetype === "polaroid-zine") {
+      return `
+        <div class="cover-bento" style="grid-template-columns:1.35fr 0.95fr;padding-right:18px;">
+          <div style="display:flex;flex-direction:column;justify-content:center;gap:14px;">
+            <span class="badge">35MM · ${coverTag} · 2026</span>
+            <h1>${coverTitle}</h1>
+            <p class="subtitle" style="max-width:100%;">${coverSub}</p>
+            <span class="mono-meta">STORY FOR · ${esc(audience)} · ${total} FRAMES</span>
+          </div>
+          <div class="card" style="background:#fff;padding:16px 16px 22px;box-shadow:0 12px 28px rgba(44,34,30,0.12);display:flex;flex-direction:column;justify-content:space-between;">
+            <div style="flex:1;min-height:190px;background:var(--accent-soft);border:1px solid var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;">
+              <span class="mono-tag accent">FRAME 01 / ${String(total).padStart(2, "0")}</span>
+              <div class="swatches">${safeChartColors.map((c) => `<span style="background:${esc(c)}"></span>`).join("")}</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:12px;" class="mono-meta">
+              <span>ISO 400 · WARM FILM</span>
+              <span>2026 LOG</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     if (archetype === "keynote-center") {
       return `

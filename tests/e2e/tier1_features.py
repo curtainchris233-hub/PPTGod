@@ -166,13 +166,14 @@ def switch_generate_style_to_dark_obsidian(guard: BrowserPageGuard) -> None:
 
 
 def t1_api_01_catalog_18_styles(ctx: TestContext) -> None:
-    """GET /api/prompts returns all 18 public official styles with valid v2 fields & sort."""
+    """GET /api/prompts returns all official curated public styles with valid fields & sort."""
     client = ctx.api()
     resp = client.get("/api/prompts").assert_status(200, "GET /api/prompts")
     data = resp.require_json("GET /api/prompts")
     prompts = data.get("prompts")
+    expected_total = len(OFFICIAL_STYLE_IDS)
     assert isinstance(prompts, list), f"Expected prompts list, got {type(prompts)}"
-    assert len(prompts) == 18, f"Expected 18 curated styles, got {len(prompts)}"
+    assert len(prompts) == expected_total, f"Expected {expected_total} curated styles, got {len(prompts)}"
 
     ids = {p["id"] for p in prompts}
     slugs = {p["slug"] for p in prompts}
@@ -720,7 +721,8 @@ def t1_ui_01_navbar_and_gallery_18_cards(ctx: TestContext) -> None:
             "Navbar missing + 发布风格 link"
         )
 
-        # Verify 18 style cards rendered
+        # Verify all official curated style cards rendered
+        expected_total = len(OFFICIAL_STYLE_IDS)
         cards = page.locator("article[data-prompt-slug]")
         cards.first.wait_for(state="visible")
         card_count = cards.count()
@@ -732,13 +734,15 @@ def t1_ui_01_navbar_and_gallery_18_cards(ctx: TestContext) -> None:
                     )
                 )
             )
-        assert card_count == 18, f"Expected 18 style cards on /, found {card_count}"
+        assert card_count == expected_total, (
+            f"Expected {expected_total} style cards on /, found {card_count}"
+        )
 
         # Dual CTAs & creator links on cards
-        assert page.locator('a[href*="/generate?style="]').count() >= 18, (
+        assert page.locator('a[href*="/generate?style="]').count() >= expected_total, (
             "Cards should expose /generate?style= direct Generate PPT CTAs"
         )
-        assert page.locator('a[href^="/creator/"]').count() >= 18, (
+        assert page.locator('a[href^="/creator/"]').count() >= expected_total, (
             "Cards should expose clickable /creator/[username] links"
         )
 
@@ -764,7 +768,7 @@ def t1_ui_01_navbar_and_gallery_18_cards(ctx: TestContext) -> None:
         )
         topic_input.fill("")
 
-        # Search filter -> narrow -> reset -> 18
+        # Search filter -> narrow -> reset -> expected_total
         search_input = first_visible(
             [
                 page.locator("#pg-gallery-search"),
@@ -775,7 +779,7 @@ def t1_ui_01_navbar_and_gallery_18_cards(ctx: TestContext) -> None:
         search_input.fill("Bento")
         page.wait_for_timeout(300)
         narrow_count = page.locator("article[data-prompt-slug]").count()
-        assert 1 <= narrow_count <= 3, f"Expected 1..3 cards for 'Bento', got {narrow_count}"
+        assert 1 <= narrow_count <= 5, f"Expected 1..5 cards for 'Bento', got {narrow_count}"
         assert page.locator('a[href="/studio/apple-soft-bento-modular"]').first.is_visible()
 
         reset_btn = first_visible(
@@ -787,7 +791,9 @@ def t1_ui_01_navbar_and_gallery_18_cards(ctx: TestContext) -> None:
         reset_btn.click()
         page.wait_for_timeout(300)
         restored_count = page.locator("article[data-prompt-slug]").count()
-        assert restored_count == 18, f"Expected 18 cards after reset, got {restored_count}"
+        assert restored_count == expected_total, (
+            f"Expected {expected_total} cards after reset, got {restored_count}"
+        )
 
         guard.assert_no_browser_errors("T1_UI_01")
 

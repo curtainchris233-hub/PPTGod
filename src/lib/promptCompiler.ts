@@ -219,6 +219,69 @@ const SLIDE_COMPOSITION_GUIDE: Record<SlideType, { zh: string; en: string }> = {
   },
 };
 
+function buildDomainGuidelines(scenario: string): {
+  heading: string;
+  rules: string[];
+} | null {
+  if (scenario === "课堂教学" || scenario === "教育培训") {
+    return {
+      heading: "课堂教学与认知负荷铁律（Pedagogical Guardrails）",
+      rules: [
+        "严格遵循「情境导入设问 → 核心概念拆解 → 典型例题/案例演练 → 随堂小测与知识树复盘」四段式教学闭环。",
+        "大字号高可读标准：主标题 ≥ 36pt、正文 ≥ 22pt，确保教室后排学生与希沃白板/线上录屏均无障碍阅读。",
+        "在关键知识页插入 1 条「课堂互动设问 / 易错点避坑提示」，在讲稿备注中附带时间分配与师生互动引导词。",
+      ],
+    };
+  }
+  if (scenario === "科研基金" || scenario === "学术答辩") {
+    return {
+      heading: "科研诚信与证据优先铁律（Scientific Evidence Guardrails）",
+      rules: [
+        "零幻觉红线：严禁捏造任何实验数值、p 值、样本量或引用文献；若原始资料缺失数据，必须显式占位为 `[待补实验数据]`。",
+        "证据占据版面主体：标题采用「发现/提出/验证」结论句式，减少无意义装饰性彩色卡片，保留样本量 n、对照基线与误差/显著性标注。",
+        "严格遵循科学汇报逻辑链：科学问题与动机 → 核心假说/方法架构 → 定量实验与消融对比 → 局限性讨论与未来工作。",
+      ],
+    };
+  }
+  if (scenario === "项目汇报") {
+    return {
+      heading: "PMO 项目管控与风险透明铁律（Delivery Governance）",
+      rules: [
+        "首屏或概览页明确标出总体健康度（绿 ON TRACK / 黄 WATCH / 红 AT RISK），先给结论与需决策事项再展开细节。",
+        "所有里程碑与阻塞风险必须包含明确责任人（Owner）、影响范围、截止日期（ETA）与可执行缓解对策，拒绝流水账。",
+      ],
+    };
+  }
+  if (scenario === "政务党建") {
+    return {
+      heading: "政务与国央企规范表达铁律（Formal Civic Standards）",
+      rules: [
+        "提纲挈领、用语规范庄重，章节小标题善用凝练对仗短语，避免轻浮网络热词与过度花哨动画。",
+        "每一项工作举措均须配量化实绩数据或重点工程落地案例，清晰呈现「总体成效 → 核心举措 → 问题剖析 → 下步部署」。",
+      ],
+    };
+  }
+  if (scenario === "个人述职") {
+    return {
+      heading: "STAR 述职与作品集叙事铁律（STAR & Impact Focus）",
+      rules: [
+        "每个代表项目均按 STAR 法则展开（背景 Situation → 挑战目标 Task → 个人核心主导行动 Action → 量化业务结果 Result）。",
+        "清晰区分团队业绩与个人不可替代贡献，提炼可复用的方法论资产，并在结尾给出面向高一职级/目标岗位的清晰规划。",
+      ],
+    };
+  }
+  if (scenario === "生活纪实") {
+    return {
+      heading: "生活纪实与松弛叙事铁律（Lifestyle & Storytelling）",
+      rules: [
+        "彻底摒弃冷冰冰的职场公文腔，多用有温度的短句、时间地点标注与留白呼吸感，让照片与情感记忆成为主角。",
+        "每页聚焦 1 个画面故事或 3 条精炼实用贴士（如行程节点、装备/开销清单、暖心金句），兼具观赏性与收藏价值。",
+      ],
+    };
+  }
+  return null;
+}
+
 export function compilePrompt(
   prompt: PromptItem,
   spec: VisualSpec,
@@ -233,6 +296,12 @@ export function compilePrompt(
   const langLabel = LANG_LABELS[params.language] ?? LANG_LABELS.zh;
   const densityInfo = DENSITY_MAP[spec.layout.density] ?? DENSITY_MAP.balanced;
   const outline = buildAdaptiveOutline(slideCount, topic);
+  const domainGuide = buildDomainGuidelines(prompt.scenario);
+  const domainMdSection = domainGuide
+    ? `\n\n## 领域专属专业铁律：${domainGuide.heading}\n${domainGuide.rules
+        .map((r) => `- ${r}`)
+        .join("\n")}`
+    : "";
   const { palette, typography, layout } = spec;
   const rawChartColors = Array.isArray(palette.chartColors)
     ? palette.chartColors
@@ -291,7 +360,7 @@ ${outline.map((item) => `- **${item.range} ${item.chapter}**：${item.focus}`).j
 ## 4. 工程交付要求
 - 严格锁定 16:9 比例画布（如 \`aspect-ratio: 16 / 9\`，自适应居中缩放，绝不溢出裁切）。
 - 每一页采用不同的版式变体（图文分栏、三步架构图、KPI + 柱状图、转化漏斗/环形占比图、双栏对比、2×2 SWOT 矩阵、横向路线图、核心团队卡片、总结三支柱），禁止每页重复相同列表模板。
-- 不要使用外部无法加载的图片 URL，所有图形装饰和图表使用纯净 SVG 与 CSS 精密绘制，并附带 \`@page { size: 13.333in 7.5in; margin: 0; }\` 与 \`@media print\` 分页打印样式方便一键导出矢量 PDF。`;
+- 不要使用外部无法加载的图片 URL，所有图形装饰和图表使用纯净 SVG 与 CSS 精密绘制，并附带 \`@page { size: 13.333in 7.5in; margin: 0; }\` 与 \`@media print\` 分页打印样式方便一键导出矢量 PDF。${domainMdSection}`;
   }
 
   if (params.targetTool === "gamma-kimi") {
@@ -335,7 +404,7 @@ ${outline
 四、写作与排版红线
 - ${prompt.promptAnatomy.content}
 - 每页标题尽量给出明确结论，正文使用精炼短句（单点不超过 20 字），避免大段堆砌纯文本。
-- 如工具支持自定义主题色，请直接输入上述 HEX 色值（背景 ${palette.bg}，强调 ${palette.accent}）。`;
+- 如工具支持自定义主题色，请直接输入上述 HEX 色值（背景 ${palette.bg}，强调 ${palette.accent}）。${domainMdSection}`;
   }
 
   if (params.targetTool === "notebooklm") {
@@ -373,7 +442,7 @@ ${outline
 # 质量控制要求
 - ${prompt.promptAnatomy.content}
 - 严格基于源文档事实提炼数据与观点，所有关键数字保留来源语境。
-- 单页只聚焦 1 个核心论点，用清晰的标题、要点与结构化图表替代长段落摘要。`;
+- 单页只聚焦 1 个核心论点，用清晰的标题、要点与结构化图表替代长段落摘要。${domainMdSection}`;
   }
 
   if (params.targetTool === "slidev-marp") {
@@ -428,7 +497,7 @@ style: |
 - **版式丰富度**：善用 HTML \`.grid-2\`、\`.grid-3\`、\`.card\` 与简洁内联 SVG 柱状图呈现以下章节：
   1. 封面页：「${topic}」与「${subtitle}」
 ${outline.map((item, idx) => `  ${idx + 2}. ${item.chapter}（${item.range}）：${item.focus}`).join("\n")}
-- **讲稿备注**：在每一页底部使用 \`<!-- 演讲者备注：... -->\` 附上 2~3 句自然口语串词。`;
+- **讲稿备注**：在每一页底部使用 \`<!-- 演讲者备注：... -->\` 附上 2~3 句自然口语串词。${domainMdSection}`;
   }
 
   if (params.targetTool === "python-pptx") {
@@ -478,7 +547,7 @@ COLOR_BORDER = RGBColor(${borderRgb[0]}, ${borderRgb[1]}, ${borderRgb[2]})    # 
    - 至少包含 1 页使用 \`slide.shapes.add_chart\` 绘制原生柱状图与环形占比图，配色使用 \`COLOR_ACCENT\` 与 \`COLOR_TEXT\`。
    - 推荐覆盖 12 类商业母版：封面页、4 象限目录页、图文分栏展示页、3 步核心架构页、KPI + 原生柱状图页、转化漏斗/环形占比页、左右双栏对比页、2×2 SWOT 战略矩阵、里程碑路线图、核心团队卡片页、金句洞察页与总结结尾页。
 4. **防遮挡检查**：严格计算所有文本框坐标 \`(left, top, width, height)\`，设置 \`word_wrap = True\`，确保所有文字留在 \`0.7 in\` 安全边距以内且互不重叠。
-5. **演讲者备注**：为每页 \`slide.notes_slide.notes_text_frame.text\` 写入精炼演讲提纲。`;
+5. **演讲者备注**：为每页 \`slide.notes_slide.notes_text_frame.text\` 写入精炼演讲提纲。${domainMdSection}`;
   }
 
   // ai-image: Single-slide OR Multi-slide sequential batch prompts (6-slide or full 12-slide pack)
@@ -526,7 +595,7 @@ ${batchPages
 
 ---
 ### 全局通用负面词（Negative Prompt）
-3D laptop mockup, angled screen, perspective distortion, cluttered icons, neon purple glow, blurry gibberish text, watermark, photo collage`;
+3D laptop mockup, angled screen, perspective distortion, cluttered icons, neon purple glow, blurry gibberish text, watermark, photo collage${domainMdSection}`;
   }
 
   const slideLabel = SLIDE_TYPE_LABELS[activeSlide] ?? SLIDE_TYPE_LABELS.cover;
@@ -550,7 +619,7 @@ Professional 16:9 presentation slide design, flat 2D digital viewport (no mockup
 
 ---
 ### 负面约束词（Negative Prompt）
-3D mockup, angled perspective, laptop bezel, cluttered icons, cheap neon gradient, blurry text, gibberish letters, stock photo collage, watermark, low contrast`;
+3D mockup, angled perspective, laptop bezel, cluttered icons, cheap neon gradient, blurry text, gibberish letters, stock photo collage, watermark, low contrast${domainMdSection}`;
 }
 
 /**

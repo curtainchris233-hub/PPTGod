@@ -111,6 +111,16 @@ export function pickDefaultArtworkForArchetype(
       return "editorial-arch";
     case "warm-humanist":
       return "editorial-botanical";
+    case "chalkboard-class":
+      return "swiss-geometry";
+    case "scientific-figure":
+      return "biotech-helix";
+    case "civic-redgold":
+      return "song-mountains";
+    case "pmo-rag-grid":
+      return "data-topography";
+    case "polaroid-zine":
+      return "editorial-botanical";
     default:
       return "architecture-iso";
   }

@@ -83,6 +83,11 @@ export interface SlideRenderContext {
   isClinical: boolean;
   isEditorial: boolean;
   isEmerald: boolean;
+  isChalkboard: boolean;
+  isScientific: boolean;
+  isCivic: boolean;
+  isPmo: boolean;
+  isPolaroid: boolean;
   padX: number;
   padY: number;
   radius: number;
@@ -132,6 +137,11 @@ export function buildSlideRenderContext(
     layout.archetype === "editorial-asymmetric" ||
     layout.archetype === "luxury-minimal";
   const isEmerald = layout.archetype === "executive-emerald";
+  const isChalkboard = layout.archetype === "chalkboard-class";
+  const isScientific = layout.archetype === "scientific-figure";
+  const isCivic = layout.archetype === "civic-redgold";
+  const isPmo = layout.archetype === "pmo-rag-grid";
+  const isPolaroid = layout.archetype === "polaroid-zine";
 
   const padX =
     layout.density === "airy" ? 68 : layout.density === "dense" ? 44 : 56;
@@ -140,15 +150,21 @@ export function buildSlideRenderContext(
   const radius = layout.cornerRadius;
 
   const cardStyle: React.CSSProperties = {
-    background: palette.surface,
+    background: isScientific ? "transparent" : palette.surface,
     border: isBrutalist
       ? `2.5px solid ${palette.border}`
+      : isChalkboard
+      ? `1.5px dashed ${palette.border}`
+      : isScientific
+      ? `1px solid ${palette.border}`
       : isBauhaus
       ? `1.5px solid ${palette.border}`
       : `1px solid ${palette.border}`,
     borderRadius: `${radius}px`,
     boxShadow: isBrutalist
       ? `5px 5px 0px ${palette.border}`
+      : isPolaroid
+      ? `0 8px 22px rgba(44, 34, 30, 0.09)`
       : isBento
       ? `0 6px 20px rgba(17, 20, 24, 0.05)`
       : "none",
@@ -206,6 +222,11 @@ export function buildSlideRenderContext(
     isClinical,
     isEditorial,
     isEmerald,
+    isChalkboard,
+    isScientific,
+    isCivic,
+    isPmo,
+    isPolaroid,
     padX,
     padY,
     radius,

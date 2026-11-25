@@ -41,6 +41,11 @@ const ARCHETYPE_OPTIONS: { id: LayoutArchetype; label: string }[] = [
   { id: "brutalist-poster", label: "酸性野兽派海报" },
   { id: "luxury-minimal", label: "北欧静奢画廊" },
   { id: "executive-emerald", label: "投行深翠年报" },
+  { id: "chalkboard-class", label: "黑板粉笔板书微课" },
+  { id: "scientific-figure", label: "Nature 科研证据流" },
+  { id: "civic-redgold", label: "红金政务庄重汇报" },
+  { id: "pmo-rag-grid", label: "PMO 红黄绿状态看板" },
+  { id: "polaroid-zine", label: "拍立得胶片手账" },
 ];
 
 const MOTIF_OPTIONS: { id: DecorativeMotif; label: string }[] = [
@@ -54,6 +59,11 @@ const MOTIF_OPTIONS: { id: DecorativeMotif; label: string }[] = [
   { id: "hard-offset", label: "野兽派硬投影" },
   { id: "ribbon-accent", label: "顶部彩带条" },
   { id: "bento-dots", label: "Bento 三色圆点" },
+  { id: "chalk-frame", label: "黑板粉笔边框" },
+  { id: "citation-axis", label: "科研坐标刻度尺" },
+  { id: "redgold-ribbon", label: "政务红金双饰带" },
+  { id: "status-dots", label: "PMO 红黄绿状态灯" },
+  { id: "film-sprocket", label: "胶片齿孔饰边" },
   { id: "none", label: "无装饰" },
 ];
 

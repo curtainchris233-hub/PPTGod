@@ -346,6 +346,11 @@ export async function POST(request: Request) {
         archetype === "editorial-asymmetric" || archetype === "luxury-minimal",
       isTerminal: archetype === "financial-terminal",
       isAcademic: archetype === "academic-paper",
+      isChalkboard: archetype === "chalkboard-class",
+      isScientific: archetype === "scientific-figure",
+      isCivic: archetype === "civic-redgold",
+      isPmo: archetype === "pmo-rag-grid",
+      isPolaroid: archetype === "polaroid-zine",
       isRounded: cornerRadius >= 8,
     };
 

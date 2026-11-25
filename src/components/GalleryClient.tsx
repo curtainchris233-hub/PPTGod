@@ -15,10 +15,12 @@ import StyleMatcherModal from "@/components/StyleMatcherModal";
 import { useApp } from "@/context/AppContext";
 import {
   COLOR_FAMILY_LABELS,
+  DOMAIN_TABS,
   SCENARIO_OPTIONS,
   STYLE_CATEGORY_OPTIONS,
   TOOL_METADATA,
   type ColorFamily,
+  type DomainTabId,
   type PromptItem,
   type TargetTool,
 } from "@/types/prompt";
@@ -26,6 +28,8 @@ import {
 const TOPIC_PRESETS = [
   "2026 AI Agent 企业级落地路线图",
   "Q4 商业增长与毛利重构复盘",
+  "高中物理 · 电磁感应公开课",
+  "2026 国家自然科学基金面上项目答辩",
   "多模态大模型稀疏推理论文答辩",
   "在地茶饮品牌全渠道视觉焕新",
 ];
@@ -38,6 +42,7 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
   const { user, syncVersion, globalTopic, setGlobalTopic } = useApp();
 
   const [prompts, setPrompts] = useState<PromptItem[]>(initialPrompts);
+  const [domainTab, setDomainTab] = useState<DomainTabId>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [scenario, setScenario] = useState<string>("全部场景");
   const [styleCategory, setStyleCategory] = useState<string>("全部风格");
@@ -64,9 +69,53 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
     };
   }, [user?.id, syncVersion]);
 
+  const activeDomainDef = useMemo(
+    () => DOMAIN_TABS.find((t) => t.id === domainTab) ?? DOMAIN_TABS[0],
+    [domainTab]
+  );
+
+  const domainCounts = useMemo(() => {
+    const counts: Record<DomainTabId, number> = {
+      all: prompts.length,
+      "business-tech": 0,
+      teaching: 0,
+      research: 0,
+      workplace: 0,
+      lifestyle: 0,
+    };
+    for (const tab of DOMAIN_TABS) {
+      if (tab.id === "all") continue;
+      counts[tab.id] = prompts.filter((p) =>
+        tab.scenarios.includes(p.scenario)
+      ).length;
+    }
+    return counts;
+  }, [prompts]);
+
+  const visibleScenarios = useMemo(() => {
+    if (domainTab === "all") return [...SCENARIO_OPTIONS];
+    return ["全部场景", ...activeDomainDef.scenarios];
+  }, [domainTab, activeDomainDef]);
+
+  const handleSelectDomain = (nextDomain: DomainTabId) => {
+    setDomainTab(nextDomain);
+    if (nextDomain !== "all" && scenario !== "全部场景") {
+      const def = DOMAIN_TABS.find((t) => t.id === nextDomain);
+      if (def && !def.scenarios.includes(scenario)) {
+        setScenario("全部场景");
+      }
+    }
+  };
+
   const filteredPrompts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const list = prompts.filter((p) => {
+      if (
+        domainTab !== "all" &&
+        !activeDomainDef.scenarios.includes(p.scenario)
+      ) {
+        return false;
+      }
       if (scenario !== "全部场景" && p.scenario !== scenario) return false;
       if (styleCategory !== "全部风格" && p.styleCategory !== styleCategory)
         return false;
@@ -102,6 +151,8 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
     });
   }, [
     prompts,
+    domainTab,
+    activeDomainDef,
     searchQuery,
     scenario,
     styleCategory,
@@ -111,6 +162,7 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
   ]);
 
   const hasActiveFilters =
+    domainTab !== "all" ||
     searchQuery.trim() !== "" ||
     scenario !== "全部场景" ||
     styleCategory !== "全部风格" ||
@@ -118,6 +170,7 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
     targetTool !== "all";
 
   const resetFilters = () => {
+    setDomainTab("all");
     setSearchQuery("");
     setScenario("全部场景");
     setStyleCategory("全部风格");
@@ -143,7 +196,7 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
           <div className="pg-hero-grid">
             <div className="pg-hero-copy">
               <p className="pg-kicker">
-                VISUAL PPT PROMPT SPECIMENS · {prompts.length} 套可交互设计系统
+                VISUAL PPT PROMPT SPECIMENS · {prompts.length} 套全领域可交互设计系统
               </p>
               <h1 className="pg-hero-title">
                 先看见 PPT 视觉效果，
@@ -151,9 +204,9 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
                 再带走精准提示词
               </h1>
               <p className="pg-hero-lead">
-                每一套提示词均以真实 16:9 幻灯片画布渲染 12 种商业页型。既可一键编译适配
-                Claude HTML、Gamma/Kimi、NotebookLM、即梦生图、Slidev 与 Python-PPTX，也可直接在线生成并导出可编辑
-                .pptx 演示文稿。
+                覆盖商业科技、教师课堂、科研基金、项目政务与生活纪实全场景，每套提示词均以真实 16:9 画布渲染 12 种页型。一键编译适配
+                Claude HTML、Gamma/Kimi、NotebookLM、即梦生图、Slidev 与 Python-PPTX，或在线直接导出可编辑
+                .pptx。
               </p>
 
               <div className="pg-hero-actions">
@@ -199,7 +252,7 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
                   id="pg-global-topic-input"
                   type="text"
                   className="pg-live-topic-input"
-                  placeholder="输入你的汇报/路演标题，下方所有风格画布同步刷新..."
+                  placeholder="输入你的课件/基金/汇报/旅行标题，下方所有画布同步刷新..."
                   value={globalTopic}
                   onChange={(e) => setGlobalTopic(e.target.value)}
                 />
@@ -230,13 +283,42 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
       <section className="pg-filters-section" aria-label="多维度筛选提示词">
         <div className="pg-container">
           <div className="pg-filter-shell">
+            {/* Full-Domain Audience Tabs */}
+            <div
+              className="pg-domain-tabs"
+              role="tablist"
+              aria-label="按人群领域浏览"
+              id="pg-domain-tabs"
+            >
+              {DOMAIN_TABS.map((tab) => {
+                const active = domainTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    id={`pg-domain-tab-${tab.id}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    title={tab.desc}
+                    className={`pg-domain-tab ${active ? "is-active" : ""}`}
+                    onClick={() => handleSelectDomain(tab.id)}
+                  >
+                    <span className="pg-domain-tab-label">{tab.label}</span>
+                    <span className="pg-domain-tab-count">
+                      {domainCounts[tab.id] ?? 0}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="pg-filter-row-top">
               <div
                 className="pg-scenario-pills"
                 role="group"
                 aria-label="按使用场景筛选"
               >
-                {SCENARIO_OPTIONS.map((sc) => (
+                {visibleScenarios.map((sc) => (
                   <button
                     key={sc}
                     type="button"

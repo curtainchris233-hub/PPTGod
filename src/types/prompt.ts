@@ -37,7 +37,12 @@ export type LayoutArchetype =
   | "executive-emerald"
   | "soft-bento"
   | "financial-terminal"
-  | "clinical-clean";
+  | "clinical-clean"
+  | "chalkboard-class"
+  | "scientific-figure"
+  | "civic-redgold"
+  | "pmo-rag-grid"
+  | "polaroid-zine";
 
 export type TypographyMood =
   | "swiss"
@@ -60,6 +65,11 @@ export type DecorativeMotif =
   | "hard-offset"
   | "ribbon-accent"
   | "bento-dots"
+  | "chalk-frame"
+  | "citation-axis"
+  | "redgold-ribbon"
+  | "status-dots"
+  | "film-sprocket"
   | "none";
 
 export type AnatomyDimension =
@@ -292,11 +302,69 @@ export const SCENARIO_OPTIONS = [
   "咨询汇报",
   "年度总结",
   "品牌提案",
-  "学术答辩",
-  "技术分享",
+  "课堂教学",
   "教育培训",
+  "学术答辩",
+  "科研基金",
+  "项目汇报",
+  "政务党建",
+  "个人述职",
+  "技术分享",
   "文化创意",
+  "生活纪实",
 ] as const;
+
+export type DomainTabId =
+  | "all"
+  | "business-tech"
+  | "teaching"
+  | "research"
+  | "workplace"
+  | "lifestyle";
+
+export const DOMAIN_TABS: {
+  id: DomainTabId;
+  label: string;
+  desc: string;
+  scenarios: readonly string[];
+}[] = [
+  {
+    id: "all",
+    label: "全部领域",
+    desc: "工作与生活全场景视觉母版",
+    scenarios: [],
+  },
+  {
+    id: "business-tech",
+    label: "商业与科技",
+    desc: "产品发布、商业路演、品牌提案与技术分享",
+    scenarios: ["产品发布", "商业路演", "品牌提案", "技术分享"],
+  },
+  {
+    id: "teaching",
+    label: "教师与课堂",
+    desc: "黑板板书、公开课说课、K12 班会与 STEAM 培训",
+    scenarios: ["课堂教学", "教育培训"],
+  },
+  {
+    id: "research",
+    label: "科研与学术",
+    desc: "国自然基金答辩、Nature 证据流、组会精读与硕博答辩",
+    scenarios: ["科研基金", "学术答辩"],
+  },
+  {
+    id: "workplace",
+    label: "项目与职场",
+    desc: "PMO 里程碑、咨询汇报、政务党建、年终述职与年度总结",
+    scenarios: ["项目汇报", "政务党建", "个人述职", "咨询汇报", "年度总结"],
+  },
+  {
+    id: "lifestyle",
+    label: "生活与个人",
+    desc: "旅行胶片手账、婚礼纪念、读书会、文创与兴趣社团",
+    scenarios: ["生活纪实", "文化创意", "个人述职"],
+  },
+];
 
 export const STYLE_CATEGORY_OPTIONS = [
   "全部风格",
@@ -310,6 +378,9 @@ export const STYLE_CATEGORY_OPTIONS = [
   "暖调人文",
   "野兽派海报",
   "学术期刊",
+  "课堂板书",
+  "政务红金",
+  "胶片手账",
 ] as const;
 
 export const COLOR_FAMILY_LABELS: Record<ColorFamily | "all", string> = {

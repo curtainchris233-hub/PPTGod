@@ -1149,6 +1149,1093 @@ export const SEED_PROMPTS: SeedPrompt[] = [
     savesCount: 329,
     copiesCount: 1030,
   },
+  /* ==================== v5 新增：教师与课堂教学（4 套） ==================== */
+  {
+    id: "prompt_chalkboard_lesson",
+    slug: "chalkboard-classic-lesson",
+    title: "墨绿护眼黑板 · 经典粉笔板书微课",
+    englishTitle: "Classic Chalkboard Lesson",
+    summary:
+      "还原经典护眼墨绿黑板与木质粉笔槽质感：高对比暖白粉笔字搭配柠檬黄重点圈注与虚线板书框，专为中小学与高校板书推导微课设计。",
+    scenario: "课堂教学",
+    styleCategory: "课堂板书",
+    colorFamily: "dark",
+    recommendedTools: ["claude-html", "gamma-kimi", "ai-image", "slidev-marp"],
+    tags: ["教师课件", "黑板粉笔", "板书推导", "护眼暗底", "微课录屏"],
+    visualSpec: {
+      palette: {
+        bg: "#1E352F",
+        surface: "#254039",
+        text: "#F7F5EB",
+        muted: "#C3D4CC",
+        accent: "#FACC15",
+        accentSoft: "rgba(250, 204, 21, 0.16)",
+        border: "#4E6E64",
+        chartColors: ["#FACC15", "#7DD3FC", "#FCA5A5", "#A7F3D0"],
+      },
+      typography: {
+        mood: "humanist",
+        headingFontLabel: "思源黑体 / 楷体加粗（粉笔板书感）",
+        bodyFontLabel: "苹方 / 思源黑体 Medium",
+        titleWeight: 700,
+        titleTracking: "0em",
+      },
+      layout: {
+        archetype: "chalkboard-class",
+        density: "balanced",
+        cornerRadius: 6,
+        showPageNumber: true,
+        decorativeMotif: "chalk-frame",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "沉浸式护眼黑板板书教学美学（Classic Chalkboard Pedagogy）：哑光墨绿底板配合虚线粉笔框与底部木质板槽线，帮助学生聚焦推导逻辑与课堂重点。",
+      palette:
+        "经典护眼墨绿黑板底（#1E352F）、浅石板绿板书卡（#254039）、暖白粉笔正文（#F7F5EB），柠檬粉笔黄（#FACC15）专用于高亮公式、易错点与随堂提问。",
+      typography:
+        "主标题 ≥ 36pt、正文 ≥ 22pt 大字号高对比规范，确保教室后排与线上录屏均清晰易读，公式与例题分步呈现。",
+      layout:
+        "每课严格遵循「情境导入设问 → 核心概念拆解 → 典型例题分步板书 → 随堂小测与知识树小结」四段式闭环。",
+      content:
+        "每页预留明确的「老师互动提问」与「易错点提醒」标注，避免大段照本宣科。",
+    },
+    customNotes:
+      "数学、物理、化学推导及中小学公开课、慕课录屏高频口碑模板。",
+    sampleTopic: "牛顿第二定律与动力学两类核心问题精讲",
+    sampleSubtitle: "高一物理必修一 · 探究加速度、合力与质量的定量关系",
+    authorId: "user_studio_official",
+    isOfficial: true,
+    likesCount: 412,
+    savesCount: 365,
+    copiesCount: 1240,
+  },
+  {
+    id: "prompt_open_class_cyan",
+    slug: "open-class-competition-cyan",
+    title: "青教赛金奖 · 公开课与说课规范课件",
+    englishTitle: "Teaching Competition Standard",
+    summary:
+      "面向高校青教赛、教学创新大赛与精品说课评审：高对比抗反光冷白纸底，教育青蓝知识骨架配暖橙互动锚点，清晰呈现教学目标与痛点突破。",
+    scenario: "课堂教学",
+    styleCategory: "暖调人文",
+    colorFamily: "light",
+    recommendedTools: ["claude-html", "gamma-kimi", "notebooklm", "python-pptx"],
+    tags: ["青教赛", "公开课说课", "教学创新", "抗反光白底", "高校教师"],
+    visualSpec: {
+      palette: {
+        bg: "#F8FAFC",
+        surface: "#FFFFFF",
+        text: "#0F172A",
+        muted: "#475569",
+        accent: "#0284C7",
+        accentSoft: "#E0F2FE",
+        border: "#CBD5E1",
+        chartColors: ["#0284C7", "#EA580C", "#0D9488", "#64748B"],
+      },
+      typography: {
+        mood: "humanist",
+        headingFontLabel: "思源黑体 Bold / Plus Jakarta Sans",
+        bodyFontLabel: "苹方 / 微软雅黑 Regular",
+        titleWeight: 700,
+        titleTracking: "-0.015em",
+      },
+      layout: {
+        archetype: "warm-humanist",
+        density: "balanced",
+        cornerRadius: 10,
+        showPageNumber: true,
+        decorativeMotif: "ribbon-accent",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "全国教学竞赛金奖标准风格（Instructional Excellence）：明亮通透、层次分明、评审友好，在 15–20 分钟说课内一眼呈现教学痛点、创新举措与学情成效。",
+      palette:
+        "无反光冷白底（#F8FAFC）保障强光礼堂投影清晰度，知识青蓝（#0284C7）构建课程主脉络，活力琥珀橙（#EA580C）标注课程思政融合点与互动环节。",
+      typography:
+        "清晰的三级教学层级：顶部章节进度条 + 结论式课时小标题 + 精炼关键词卡片，重点概念加粗标色。",
+      layout:
+        "内置「学情痛点 → 教学目标（知识/能力/素养）→ 混合式教学闭环 → 评价反思与成效数据」标准化说课框架。",
+      content:
+        "强调以学生为中心（OBE 理念），配合形成性评价数据与课堂互动实景说明，杜绝纯教材目录罗列。",
+    },
+    customNotes:
+      "高校青年教师教学竞赛、中小学优质课评比与教研组说课汇报首选。",
+    sampleTopic: "《人工智能导论》混合式翻转课堂教学创新说课",
+    sampleSubtitle: "基于问题链驱动与项目式实训的 OBE 教学设计方案",
+    authorId: "user_demo",
+    isOfficial: true,
+    likesCount: 389,
+    savesCount: 342,
+    copiesCount: 1180,
+  },
+  {
+    id: "prompt_k12_storybook",
+    slug: "k12-pastel-storybook",
+    title: "豆沙护眼绘本 · K12 启蒙与主题班会",
+    englishTitle: "K12 Pastel Storybook",
+    summary:
+      "专为小学初中课堂、主题班会与家长会打造的低饱和护眼豆沙绿绘本风格：大圆角亲和卡片配蜜桃珊瑚暖色徽章，活泼清爽不刺眼。",
+    scenario: "课堂教学",
+    styleCategory: "现代Bento",
+    colorFamily: "warm",
+    recommendedTools: ["claude-html", "gamma-kimi", "ai-image"],
+    tags: ["中小学班会", "家长会", "K12 课件", "护眼浅绿", "亲子互动"],
+    visualSpec: {
+      palette: {
+        bg: "#F4F8F2",
+        surface: "#FFFFFF",
+        text: "#253029",
+        muted: "#5C6E63",
+        accent: "#E06D53",
+        accentSoft: "#FCECE8",
+        border: "#DCE6D9",
+        chartColors: ["#E06D53", "#4F8A6E", "#E9B44C", "#6C9BD2"],
+      },
+      typography: {
+        mood: "humanist",
+        headingFontLabel: "圆润黑体 / Plus Jakarta Sans Bold",
+        bodyFontLabel: "苹方 / 思源黑体 Regular",
+        titleWeight: 700,
+        titleTracking: "-0.01em",
+      },
+      layout: {
+        archetype: "soft-bento",
+        density: "airy",
+        cornerRadius: 18,
+        showPageNumber: true,
+        decorativeMotif: "bento-dots",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "低龄友好护眼绘本 Bento 美学（Warm K12 Storybook）：高留白、大圆角、马卡龙自然暖色系，营造安全轻松的课堂讨论与家校沟通氛围。",
+      palette:
+        "视力保护豆沙浅绿纸底（#F4F8F2）配纯白圆角卡片，深松叶墨绿文字（#253029）高对比护眼，蜜桃珊瑚橘（#E06D53）引导视觉焦点。",
+      typography:
+        "大字号圆润友好标题，每页文字严格控制在 35 字以内，多用生活化比喻与图标序号降低阅读压力。",
+      layout:
+        "18px 亲和圆角模块化卡片 + 右上角三色圆点装饰，便于排布故事导入、小组讨论任务卡与表彰光荣榜。",
+      content:
+        "契合主题班会、心理健康课、期中家长会与小学语文/科学启蒙课件，注重互动感与正向激励。",
+    },
+    customNotes:
+      "班主任开家长会、安全教育主题班会及儿童素质拓展课极受欢迎。",
+    sampleTopic: "做情绪的小主人 · 五年级心理健康主题班会",
+    sampleSubtitle: "认识情绪信号 · 学会三个科学冷静小锦囊",
+    authorId: "user_demo",
+    isOfficial: true,
+    likesCount: 344,
+    savesCount: 310,
+    copiesCount: 990,
+  },
+  {
+    id: "prompt_steam_gridbook",
+    slug: "steam-inquiry-gridbook",
+    title: "方格实验手账 · STEAM 科创与探究课",
+    englishTitle: "STEAM Inquiry Gridbook",
+    summary:
+      "模拟工程实验方格笔记本的清爽亮底探究风：电光靛蓝步骤轴搭配翡翠绿假设验证徽章与精密准星，点燃创客、编程与科学实验课堂。",
+    scenario: "教育培训",
+    styleCategory: "科技未来",
+    colorFamily: "light",
+    recommendedTools: ["claude-html", "gamma-kimi", "slidev-marp", "notebooklm"],
+    tags: ["STEAM 科创", "实验探究", "少儿编程", "方格笔记", "工作坊"],
+    visualSpec: {
+      palette: {
+        bg: "#F9F8F3",
+        surface: "#FFFFFF",
+        text: "#181B2C",
+        muted: "#5A6078",
+        accent: "#4F46E5",
+        accentSoft: "#EEF2FF",
+        border: "#D9DCE8",
+        chartColors: ["#4F46E5", "#10B981", "#F59E0B", "#64748B"],
+      },
+      typography: {
+        mood: "tech",
+        headingFontLabel: "Space Grotesk / 思源黑体 Bold",
+        bodyFontLabel: "Inter / 苹方 Regular",
+        titleWeight: 700,
+        titleTracking: "-0.02em",
+      },
+      layout: {
+        archetype: "tech-blueprint",
+        density: "balanced",
+        cornerRadius: 6,
+        showPageNumber: true,
+        decorativeMotif: "corner-brackets",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "明亮创客实验笔记风格（Bright STEAM Lab Notebook）：融合科学探究的严谨准星与现代创客的明快色阶，让动手实践流程一目了然。",
+      palette:
+        "暖米实验纸底（#F9F8F3）、纯白模块卡，主强调色采用电光靛蓝（#4F46E5），实验成功指标与对照组分别用翡翠绿（#10B981）与警示琥珀（#F59E0B）区分。",
+      typography:
+        "清晰现代无衬线标题搭配等宽参数标签（如 `STEP 01 / V=3.3V / T=25°C`），激发工程好奇心。",
+      layout:
+        "遵循「观察现象 → 提出假设 → 动手搭建与控制变量 → 数据记录与迭代反思」的 PBL 项目制探究结构。",
+      content:
+        "适合高校创新创业实训、中学物理/生物实验课、创客工作坊与少儿编程竞赛路演。",
+    },
+    customNotes:
+      "相比深色科技风，浅底实验手账在普通教室投影下辨识度高出一倍。",
+    sampleTopic: "太阳能智能滴灌系统 · STEAM 跨学科科创项目",
+    sampleSubtitle: "从土壤湿度传感原理到 PID 自动控制原型验证",
+    authorId: "user_studio_official",
+    isOfficial: true,
+    likesCount: 326,
+    savesCount: 288,
+    copiesCount: 870,
+  },
+
+  /* ==================== v5 新增：研究人员与学术全周期（4 套） ==================== */
+  {
+    id: "prompt_nsfc_grant",
+    slug: "nsfc-grant-defense-bluered",
+    title: "国自然 NSFC · 基金申报与重点课题答辩",
+    englishTitle: "NSFC Grant Defense Spec",
+    summary:
+      "严格对标国家自然科学基金、杰青/优青与重点研发计划评审规范：纯白学术底板、科学院深蓝骨架配关键创新点朱红高亮，适配 5–7 分钟专家高精度汇报。",
+    scenario: "科研基金",
+    styleCategory: "学术期刊",
+    colorFamily: "light",
+    recommendedTools: ["claude-html", "gamma-kimi", "notebooklm", "python-pptx"],
+    tags: ["国自然 NSFC", "基金答辩", "重点课题", "蓝红学术", "高密度汇报"],
+    visualSpec: {
+      palette: {
+        bg: "#FFFFFF",
+        surface: "#F5F8FC",
+        text: "#111827",
+        muted: "#4B5563",
+        accent: "#0F3D75",
+        accentSoft: "#E6EFFA",
+        border: "#CBD5E1",
+        chartColors: ["#0F3D75", "#C81E1E", "#0E7490", "#64748B"],
+      },
+      typography: {
+        mood: "consulting",
+        headingFontLabel: "思源黑体 Bold / 微软雅黑 Bold",
+        bodyFontLabel: "思源黑体 / Arial Regular",
+        titleWeight: 700,
+        titleTracking: "-0.015em",
+      },
+      layout: {
+        archetype: "consulting-mbb",
+        density: "dense",
+        cornerRadius: 4,
+        showPageNumber: true,
+        decorativeMotif: "hairline-rule",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "国家自然科学基金评审专攻风格（High-Precision Grant Defense）：绝对克制零花哨动画，顶部核心科学问题一句话定调，全页模块化块状排版，专为评审专家 5–7 分钟快速抓重点打造。",
+      palette:
+        "高对比纯白纸底（#FFFFFF）确保会议室投影零偏色，科学院深蓝（#0F3D75）建立研究骨架，核心科学假说与突破性指标严格用学术朱红（#C81E1E）精准点题。",
+      typography:
+        "每页标题必须采用「动词 + 科学发现/技术突破」结论句式（多用「揭示」「提出」「突破」），正文层级严密，关键量化指标加粗标红。",
+      layout:
+        "按国自然黄金六步展开：立项依据与关键科学问题 → 研究目标与核心假说 → 技术路线与机理框架 → 前期工作基础（代表作/预实验）→ 创新点对比 → 年度计划与团队保障。",
+      content:
+        "严禁编造或夸大实验数据，所有前期代表论文与指标需保留期刊年份、样本量与对照基线。",
+    },
+    customNotes:
+      "高校与科研院所申报国自然优青/面上/重点项目、博士后基金及重大科技专项答辩必备。",
+    sampleTopic: "面向极端工况的多物理场耦合失效机理与智能调控",
+    sampleSubtitle: "国家自然科学基金重点项目申请答辩 · 科学问题与技术路线",
+    authorId: "user_curator_chen",
+    isOfficial: true,
+    likesCount: 468,
+    savesCount: 432,
+    copiesCount: 1560,
+  },
+  {
+    id: "prompt_nature_okabe",
+    slug: "nature-okabe-ito-evidence",
+    title: "Nature 证据流 · Okabe-Ito 色盲安全科研风",
+    englishTitle: "Nature Evidence Okabe-Ito",
+    summary:
+      "融合 Nature Methods 官方推荐的 Okabe-Ito 色盲安全科研色板与「去 AI 卡片化」极简证据流排版：无冗余阴影框、纯白高可读大字号，让实验图表与显著性结论占据绝对视觉主体。",
+    scenario: "科研基金",
+    styleCategory: "学术期刊",
+    colorFamily: "light",
+    recommendedTools: ["claude-html", "notebooklm", "slidev-marp", "python-pptx"],
+    tags: ["Nature 科研", "Okabe-Ito", "色盲安全", "去卡片化", "国际会议"],
+    visualSpec: {
+      palette: {
+        bg: "#FCFCFD",
+        surface: "#F8FAFC",
+        text: "#111827",
+        muted: "#4B5563",
+        accent: "#0072B2",
+        accentSoft: "#E6F2FA",
+        border: "#D1D5DB",
+        chartColors: ["#0072B2", "#D55E00", "#009E73", "#CC79A7"],
+      },
+      typography: {
+        mood: "academic",
+        headingFontLabel: "Instrument Serif / 思源宋体 SemiBold",
+        bodyFontLabel: "Inter / 思源黑体 Regular",
+        titleWeight: 600,
+        titleTracking: "-0.01em",
+      },
+      layout: {
+        archetype: "scientific-figure",
+        density: "balanced",
+        cornerRadius: 2,
+        showPageNumber: true,
+        decorativeMotif: "citation-axis",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "顶级国际期刊科研报告美学（Nature / Science Evidence-First）：坚决摒弃廉价 AI 彩色圆角卡片堆砌，以透明留白区块、精密坐标刻度线和 100% 证据驱动排版彰显学者品位。",
+      palette:
+        "严格内置 Masataka Okabe & Kei Ito 色盲安全标准色板（海蓝 #0072B2、朱橙 #D55E00、翠绿 #009E73、绛紫 #CC79A7），确保色觉异常听众与黑白打印下均可清晰区分实验组别。",
+      typography:
+        "遵循国际学术会场投影大字号标准（标题 ≥ 36pt，正文 ≥ 22pt，坐标轴标注 ≥ 18pt），底部固定等宽文献引用与 p 值脚注。",
+      layout:
+        "顶部精密坐标刻度尺眉标 + 左侧 60% 放大实验证据/图表区 + 右侧精炼 2–3 条统计学解释，每页只证明 1 个可证伪的科学论断。",
+      content:
+        "强制科研诚信护栏：严格忠实于上传论文与原始数据，任何缺失数字标注 `[TK: 待补实验值]`，保留样本量 n、置信区间与来源引文。",
+    },
+    customNotes:
+      "NeurIPS、ICML、Nature/Cell 国际学术会议 Oral Talk 及海外博士组会汇报王牌风格。",
+    sampleTopic: "Single-Cell Spatial Atlas Reveals Immune Niche Remodeling",
+    sampleSubtitle: "高分辨率空间转录组揭示微环境重塑机制 · 国际学术大会口头报告",
+    authorId: "user_studio_official",
+    isOfficial: true,
+    likesCount: 452,
+    savesCount: 418,
+    copiesCount: 1490,
+  },
+  {
+    id: "prompt_journal_club",
+    slug: "journal-club-paper-reading",
+    title: "实验室组会 · Journal Club 文献精读",
+    englishTitle: "Lab Journal Club Briefing",
+    summary:
+      "专为硕博研究生每周组会、文献精读与实验进展同步打造：护眼冷灰纸底、牛津深青章节导航栏与批注赭橙质疑点标记，高效拆解 Motivation / Method / Ablation。",
+    scenario: "学术答辩",
+    styleCategory: "学术期刊",
+    colorFamily: "light",
+    recommendedTools: ["notebooklm", "claude-html", "slidev-marp", "gamma-kimi"],
+    tags: ["文献精读", "组会汇报", "Journal Club", "消融实验", "研究生"],
+    visualSpec: {
+      palette: {
+        bg: "#F5F7FA",
+        surface: "#FFFFFF",
+        text: "#18222F",
+        muted: "#536274",
+        accent: "#0F4C5C",
+        accentSoft: "#E6F1F4",
+        border: "#D4DDE7",
+        chartColors: ["#0F4C5C", "#C2410C", "#2563EB", "#64748B"],
+      },
+      typography: {
+        mood: "academic",
+        headingFontLabel: "思源宋体 / Plus Jakarta Sans Bold",
+        bodyFontLabel: "Inter / 苹方 Regular",
+        titleWeight: 700,
+        titleTracking: "-0.015em",
+      },
+      layout: {
+        archetype: "academic-paper",
+        density: "dense",
+        cornerRadius: 4,
+        showPageNumber: true,
+        decorativeMotif: "citation-axis",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "高效科研组会文献精读风（Weekly Lab Journal Club）：顶部带 Beamer 式章节进度导航，结构利落不冗余，让导师和同门 10 分钟抓准论文核心贡献与可复现缺陷。",
+      palette:
+        "护眼冷灰白纸（#F5F7FA）配合纯白实验框，牛津深青（#0F4C5C）标注原论文核心方法，批注赭橙（#C2410C）突出「Critique 局限性」与「对本课题组启发」。",
+      typography:
+        "清晰展示论文元信息（Venue / Year / Code Link），公式变量与基线指标使用等宽字体对齐，便于横向对比 SOTA。",
+      layout:
+        "固定文献拆解链路：Paper Card 元信息 → Research Gap → Core Architecture → Main Results & Ablation → Critical Review & Lab Takeaway。",
+      content:
+        "高度契合搭配 NotebookLM 上传 PDF 论文自动提炼，要求明确区分「作者原话结论」与「汇报人批判性思考」。",
+    },
+    customNotes:
+      "配合 NotebookLM 或直接上传英文论文 PDF 到工坊，5 分钟生成高质量周会精读 PPT。",
+    sampleTopic: "文献精读：Test-Time Scaling Laws in Multimodal Reasoning",
+    sampleSubtitle: "ICLR 2026 Spotlight 拆解 · 方法架构、消融实验与本组复现建议",
+    authorId: "user_curator_chen",
+    isOfficial: true,
+    likesCount: 374,
+    savesCount: 348,
+    copiesCount: 1210,
+  },
+  {
+    id: "prompt_humanities_archive",
+    slug: "humanities-archival-seminar",
+    title: "古籍田野笺纸 · 人文社科与历史考据",
+    englishTitle: "Humanities Archival Seminar",
+    summary:
+      "脱胎于线装古籍笺纸与人文期刊的雅致学术风：竹纸米褐底色、焦茶墨宋体引文配藏书印泥红，赋予文史哲、社会学、法学与建筑遗产答辩厚重书卷气。",
+    scenario: "学术答辩",
+    styleCategory: "新中式美学",
+    colorFamily: "earth",
+    recommendedTools: ["claude-html", "notebooklm", "gamma-kimi", "ai-image"],
+    tags: ["人文社科", "文史哲答辩", "法学研讨", "田野调查", "古籍笺纸"],
+    visualSpec: {
+      palette: {
+        bg: "#F6F1E7",
+        surface: "#FCF9F2",
+        text: "#2B241E",
+        muted: "#6E6155",
+        accent: "#9E2A2B",
+        accentSoft: "#F5E4E4",
+        border: "#DDD3C2",
+        chartColors: ["#9E2A2B", "#4A5D5E", "#8C6D46", "#A99B89"],
+      },
+      typography: {
+        mood: "chinese",
+        headingFontLabel: "思源宋体 / 华文仿宋 Bold",
+        bodyFontLabel: "思源宋体 / 苹方 Regular",
+        titleWeight: 700,
+        titleTracking: "0.02em",
+      },
+      layout: {
+        archetype: "neo-chinese",
+        density: "airy",
+        cornerRadius: 2,
+        showPageNumber: true,
+        decorativeMotif: "editorial-drop",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "典雅人文社科考据美学（Archival Humanities Seminar）：如博物馆文献展签与学术专著版式，温润沉静，擅长呈现一手史料引文、田野访谈摘录与年表脉络。",
+      palette:
+        "竹纸米褐底（#F6F1E7）搭配宣纸暖白卡（#FCF9F2），焦茶墨正文（#2B241E）温润不刺眼，藏书印泥红（#9E2A2B）点缀文献出处与核心论点。",
+      typography:
+        "全程以宋体/楷宋建立典雅人文层级，原始文献/访谈引文使用大字号竖线引用块，页脚保留规范芝加哥/GB7714 文献注脚。",
+      layout:
+        "疏朗编辑部留白 + 精细内页框线，特别强化时间年表（Timeline）、双栏文本互证对比（Comparison）与核心金句引证页（Quote）。",
+      content:
+        "面向历史、文学、哲学、社会学、新闻传播、建筑史与法学专业学位答辩及读书研讨会。",
+    },
+    customNotes:
+      "人文社科研究者终于告别千篇一律的科技蓝模板，用书卷气赢得答辩席好感。",
+    sampleTopic: "明清江南市镇水系变迁与商帮治理空间考证",
+    sampleSubtitle: "历史地理学硕士学位论文答辩 · 地方志文献与田野口述互证",
+    authorId: "user_demo",
+    isOfficial: true,
+    likesCount: 338,
+    savesCount: 306,
+    copiesCount: 910,
+  },
+
+  /* ==================== v5 新增：项目管理与日常职场汇报（5 套） ==================== */
+  {
+    id: "prompt_pmo_rag",
+    slug: "pmo-rag-milestone-board",
+    title: "PMO 里程碑看板 · 项目交付与红黄绿管控",
+    englishTitle: "PMO RAG Milestone Board",
+    summary:
+      "专为项目经理、交付总监与跨部门项目复盘打造：精密工程灰底配钴蓝骨架与标准 RAG（红/黄/绿）健康度指示灯，一屏说清进度、依赖、预算与风险对策。",
+    scenario: "项目汇报",
+    styleCategory: "商务咨询",
+    colorFamily: "light",
+    recommendedTools: ["claude-html", "gamma-kimi", "python-pptx", "slidev-marp"],
+    tags: ["PMO 汇报", "项目周报", "里程碑", "红黄绿风险", "交付复盘"],
+    visualSpec: {
+      palette: {
+        bg: "#F4F6F9",
+        surface: "#FFFFFF",
+        text: "#0F172A",
+        muted: "#526071",
+        accent: "#1D4ED8",
+        accentSoft: "#DBEAFE",
+        border: "#D5DDE8",
+        chartColors: ["#16A34A", "#D97706", "#DC2626", "#2563EB"],
+      },
+      typography: {
+        mood: "consulting",
+        headingFontLabel: "Plus Jakarta Sans / 思源黑体 Bold",
+        bodyFontLabel: "Inter / 苹方 Regular",
+        titleWeight: 700,
+        titleTracking: "-0.02em",
+      },
+      layout: {
+        archetype: "pmo-rag-grid",
+        density: "dense",
+        cornerRadius: 6,
+        showPageNumber: true,
+        decorativeMotif: "status-dots",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "国际 PMP / PMO 项目治理仪表盘美学（Executive PMO Governance）：理性、紧凑、决策直达，右上角固定红黄绿健康状态灯，帮助管理层 30 秒识别项目风险。",
+      palette:
+        "精密工业浅灰底（#F4F6F9）配纯白状态卡，钴蓝（#1D4ED8）作为主结构色，数据状态色严格绑定语义：正常绿（#16A34A）、预警黄（#D97706）、阻塞红（#DC2626）。",
+      typography:
+        "结论先行顶部状态条 + 等宽数字工期/燃尽指标，所有任务均带明确 `Owner` 与 `ETA` 时间戳。",
+      layout:
+        "封面自带四维健康矩阵（进度/质量/依赖/预算），内页强化甘特里程碑路线图、阻塞风险与缓解举措双栏矩阵及跨团队协作清单。",
+      content:
+        "适用于大型 IT 系统上线、软硬件项目立项/结项评审、客户交付周报与跨部门 PMO 月度例会。",
+    },
+    customNotes:
+      "老板最爱看的汇报结构：先给总体红黄绿灯，再讲阻塞项和需要拍板的资源。",
+    sampleTopic: "ERP 核心财务中台一期上线里程碑与风险复盘",
+    sampleSubtitle: "PMO 双周 Steering Committee 汇报 · 进度达成 94% / 2 项跨部依赖预警",
+    authorId: "user_curator_chen",
+    isOfficial: true,
+    likesCount: 421,
+    savesCount: 389,
+    copiesCount: 1350,
+  },
+  {
+    id: "prompt_civic_redgold",
+    slug: "civic-party-red-gold",
+    title: "丹宸鎏金 · 政务党建与国央企庄重汇报",
+    englishTitle: "Civic Red & Gold Formal",
+    summary:
+      "摆脱陈旧俗艳的现代庄重政务美学：温润暖象牙底板搭配端庄中国红与克制鎏金双饰带，中轴对称章法严谨，适配党政机关、国央企与高校党委专题汇报。",
+    scenario: "政务党建",
+    styleCategory: "政务红金",
+    colorFamily: "warm",
+    recommendedTools: ["claude-html", "gamma-kimi", "python-pptx", "ai-image"],
+    tags: ["政务汇报", "党建专题", "国央企", "红金庄重", "年度述职"],
+    visualSpec: {
+      palette: {
+        bg: "#FCF9F5",
+        surface: "#FFFFFF",
+        text: "#1F1917",
+        muted: "#655853",
+        accent: "#B91C1C",
+        accentSoft: "#FEF2F2",
+        border: "#E7D9CE",
+        chartColors: ["#B91C1C", "#B45309", "#1E3A5F", "#78716C"],
+      },
+      typography: {
+        mood: "chinese",
+        headingFontLabel: "思源宋体 / 方正小标宋 Bold",
+        bodyFontLabel: "思源黑体 / 仿宋 Regular",
+        titleWeight: 700,
+        titleTracking: "0.01em",
+      },
+      layout: {
+        archetype: "civic-redgold",
+        density: "balanced",
+        cornerRadius: 4,
+        showPageNumber: true,
+        decorativeMotif: "redgold-ribbon",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "现代新派庄重政务党建美学（Modern Dignified Civic）：以暖象牙纸感取代刺眼大红铺满，保留红头双线与鎏金腰带的权威仪式感，同时大幅提升长文阅读舒适度。",
+      palette:
+        "暖象牙纸底（#FCF9F5）配纯白公文卡，正统中国红（#B91C1C）确立政治与纲领重心，克制鎏金棕（#B45309）与深政蓝（#1E3A5F）辅助分层图表。",
+      typography:
+        "中轴对称大字号宋体主标，正文清晰工整，善用四字/八字对仗提纲（如「党建引领 · 实干笃行」）提炼重点。",
+      layout:
+        "顶部双层红金眉线贯穿全套母版，结构严格遵循「总体成效与量化实绩 → 重点举措与经验做法 → 存在不足与剖析 → 下一步工作部署」。",
+      content:
+        "用语严谨规范，注重政策落点、群众/业务实效数据对比与重点项目推进节点。",
+    },
+    customNotes:
+      "政府部门工作总结、国央企党委述职、事业单位专题汇报及主题党日活动首选。",
+    sampleTopic: "2026 年度党建引领高质量发展与重点工程攻坚汇报",
+    sampleSubtitle: "凝心聚力担使命 · 全面完成年度十二项民生与产业实事清单",
+    authorId: "user_studio_official",
+    isOfficial: true,
+    likesCount: 398,
+    savesCount: 356,
+    copiesCount: 1290,
+  },
+  {
+    id: "prompt_star_promotion",
+    slug: "star-career-promotion-pitch",
+    title: "STAR 晋升战报 · 年终述职与竞聘答辩",
+    englishTitle: "STAR Promotion Review",
+    summary:
+      "为职场晋升答辩、年终述职与岗位竞聘量身打造：睿智冰白纸底、深海领航蓝骨架配战绩活力青，将个人核心战功、量化增幅与成长思考清晰立体地推到评委眼前。",
+    scenario: "个人述职",
+    styleCategory: "商务咨询",
+    colorFamily: "light",
+    recommendedTools: ["claude-html", "gamma-kimi", "python-pptx"],
+    tags: ["晋升答辩", "年终述职", "岗位竞聘", "STAR 法则", "个人战报"],
+    visualSpec: {
+      palette: {
+        bg: "#F8FAFC",
+        surface: "#FFFFFF",
+        text: "#0F2942",
+        muted: "#52657A",
+        accent: "#0D9488",
+        accentSoft: "#CCFBF1",
+        border: "#D6E0EB",
+        chartColors: ["#0D9488", "#0F2942", "#2563EB", "#94A3B8"],
+      },
+      typography: {
+        mood: "swiss",
+        headingFontLabel: "Plus Jakarta Sans / 思源黑体 ExtraBold",
+        bodyFontLabel: "Inter / 苹方 Regular",
+        titleWeight: 800,
+        titleTracking: "-0.025em",
+      },
+      layout: {
+        archetype: "executive-emerald",
+        density: "balanced",
+        cornerRadius: 8,
+        showPageNumber: true,
+        decorativeMotif: "swiss-cross",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "高能职场晋升战报风格（STAR Executive Pitch）：干练、自信、结果导向，把「我做了什么」升维为「我主导解决了什么关键难题并带来了多少可复用价值」。",
+      palette:
+        "清冽冰白底（#F8FAFC）彰显逻辑清晰度，深海领航蓝（#0F2942）传递专业稳重感，战绩活力青（#0D9488）瞬间点亮核心产出 KPI 与个人主导贡献。",
+      typography:
+        "大字号量化结果数字（如 `降本 42%` / `GMV +1.8 亿`）配极简情境标签，10 秒抓住晋升评委注意力。",
+      layout:
+        "围绕「个人定位与年度全景 → 2–3 个标杆项目 STAR 深度拆解 → 方法论沉淀与团队影响力 → 反思与高一职级规划」高效展开。",
+      content:
+        "严格区分团队成果与个人核心 Action，每一页项目案例均落脚到可验证数据与组织复用资产。",
+    },
+    customNotes:
+      "互联网大厂职级晋升（P7/P8/L5/L6）、试用期转正答辩与中层管理竞聘杀手锏。",
+    sampleTopic: "2026 年度工作述职与高级产品专家职级晋升答辩",
+    sampleSubtitle: "主导交易中台重构与增长闭环 · 支撑业务转化率跃升 +38%",
+    authorId: "user_curator_chen",
+    isOfficial: true,
+    likesCount: 435,
+    savesCount: 402,
+    copiesCount: 1410,
+  },
+  {
+    id: "prompt_agile_linear",
+    slug: "agile-sprint-okr-linear",
+    title: "Linear 极简冲刺 · 敏捷研发周报与 OKR 复盘",
+    englishTitle: "Linear Agile Sprint & OKR",
+    summary:
+      "汲取 Linear / Raycast 现代暗色工具美学：深邃曜石石墨底配电光紫蓝与敏捷青高亮，极速呈现迭代燃尽、OKR 达成度与跨端研发交付节奏。",
+    scenario: "项目汇报",
+    styleCategory: "科技未来",
+    colorFamily: "dark",
+    recommendedTools: ["claude-html", "slidev-marp", "gamma-kimi"],
+    tags: ["敏捷迭代", "OKR 复盘", "研发周报", "Linear 风", "暗黑极简"],
+    visualSpec: {
+      palette: {
+        bg: "#0D0E12",
+        surface: "#15171E",
+        text: "#F3F4F6",
+        muted: "#94A3B8",
+        accent: "#6366F1",
+        accentSoft: "rgba(99, 102, 241, 0.18)",
+        border: "#262938",
+        chartColors: ["#6366F1", "#22D3EE", "#10B981", "#64748B"],
+      },
+      typography: {
+        mood: "tech",
+        headingFontLabel: "Plus Jakarta Sans / 思源黑体 Bold",
+        bodyFontLabel: "Inter / JetBrains Mono",
+        titleWeight: 700,
+        titleTracking: "-0.03em",
+      },
+      layout: {
+        archetype: "keynote-center",
+        density: "balanced",
+        cornerRadius: 10,
+        showPageNumber: true,
+        decorativeMotif: "spotlight-orb",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "现代 SaaS 研发工具暗夜极简美学（Linear / Vercel Craft）：细腻发丝微边框 + 克制聚光氛围，零杂乱图标，极度契合互联网产研双周 Review 与季度 OKR 复盘。",
+      palette:
+        "深邃曜石石墨底（#0D0E12）与微亮卡片（#15171E），电光靛紫（#6366F1）与敏捷青（#22D3EE）标识 KR 进度条与关键交付里程碑。",
+      typography:
+        "紧致负字距现代黑体大标题 + 等宽版本号与进度百分比（如 `KR1 · 88%` / `v2.14 SHIPPED`），读起来如产品 Changelog 般爽快。",
+      layout:
+        "聚焦「Sprint Shipped 交付亮点 → OKR 量化进度看板 → 线上稳定性与缺陷复盘 → 下周期优先级排期」。",
+      content:
+        "拒绝流水账式工时罗列，每条迭代事项均关联用户价值指标或系统性能收益。",
+    },
+    customNotes:
+      "技术团队双周 Demo Day、季度 OKR 复盘与独立开发者/SaaS 产品迭代简报最爱。",
+    sampleTopic: "Q3 产研敏捷冲刺与核心 OKR 达成复盘（Sprint 18）",
+    sampleSubtitle: "14 项核心能力按期上线 · 线上 P0 故障归零与编译提速 2.6×",
+    authorId: "user_studio_official",
+    isOfficial: true,
+    likesCount: 382,
+    savesCount: 344,
+    copiesCount: 1120,
+  },
+  {
+    id: "prompt_esg_lean",
+    slug: "esg-green-lean-quality",
+    title: "森呼吸双碳 · ESG 可持续与精益制造质控",
+    englishTitle: "ESG & Lean Sustainability",
+    summary:
+      "面向 ESG 年度可持续发展报告、新能源双碳战略与精益制造品控汇报：生态雾绿白纸底配松石深绿与可再生暖柠，传递可信、绿色与高标准治理形象。",
+    scenario: "项目汇报",
+    styleCategory: "极简主义",
+    colorFamily: "earth",
+    recommendedTools: ["claude-html", "gamma-kimi", "python-pptx", "notebooklm"],
+    tags: ["ESG 报告", "双碳新能源", "精益制造", "绿色可持续", "品质管理"],
+    visualSpec: {
+      palette: {
+        bg: "#F3F8F5",
+        surface: "#FFFFFF",
+        text: "#14291E",
+        muted: "#4F6B5D",
+        accent: "#166534",
+        accentSoft: "#DCFCE7",
+        border: "#CFE0D6",
+        chartColors: ["#166534", "#65A30D", "#0F766E", "#86A896"],
+      },
+      typography: {
+        mood: "swiss",
+        headingFontLabel: "Plus Jakarta Sans / 思源黑体 Bold",
+        bodyFontLabel: "Inter / 苹方 Regular",
+        titleWeight: 700,
+        titleTracking: "-0.02em",
+      },
+      layout: {
+        archetype: "clinical-clean",
+        density: "balanced",
+        cornerRadius: 8,
+        showPageNumber: true,
+        decorativeMotif: "ribbon-accent",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "北欧可持续报告与现代精益管理美学（Clean ESG & Lean Operations）：洁净自然、数据透明，将环境减碳、社会责任与供应链治理指标以清爽图表有序展开。",
+      palette:
+        "生态雾绿浅底（#F3F8F5）配纯白数据卡，松石森林绿（#166534）锚定主视觉，可再生暖柠绿（#65A30D）与深青（#0F766E）区分绿电占比与良率趋势。",
+      typography:
+        "国际机构年报级干净字体层级，碳排放强度（tCO2e）、良率与能耗同比数据采用大字号等宽指标卡突出呈现。",
+      layout:
+        "顶部绿色三色渐变细饰带贯穿，擅长展示碳中和路线图（2026–2035）、精益改善前后对比与 E/S/G 三支柱量化看板。",
+      content:
+        "适合上市公司 ESG 报告、新能源/光伏/锂电产业方案、工厂精益六西格玛改善与环保公益汇报。",
+    },
+    customNotes:
+      "新能源企业、制造业精益改善（QCC/6σ）与上市公司 ESG 披露的优雅替代方案。",
+    sampleTopic: "2026 零碳工厂精益跃升与 ESG 可持续发展年报",
+    sampleSubtitle: "单位产值碳排放同比下降 31.4% · 绿电使用比例突破 78%",
+    authorId: "user_curator_chen",
+    isOfficial: true,
+    likesCount: 315,
+    savesCount: 282,
+    copiesCount: 840,
+  },
+
+  /* ==================== v5 新增：生活与个人表达全场景（5 套） ==================== */
+  {
+    id: "prompt_kodak_travel",
+    slug: "kodak-analog-travelogue",
+    title: "柯达胶片手账 · 旅行游记与城市漫步",
+    englishTitle: "Kodak Analog Travelogue",
+    summary:
+      "致敬 35mm 胶片与拍立得旅行手账的温暖纪实风：右侧胶片齿孔装饰、暖阳米纸底配柯达琥珀橘时间戳，让每一段旅途攻略、城市漫步与年度相册都像独立画册。",
+    scenario: "生活纪实",
+    styleCategory: "胶片手账",
+    colorFamily: "warm",
+    recommendedTools: ["claude-html", "ai-image", "gamma-kimi"],
+    tags: ["旅行游记", "胶片手账", "拍立得", "出行攻略", "生活记录"],
+    visualSpec: {
+      palette: {
+        bg: "#FBF6EE",
+        surface: "#FFFFFF",
+        text: "#2C221E",
+        muted: "#7A6A60",
+        accent: "#D97706",
+        accentSoft: "#FEF3C7",
+        border: "#E6DAC8",
+        chartColors: ["#D97706", "#B45309", "#2F6F64", "#A89885"],
+      },
+      typography: {
+        mood: "editorial",
+        headingFontLabel: "Instrument Serif / 思源宋体 Bold",
+        bodyFontLabel: "Plus Jakarta Sans / 苹方 Regular",
+        titleWeight: 600,
+        titleTracking: "-0.01em",
+      },
+      layout: {
+        archetype: "polaroid-zine",
+        density: "airy",
+        cornerRadius: 6,
+        showPageNumber: true,
+        decorativeMotif: "film-sprocket",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "35mm 胶片摄影画报与拍立得手账美学（Analog Film Zine）：保留暖阳纸张颗粒呼吸感与拍立得留白边框，将风景图文、路线打卡点与旅途心情娓娓道来。",
+      palette:
+        "暖阳胶片米底（#FBF6EE）配洁白拍立得相纸框，焦糖暗房棕正文（#2C221E）柔和耐看，柯达琥珀橘（#D97706）点亮经纬度、天数与推荐星标。",
+      typography:
+        "文艺杂志感衬线主标题搭配等宽胶片印记（`ISO 400 · DAY 03 · 64°N`），图文主次分明，克制短句更具电影感。",
+      layout:
+        "右侧胶片齿孔饰边 + 拍立得大比例图文分栏 + 每日行程时间轴（Timeline）+ 预算/装备极简清单，零职场生硬感。",
+      content:
+        "极适合旅行分享会、蜜月/毕业旅行纪念册、Citywalk 美食攻略、留学生活记录与摄影作品集。",
+    },
+    customNotes:
+      "在工坊上传旅途实拍照片到「图文分栏页」，一键导出离线 HTML 发给朋友像翻看电子画册！",
+    sampleTopic: "冰岛环岛 10 日 · 追逐极光与黑沙滩的 35mm 手账",
+    sampleSubtitle: "1 号公路自驾 2,400 公里 · 每日路线、胶片机位与实用开销全记录",
+    authorId: "user_demo",
+    isOfficial: true,
+    likesCount: 406,
+    savesCount: 378,
+    copiesCount: 1160,
+  },
+  {
+    id: "prompt_sage_wedding",
+    slug: "champagne-sage-wedding",
+    title: "香槟鼠尾草 · 婚礼誓言与家庭纪念庆典",
+    englishTitle: "Champagne Sage Celebration",
+    summary:
+      "如高端庄园婚礼请柬般温柔典雅：丝绸奶油白底板融合低饱和鼠尾草绿与香槟暖金，配纤细画册外框与诗意衬线体，定格婚礼、纪念日与家庭重要时刻。",
+    scenario: "生活纪实",
+    styleCategory: "编辑部杂志",
+    colorFamily: "warm",
+    recommendedTools: ["claude-html", "ai-image", "gamma-kimi"],
+    tags: ["婚礼暖场", "恋爱纪念", "家庭相册", "鼠尾草绿", "仪式感"],
+    visualSpec: {
+      palette: {
+        bg: "#FDFAF6",
+        surface: "#FFFFFF",
+        text: "#2B302A",
+        muted: "#727A70",
+        accent: "#5F7A61",
+        accentSoft: "#ECF2EC",
+        border: "#E5DFD3",
+        chartColors: ["#5F7A61", "#C59B6D", "#A3B18A", "#D8CFC2"],
+      },
+      typography: {
+        mood: "editorial",
+        headingFontLabel: "Instrument Serif / 思源宋体 Regular",
+        bodyFontLabel: "Plus Jakarta Sans / 苹方 Light",
+        titleWeight: 400,
+        titleTracking: "0.02em",
+      },
+      layout: {
+        archetype: "luxury-minimal",
+        density: "airy",
+        cornerRadius: 4,
+        showPageNumber: false,
+        decorativeMotif: "editorial-drop",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "森系庄园婚礼与高端纪念册美学（Botanical Champagne Celebration）：拒绝土味红金大字，以温柔丝绸白、鼠尾草绿与香槟暖金谱写浪漫松弛的纪念影像。",
+      palette:
+        "丝绸奶油白底（#FDFAF6），橄榄深炭正文（#2B302A），低饱和鼠尾草绿（#5F7A61）与香槟暖金（#C59B6D）勾勒细框线与纪念年份。",
+      typography:
+        "极富呼吸感的纤细衬线主标题（字重 400）+ 宽字距英文寄语（OUR STORY / FOREVER），每页仅留 1–2 句走心短句。",
+      layout:
+        "宽阔画廊留白 + 精细外框装饰，隐藏冰冷页码，强化恋爱/成长时间轴、图文合影页与深情致谢金句页。",
+      content:
+        "适用于婚礼现场暖场循环播放、结婚周年纪念、宝宝周岁成长礼、父母金婚庆典与挚友生日祝福。",
+    },
+    customNotes:
+      "婚礼大屏循环播放或导出离线 HTML 永久珍藏，完全无外部依赖不会断网裂图。",
+    sampleTopic: "林深见鹿 · 我们的第 1,825 天与婚礼故事",
+    sampleSubtitle: "2021.05 — 2026.05 · 从初遇校园到携手步入新旅程",
+    authorId: "user_demo",
+    isOfficial: true,
+    likesCount: 362,
+    savesCount: 340,
+    copiesCount: 980,
+  },
+  {
+    id: "prompt_indie_bookstore",
+    slug: "indie-bookstore-literary",
+    title: "独立书店沙龙 · 读书拆书与观影播客",
+    englishTitle: "Indie Bookstore Literary Salon",
+    summary:
+      "复刻先锋书店与文艺播客刊物的纸本气质：再生书页米底、钢笔墨绿大标题配藏书票赭红点缀，把读书笔记、拆书框架与观影拉片讲出人文深度。",
+    scenario: "文化创意",
+    styleCategory: "编辑部杂志",
+    colorFamily: "earth",
+    recommendedTools: ["claude-html", "notebooklm", "gamma-kimi", "ai-image"],
+    tags: ["读书分享", "拆书笔记", "观影沙龙", "播客讲稿", "书店纸感"],
+    visualSpec: {
+      palette: {
+        bg: "#F3EFE6",
+        surface: "#FAF8F2",
+        text: "#1B3B36",
+        muted: "#5F6F6A",
+        accent: "#B54834",
+        accentSoft: "#F6E7E3",
+        border: "#D8D0C0",
+        chartColors: ["#B54834", "#1B3B36", "#8C704C", "#A39B8B"],
+      },
+      typography: {
+        mood: "editorial",
+        headingFontLabel: "Instrument Serif / 思源宋体 Bold",
+        bodyFontLabel: "思源黑体 / 苹方 Regular",
+        titleWeight: 600,
+        titleTracking: "-0.01em",
+      },
+      layout: {
+        archetype: "editorial-asymmetric",
+        density: "airy",
+        cornerRadius: 3,
+        showPageNumber: true,
+        decorativeMotif: "ink-wash",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "独立书店与文化沙龙纸本刊物美学（Independent Literary Zine）：不对称杂志排版配合淡淡东方远山肌理，如一本可翻页的精装书评季刊。",
+      palette:
+        "再生书页暖米底（#F3EFE6），古典钢笔墨绿主文字（#1B3B36），藏书票赭红（#B54834）用于高亮金句摘录、书名号与思辨批注。",
+      typography:
+        "大号衬线体标题与克制正文形成强烈纸媒层次感，原著摘录以大引号金句页居中呈现，沉浸感拉满。",
+      layout:
+        "天然适配「作者与时代背景 → 全书三层逻辑拆解 → 精彩原文摘录与思辨对照 → 延伸书单与沙龙开放讨论题」结构。",
+      content:
+        "面向读书会领读、视频号/B站深度拆书科普、电影拉片沙龙、播客线下分享与个人年度阅读书单。",
+    },
+    customNotes:
+      "配合 NotebookLM 导入整本电子书或长篇影评，快速产出极具格调的领读课件。",
+    sampleTopic: "《置身事内》深度拆书 · 理解中国经济发展的微观机制",
+    sampleSubtitle: "周末独立书店共读沙龙 · 财政逻辑、产业转型与普通人的时代坐标",
+    authorId: "user_studio_official",
+    isOfficial: true,
+    likesCount: 351,
+    savesCount: 319,
+    copiesCount: 940,
+  },
+  {
+    id: "prompt_morandi_portfolio",
+    slug: "morandi-creator-portfolio",
+    title: "莫兰迪作品集 · 求职面试与保研个人展映",
+    englishTitle: "Creator Portfolio Showcase",
+    summary:
+      "专为设计师、产品经理、保研学子与创意人打造的个人介绍与作品集母版：画廊石灰白底、炭黑硬朗网格配克莱因电蓝，3 分钟让面试官记住你的代表作与思考力。",
+    scenario: "个人述职",
+    styleCategory: "极简主义",
+    colorFamily: "light",
+    recommendedTools: ["claude-html", "gamma-kimi", "ai-image"],
+    tags: ["求职作品集", "自我介绍", "保研面试", "克莱因蓝", "个人品牌"],
+    visualSpec: {
+      palette: {
+        bg: "#F2F1ED",
+        surface: "#FFFFFF",
+        text: "#18181B",
+        muted: "#62626A",
+        accent: "#1D4ED8",
+        accentSoft: "#DBEAFE",
+        border: "#27272A",
+        chartColors: ["#1D4ED8", "#18181B", "#EA580C", "#71717A"],
+      },
+      typography: {
+        mood: "swiss",
+        headingFontLabel: "Plus Jakarta Sans / 思源黑体 ExtraBold",
+        bodyFontLabel: "Inter / 苹方 Regular",
+        titleWeight: 800,
+        titleTracking: "-0.03em",
+      },
+      layout: {
+        archetype: "swiss-grid",
+        density: "airy",
+        cornerRadius: 2,
+        showPageNumber: true,
+        decorativeMotif: "hard-offset",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "当代画廊策展式个人作品集美学（Curated Creator Portfolio）：干净石灰白底衬托高反差炭黑网格与克莱因电蓝点缀，作品大图为主角、文字极度克制有力。",
+      palette:
+        "画廊灰白底（#F2F1ED）、纯白展示框、锐利炭黑（#18181B）硬边框，唯一饱和亮色克莱因电蓝（#1D4ED8）标记个人标签与核心项目成果。",
+      typography:
+        "巨型瑞士编号（`01` / `02` / `03`）串联代表项目，自我介绍用 3 个高辨识度关键词锚定个人定位，绝不照念 Word 简历。",
+      layout:
+        "经典面试黄金结构：个人名片与核心标签 → 3 个代表项目「背景-思路-最终作品-数据影响」图文分栏 → 技能矩阵 → 致谢与联系方式。",
+      content:
+        "适用于求职面试自我介绍、设计师/PM 作品集、高校保研夏令营个人陈述与自由职业者接单名片。",
+    },
+    customNotes:
+      "上传你的界面截图或科研成果图到图文分栏页，立刻变身媲美一线设计工作室的作品集。",
+    sampleTopic: "个人作品集与求职陈述 · 用系统设计驱动增长",
+    sampleSubtitle: "3 年全链路产品设计实战 · 覆盖 AI 工具、设计系统与 B 端效率平台",
+    authorId: "user_curator_chen",
+    isOfficial: true,
+    likesCount: 394,
+    savesCount: 368,
+    copiesCount: 1190,
+  },
+  {
+    id: "prompt_avocado_lifestyle",
+    slug: "avocado-organic-lifestyle",
+    title: "牛油果森系生活 · 社团招新 / 美食 / 健康打卡",
+    englishTitle: "Organic Avocado Lifestyle",
+    summary:
+      "充满生命力的清爽日常表达母版：晨露奶油底板搭配牛油果自然绿与暖杏阳光橘，大圆角轻盈模块化卡片，让大学社团招新、露营活动、美食探店与运动复盘焕发松弛活力。",
+    scenario: "生活纪实",
+    styleCategory: "现代Bento",
+    colorFamily: "earth",
+    recommendedTools: ["claude-html", "gamma-kimi", "ai-image"],
+    tags: ["社团招新", "户外露营", "美食健康", "牛油果绿", "日常分享"],
+    visualSpec: {
+      palette: {
+        bg: "#F7F9F3",
+        surface: "#FFFFFF",
+        text: "#1E2A1A",
+        muted: "#5C6D56",
+        accent: "#4D7C0F",
+        accentSoft: "#ECFCCB",
+        border: "#DAE4CE",
+        chartColors: ["#4D7C0F", "#EA580C", "#0D9488", "#A3B18A"],
+      },
+      typography: {
+        mood: "humanist",
+        headingFontLabel: "Plus Jakarta Sans / 思源黑体 Bold",
+        bodyFontLabel: "苹方 / 思源黑体 Regular",
+        titleWeight: 700,
+        titleTracking: "-0.015em",
+      },
+      layout: {
+        archetype: "soft-bento",
+        density: "balanced",
+        cornerRadius: 16,
+        showPageNumber: true,
+        decorativeMotif: "bento-dots",
+      },
+    },
+    promptAnatomy: {
+      style:
+        "清新自然生活方式 Bento 美学（Organic Lifestyle Bento）：灵感来自精品咖啡馆菜单与户外生活志，圆润舒展、元气满满，零商务压迫感。",
+      palette:
+        "晨露奶油绿底（#F7F9F3）配纯白圆角卡，牛油果自然绿（#4D7C0F）为主基调，暖杏阳光橘（#EA580C）点亮活动亮点与报名号召。",
+      typography:
+        "轻快易读的现代圆润黑体标题搭配趣味短标签与 Emoji 节奏，适合线上社群共创和校园大屏展示。",
+      layout:
+        "16px 柔和圆角卡片网格，轻松驾驭活动日程排期、成员介绍墙（Team Grid）、食谱/装备对比与年度运动习惯打卡总结。",
+      content:
+        "覆盖高校社团百团大战招新、周末徒步露营策划、咖啡美食探店分享、健身饮食年度复盘及兴趣社群沙龙。",
+    },
+    customNotes:
+      "生活不止 KPI！用这套清爽元气模板做社团招新、露营路书或年度健康总结，氛围瞬间拉满。",
+    sampleTopic: "山野计划 2026 · 城市轻户外徒步社团秋季招新",
+    sampleSubtitle: "12 条精选周末秘境路线 · 零基础装备清单与安全领队体系",
+    authorId: "user_demo",
+    isOfficial: true,
+    likesCount: 332,
+    savesCount: 298,
+    copiesCount: 890,
+  },
 ];
 
 export interface SeedComment {

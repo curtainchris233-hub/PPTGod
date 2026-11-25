@@ -17,9 +17,10 @@ interface StyleMatcherModalProps {
 type AudienceGoal =
   | "exec-consulting"
   | "product-launch"
-  | "academic-tech"
-  | "brand-culture"
-  | "training-review";
+  | "teaching-class"
+  | "research-academic"
+  | "project-workplace"
+  | "brand-lifestyle";
 
 type VenueLighting = "bright-room" | "dark-stage" | "screen-read";
 type DensityPref = "airy" | "balanced" | "dense";
@@ -43,22 +44,28 @@ const GOAL_OPTIONS: {
     scenarios: ["产品发布", "技术分享"],
   },
   {
-    id: "academic-tech",
-    title: "学术答辩 / 研发评审",
-    desc: "硕博论文答辩、临床医药、技术架构",
-    scenarios: ["学术答辩", "技术分享"],
+    id: "teaching-class",
+    title: "教师授课 / 公开课",
+    desc: "中小学与高校板书、说课课件、互动讲义",
+    scenarios: ["课堂教学", "教育培训"],
   },
   {
-    id: "brand-culture",
-    title: "品牌全案 / 文化策展",
-    desc: "美学零售、时尚高定、东方文创提案",
-    scenarios: ["品牌提案", "文化创意"],
+    id: "research-academic",
+    title: "科研基金 / 学术答辩",
+    desc: "国自然基金答辩、顶会口头报告、临床数据",
+    scenarios: ["科研基金", "学术答辩"],
   },
   {
-    id: "training-review",
-    title: "企业内训 / 年度总结",
-    desc: "公开课课件、团队复盘与人文叙事",
-    scenarios: ["教育培训", "年度总结"],
+    id: "project-workplace",
+    title: "项目管控 / 政务述职",
+    desc: "PMO 里程碑周报、政务党建、晋升述职",
+    scenarios: ["项目汇报", "政务党建", "个人述职", "年度总结"],
+  },
+  {
+    id: "brand-lifestyle",
+    title: "品牌策展 / 生活纪实",
+    desc: "旅行手账、婚礼请柬、读书沙龙与作品集",
+    scenarios: ["生活纪实", "文化创意", "品牌提案", "个人述职"],
   },
 ];
 
@@ -209,11 +216,12 @@ export default function StyleMatcherModal({
               <span className="pg-matcher-step-num">1</span>
               <span>汇报对象与场景</span>
             </div>
-            <div className="pg-matcher-options">
+            <div className="pg-matcher-options pg-matcher-options--2col">
               {GOAL_OPTIONS.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
+                  data-goal-id={opt.id}
                   className={`pg-matcher-opt ${
                     goal === opt.id ? "is-active" : ""
                   }`}

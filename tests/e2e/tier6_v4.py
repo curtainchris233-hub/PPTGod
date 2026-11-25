@@ -527,7 +527,9 @@ def t6_og_06_dynamic_og_image_and_gallery_more_slides(ctx: TestContext) -> None:
         page = guard.page
         page.goto(ctx.url("/"), wait_until="networkidle")
         hero_text = page.locator(".pg-hero-lead").inner_text()
-        assert "12 种商业页型" in hero_text, f"Expected updated 12-slide copy in Hero, got: {hero_text}"
+        assert (
+            "12 种页型" in hero_text or "12 种商业页型" in hero_text
+        ) and "8 种" not in hero_text, f"Expected updated 12-slide copy in Hero, got: {hero_text}"
 
         first_card = page.locator(".pg-card").first
         assert first_card.locator('[role="tab"]').count() == 5, (
