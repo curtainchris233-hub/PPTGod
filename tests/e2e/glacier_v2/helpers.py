@@ -2946,6 +2946,10 @@ class BrowserPageGuard:
             )
         if settle_network:
             try:
+                self.page.wait_for_load_state("load", timeout=min(self.timeout_ms, 8000))
+            except Exception:  # noqa: BLE001
+                pass
+            try:
                 self.page.wait_for_load_state("networkidle", timeout=min(self.timeout_ms, 8000))
             except Exception:  # noqa: BLE001 — SSE/polling pages may stay active; domcontentloaded already succeeded
                 self.page.wait_for_timeout(300)
@@ -3134,7 +3138,7 @@ class PlaywrightSession:
                 self._pw_cm = sync_playwright()
                 self._pw = self._pw_cm.start()
 
-            launch_args = ["--disable-dev-shm-usage", "--font-render-hinting=none"]
+            launch_args = ["--disable-dev-shm-usage", "--disable-gpu", "--font-render-hinting=none"]
             try:
                 self._browser = self._pw.chromium.launch(headless=True, args=launch_args)
             except Exception:  # noqa: BLE001 — retry with --no-sandbox in restricted containers

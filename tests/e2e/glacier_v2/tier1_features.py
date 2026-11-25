@@ -2306,7 +2306,7 @@ def g1_ui_11_studio_redirect_and_workbench(ctx: TestContext) -> None:
                 click_resilient(page, ["#pg-studio-export-html-btn"], description="Studio export HTML button")
             html_path = html_dl.value.path()
             assert html_path is not None, "Studio HTML export did not produce a downloaded file"
-            HtmlDeckVerifier.verify_html(Path(html_path).read_text(encoding="utf-8"))
+            HtmlDeckVerifier.verify(Path(html_path).read_text(encoding="utf-8"))
 
             with page.expect_download(timeout=ctx.timeout_ms) as json_dl:
                 click_resilient(page, ["#pg-studio-export-json-btn"], description="Studio export .pptgod.json button")

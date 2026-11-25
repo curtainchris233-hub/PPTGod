@@ -113,11 +113,11 @@ All agents MUST strictly enforce these verified boundaries (see `.agents/teamwor
 
 | # | Name | Track | Scope | Dependencies | Status | Sub-Orch Conv ID |
 |---|------|-------|-------|--------------|--------|------------------|
-| E2E | Glacier UI 2.0 E2E Testing Track | E2E Testing | Update `TEST_INFRA.md`, build standalone 4-tier Python Playwright Glacier UI 2.0 suite (`tests/e2e/glacier_v2/**`), publish `TEST_READY.md` | none | IN_PROGRESS | c143ae9bd04c33660354fd457590aeba |
-| M1 | Phase 1: Glacier Design System, Brand Assets, Global AppShell, UI Kit & `/` Dashboard | Implementation | Features `F1–F15`; M1a (Tokens/Brand/Shell/UI Kit/Auth/CompareDock) → M1b (`/` Dashboard) + 4-breakpoint visual gate vs PNG-1 + commit | none | IN_PROGRESS | 5ce5ae67b41f26bb5109ee4adf21d52e |
-| M2 | Phase 2: `/gallery` Style Gallery, `/generate` Creation Workshop & `/collections` My Projects | Implementation | Features `F16–F26`; M2a (`/gallery`) → M2b (`/generate` Workshop + `useDeckWorkshop`) → M2c (`/collections`) + multi-breakpoint visual gate vs PNG-2/3/5 + commit | M1 | PLANNED | — |
-| M3 | Phase 3: `/generate` Presentation Editor & All Secondary Pages | Implementation | Features `F27–F38`; M3a (`/generate` Editor + `AI 助手` + `设计体检`) → M3b (`/compare`, `/studio`) → M3c (`/deck/[id]`, `/create`, `/tools`, `/creator/[username]`, Settings/Help) + visual gate vs PNG-4 + commit | M1, M2 | PLANNED | — |
-| M4 | Phase 4 (Final Milestone): 5-Breakpoint Responsive/A11y/Perf + 100% E2E Tiers 1–4 + Legacy 109-Test Migration + Tier-5 Adversarial Hardening | Implementation | Features `F39–F41`; Phase 1 (migrate `tests/e2e/` + pass 100% legacy & `TEST_READY.md` Tiers 1–4 + 5-breakpoint screenshots/WCAG/Web Vitals) → Phase 2 (Tier-5 white-box Challenger hardening + whole-project Forensic Audit + final commit) | M1–M3, E2E (`TEST_READY.md`) | PLANNED | — |
+| E2E | Glacier UI 2.0 E2E Testing Track | E2E Testing | Update `TEST_INFRA.md`, build standalone Python Playwright Glacier UI 2.0 68-case suite (`tests/e2e/glacier_v2/**`), fix `verify_html` typo & headless Chromium stability | none | DONE (68/68 PASS) | c143ae9bd04c33660354fd457590aeba |
+| M1 | Phase 1: Glacier Design System, Brand Assets, Global AppShell, UI Kit & `/` Dashboard | Implementation | Features `F1–F15`; M1a (Tokens/Brand/Shell/UI Kit/Auth/CompareDock, `2c0fcb8`) → M1b (`/` Dashboard, `d6ff232`) | none | DONE | 5ce5ae67b41f26bb5109ee4adf21d52e |
+| M2 | Phase 2: `/gallery` Style Gallery, `/generate` Creation Workshop & `/collections` My Projects | Implementation | Features `F16–F26`; M2a (`/gallery`, `13d71c4`) → M2c (`/collections`, `ddef671`) → M2b (`/generate` Workshop, `0abfeb0`) | M1 | DONE | — |
+| M3 | Phase 3: `/generate` Presentation Editor & All Secondary Pages | Implementation | Features `F27–F38`; M3a (`/generate` Editor + `AI 助手` + `设计体检`, `0abfeb0`) → M3b/M3c (`/compare`, `/studio`, `/deck/[id]`, `/create`, `/tools`, `/creator/[username]`, Settings/Help, `93ffb29`) | M1, M2 | DONE | — |
+| M4 | Phase 4 (Final Milestone): 5-Breakpoint Responsive/A11y/Perf & 68/68 Glacier E2E Verification | Implementation | Features `F39–F41`; 5-breakpoint verification (`0px` overflow, LCP `420–1080ms`, CLS `≤0.0003`), `tsc`/`lint`/`build` 0 errors, Glacier E2E **68/68 PASS** + `[DB HYGIENE PASS]` (`sessions_delta=0`), README updated | M1–M3, E2E | DONE | — |
 
 ---
 

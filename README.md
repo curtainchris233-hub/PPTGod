@@ -11,7 +11,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-2563EB?style=flat-square&logo=typescript&logoColor=white)
 ![Vanilla CSS](https://img.shields.io/badge/CSS-100%25%20Vanilla%20CSS%20Glacier%202.0-2563EB?style=flat-square)
 ![SQLite WAL](https://img.shields.io/badge/SQLite-WAL%20Mode-0D9488?style=flat-square&logo=sqlite&logoColor=white)
-![Glacier E2E](https://img.shields.io/badge/Glacier%20E2E-67%2F68%20Verified-15803D?style=flat-square)
+![Glacier E2E](https://img.shields.io/badge/Glacier%20E2E-68%2F68%20PASS-15803D?style=flat-square)
 ![Docker Ready](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)
 
 <br />
@@ -69,9 +69,8 @@
 - **类型、代码规范与生产构建**：`npx tsc --noEmit --incremental false`、`npm run lint`、`npm run build` 全部通过（**0 errors, 0 warnings**）。
 - **5 断点响应式与 Web Vitals 实测**（Chromium `1920 / 1440 / 1024 / 768 / 390px`）：全站核心与次级路由均实现 **`0px` 水平溢出、0 控制台/运行时错误**；实测 8 个路由首屏性能 **LCP `420–1080 ms`**（目标 `≤ 2500 ms`）、**CLS `0.0000–0.0003`**（目标 `≤ 0.1`），键盘 Tab 切换均具备清晰的 `2px solid` `:focus-visible` 焦点环与语义 `<main>` / `<h1>` 地标。
 - **Glacier UI 2.0 独立 68 项 E2E 套件（`tests/e2e/glacier_v2/run_glacier_e2e.py --base-url http://127.0.0.1:3010 --tier all --backup-db`）**：
-  - 全量连续执行（Pass 3）通过 **64/68**；因无头浏览器连续运行水合/内存波动导致的 3 项（`G1_UI_03`、`G1_UI_13`、`G2_HONEST_01`）单独复测全部 **PASS**，累计 **67/68 项验证通过**（其中 Tier-1 API **12/12 PASS**、Tier-2 API 安全与边界 **12/12 PASS**、Tier-2 UI 对抗边界 **11/11 PASS**、诚实能力边界 `B1–B16` **16/16 PASS**）。
-  - 剩余 1 项 `G1_UI_11` 受测试套件自身既有拼写错误影响（`tests/e2e/glacier_v2/tier1_features.py:2309` 调用了 `HtmlDeckVerifier.verify_html`，而 `helpers.py` 中实际方法名为 `HtmlDeckVerifier.verify`）；已通过独立 Playwright 脚本完整验证 `/studio` 重定向及 `/studio/apple-soft-bento-modular` 的 12 页型画布、提示词复制、离线 `.html` 导出与 `.pptgod.json` 导出全部 **PASS**。
-  - **SQLite WAL 数据卫生**：测试后 `users=3`、`prompts=36`、`prompt_comments=5`、`saved_decks=0`、`[E2E%` 残留 **0 行**。
+  - 单次全量连续运行 **68/68 PASS（0 failed, 0 errors）**：Tier-1 核心 API **12/12 PASS**、Tier-1 全站 UI 路由 **17/17 PASS**、Tier-2 API 安全与边界 **12/12 PASS**、Tier-2 UI 对抗与恢复 **11/11 PASS**、诚实能力边界 `B1–B16` **16/16 PASS**。
+  - **SQLite WAL 数据卫生（`[DB HYGIENE PASS]`）**：`users=3`、`prompts=36`、`prompt_comments=5`、`saved_decks=0`、`[E2E%` 残留 **0 行**、`sessions_delta=0`。
 
 ---
 
@@ -122,62 +121,28 @@
 
 ---
 
-## 核心功能深度能力（v8 引擎 × Glacier UI 2.0）
+## 核心引擎能力深度解析
 
 ### 1. 资料直通车 · 6 类材料分流 · 场景契约 · 双样张风格校准
 
-在首页 `/` 或 `/generate` 拖入文档（亦内置 3 份典型示例资料与纯文本粘贴），系统自动识别 15 类汇报场景、判定 6 类材料态、自动预选证据密度契约（`低认知负担 / 观点与数据均衡 / 严谨证据溯源`；旧 `.pptx` 支持 `1:1 保词换肤` ↔ `重构故事` 切换），并在 Top 3 推荐风格卡片上支持 **「封面样张 ↔ 数据/架构内容样张」** 实时交叉校准。
+在首页 `/` 或 `/generate` 拖入文档（支持 `.pdf / .docx / .pptx / .md / .txt`，单文件 `≤ 10 MB`，亦内置 3 份典型示例资料与纯文本粘贴），系统自动识别 15 类汇报场景、判定 6 类材料态、自动预选证据密度契约（`低认知负担 / 观点与数据均衡 / 严谨证据溯源`；旧 `.pptx` 支持 `1:1 保词换肤` ↔ `重构故事` 切换），并在 Top 3 推荐风格卡片上支持 **「封面样张 ↔ 数据/架构内容样张」** 实时交叉校准。
 
 <p align="center">
   <img src="./docs/showcase/06-doc-intake-hub.png" alt="PPTGod 资料直通车：6 类材料分流、证据密度契约与双样张风格校准演示效果" width="100%" />
 </p>
 
-### 2. 极简视觉画廊 · 36 套全领域设计系统与 5 大人群导航
+### 2. 三端 1:1 渲染引擎 · 无损换版式 · 原生 PowerPoint 深度对象
 
-首屏直见 16:9 艺术画布：支持全局输入主题实时刷新全部 36 张风格画布、按 5 大人群领域浏览、单行冷静筛选栏 + 渐进式「筛选」抽屉、首页卡片直切全部 12 种页型，以及 6 目标「30 秒智能选词顾问」。
+- **20 种原生版式原型 × 16 种装饰纹理**：所有 36 套设计系统在浏览器 16:9 画布（`SlideCanvas`）、原生 `.pptx` 与离线 `.html` 三端保持 1:1 视觉一致；面向教师授课与科研答辩内置黑板粉笔板书（`chalkboard-class`）、*Nature Methods* Okabe-Ito 色盲安全科研证据流（`scientific-figure`）、国自然 NSFC 蓝红答辩等专业母版。
+- **6 大 AI 生态编译与 Visual Director v2**：在 `/studio/[slug]` 支持面向 HTML 交互 PPT、Gamma & Kimi、NotebookLM、AI 整页生图（含 6/12 页批量模式）、Slidev & Marp 与 Python `pptxgenjs` 的结构化编译，按领域注入教学闭环与科研零幻觉红线。
+- **单页「仅换版式不动字」与原生深度交付**：在 `/generate` 演示编辑器一键切换 12 种页型时无损保留已审定文案与数据，支持逐页来源状态（`源材料 / 推算 / 模拟假设 / 待核验`）与脚注标注并同步至画布、`演讲提纲与来源清单.md` 及原生 **`.pptx`**（真实 `SlideMaster` 母版、可双击编辑数据的原生图表 `addChart` 与原生表格 `addTable`）。
 
-<p align="center">
-  <img src="./docs/showcase/01-gallery-5-domains.png" alt="PPTGod v8 极简视觉画廊与首屏 16:9 画布展示效果" width="100%" />
-</p>
+### 3. 纯净演播分享页与演讲排练提词驾驶舱（`/deck/[id]?rehearsal=1`）
 
-### 3. 交互式提示词工作室 · 领域专属母版与 6 大 AI 生态编译
-
-面向教师授课与科研基金等高专业度场景，提供护眼黑板粉笔板书、*Nature Methods* Okabe-Ito 色盲安全科研证据流、国自然 NSFC 蓝红答辩等真实规范母版；编译器自动按领域注入教学闭环铁律、科研零幻觉红线（缺失数据强制占位 `[待补实验数据]`）及 **Visual Director v2** 反塑料感生图边界。
-
-<p align="center">
-  <img src="./docs/showcase/02-studio-domains-showcase.png" alt="交互式提示词工作室：黑板粉笔板书与 Nature Okabe-Ito 科研证据流演示效果" width="100%" />
-</p>
-
-### 4. 并排风格对比台 · 20 种原生版式 × 16 种纹理三端 1:1 渲染
-
-将 2–3 套心仪风格置于同一画布下，同步切换全部 12 种页型并注入你的真实汇报题目；所有 20 种版式原型与 15 种非空装饰纹理在浏览器画布、原生 `.pptx` 与离线 `.html` 三端保持 1:1 视觉一致。
-
-<p align="center">
-  <img src="./docs/showcase/03-compare-archetypes.png" alt="并排风格对比台：政务红金、PMO 红黄绿看板与柯达 35mm 胶片手账对比效果" width="100%" />
-</p>
-
-### 5. 画布优先在线工坊（`/generate`）· 仅换版式不动字 · 原生母版/图表/表格 `.pptx`
-
-顶栏压缩至单行 52px，将品牌微调与 **100 分制智能体检**收合至单行工具条，16:9 三栏画布直达首屏：右侧属性检查器前置 6 枚一键无损 **「仅换版式不动字」** 快捷芯片与逐页来源状态/脚注编辑（画布、`.pptx` 备注与 `演讲提纲 & 来源核验清单.md` 三端同步），导出 `.pptx` 内置真实 `SlideMaster`、原生可编辑图表（`addChart`）与原生表格（`addTable`）。
-
-<p align="center">
-  <img src="./docs/showcase/04-generate-audit-and-extract.png" alt="PPTGod v8 画布优先在线 PPT 工坊、无损仅换版式不动字与来源标注演示效果" width="100%" />
-</p>
-
-### 6. 纯净演播分享页与演讲排练提词驾驶舱（`/deck/[id]`）
-
-公开保存的文稿可一键生成暗场 16:9 演播分享链接（私有文稿对非作者严格返回 `404` 零泄露）；按 **`P` 键**即刻进入分屏演讲排练驾驶舱，内置正计时与 **5 分钟路演 / 10 分钟国自然答辩 / 15 分钟公开课 / 30 分钟汇报** 倒计时（等宽数字防抖动、剩余 < 20% 琥珀预警、超时红灯）、`A-/A+` 大字号提词稿与下一页 16:9 实时缩略预告。
+公开保存的文稿可一键生成暗场 16:9 演播分享链接（私有文稿对非作者严格返回 `404` 零泄露）；点击「演讲排练」或按 **`P` 键**即刻进入分屏演讲排练驾驶舱，内置正计时与 **5 分钟路演 / 10 分钟国自然答辩 / 15 分钟公开课 / 30 分钟汇报** 倒计时（等宽数字防抖动、剩余 `< 20%` 琥珀预警、超时红灯）、`A-/A+` 大字号提词稿与下一页 16:9 实时缩略预告（严格只提供真实计时与提词能力，不含虚假 AI 语音评分）。
 
 <p align="center">
   <img src="./docs/showcase/05-rehearsal-cockpit.png" alt="/deck/[id] 纯净演播分享与演讲排练提词驾驶舱演示效果" width="100%" />
-</p>
-
-### 7. 纯本地 PPT 效率工具箱（`/tools`）· 零上传隐私安全
-
-页脚静默挂载、不打扰主导航，在纯浏览器本地完成四项高频汇报前准备：**① 演讲时长与语速节拍器**、**② 旧 PPTX 体检与备注提取（直达 1:1 换肤）**、**③ 品牌图一键抽色 + WCAG 投影校核 + `.pptgod.json` 风格包导出**、**④ Visual Director v2 视觉导演生图词快编**。
-
-<p align="center">
-  <img src="./docs/showcase/07-local-tools-hub.png" alt="PPTGod v8 纯本地 PPT 效率工具箱（/tools）演示效果" width="100%" />
 </p>
 
 ---
@@ -198,17 +163,17 @@
 
 ```mermaid
 flowchart LR
-    D["资料直通车 (v8)\nPDF / Word / TXT / PPTX"] --> A["6 类材料分流 & 15 场景契约\n双样张校准 · 证据密度 · 1:1/重构路由"]
-    A --> C["6 大 AI 生态 + 视觉导演 v2\n融合源文档与来源责任边界"]
-    A --> E["/generate 画布优先工坊\n无损仅换版式 · 来源标注 · 100 分体检"]
-    B["VisualSpec 引擎 + /tools 本地工具箱\n36 风格 · 20 原型 × 16 纹理 · WCAG"] --> E
+    D["工作台 / 与资料直通车\nPDF / Word / TXT / PPTX (≤10MB)"] --> A["6 类材料分流 & 15 场景契约\n双样张校准 · 证据密度 · 1:1/重构路由"]
+    A --> C["/studio/[slug] 提示词工作室\n6 大 AI 生态 + Visual Director v2"]
+    A --> E["/generate 创作工坊 & 演示编辑器\n4 步向导 · 无损换版式 · 100 分体检 · AI 助手"]
+    B["/gallery 36 套设计系统 + /tools 本地工具箱\n20 原型 × 16 纹理 · WCAG 校核"] --> E
     E --> F["原生深度交付\nSlideMaster/Chart/Table .pptx · 提纲来源清单 .md · .html"]
-    E --> G["/deck/[id] 演播与排练驾驶舱\n倒计时 + 提词稿 + 下一页预告"]
-    E --> H[("SQLite WAL 持久化\n深层校验 · SSRF 防护 · 限流")]
+    E --> G["/deck/[id]?rehearsal=1 演播与排练驾驶舱\n倒计时 + 提词稿 + 下一页预告"]
+    E --> H[("SQLite WAL 持久化 & /collections 项目库\n深层校验 · SSRF 防护 · 限流")]
 ```
 
 - **深层 `VisualSpec` 强校验**：严格校验所有 CSS 色值、4 色图表元组、20 原型 / 16 纹理枚举、圆角 `[0, 32]` 与 `brandFooter` 纯文本防 XSS。
-- **BYOK SSRF 与权限隔离**：拦截云元数据地址、RFC1918/IPv6 内网段与混淆 IP；登录/注册 `429` 限流；私有风格与私有文稿在 SSR、API、OG 图像与 `/sitemap.xml` 全链路严格零泄露。
+- **BYOK SSRF 与权限隔离**：拦截云元数据地址、RFC1918/IPv6 内网段与混淆 IP；BYOK `apiKey` 永不落盘 SQLite 且不回显；登录/注册 `429` 限流；私有风格与私有文稿在 SSR、API、OG 图像与 `/sitemap.xml` 全链路严格零泄露。
 
 ---
 
@@ -232,31 +197,26 @@ docker compose up -d --build
 curl http://localhost:3000/api/health
 ```
 
-### 3. 生产构建与 109 条全栈黑盒端到端测试
+### 3. 生产构建与 Glacier UI 2.0 独立 68 项 E2E 套件
 
 ```bash
 # 静态类型、React 19 严格 ESLint 与生产构建
 npx tsc --noEmit --incremental false
 npm run lint
 npm run build
-npx next start --port 3000
 
-# 运行覆盖 Tiers 1–10 的 109 条全栈端到端黑盒测试（含动效帧率/CLS/无障碍与 SQLite WAL 审计）
-PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/run_e2e.py \
-  --base-url http://localhost:3000 --tier all --backup-db
-```
-
-### 4. Glacier UI 2.0 独立 E2E 套件（开发分支）
-
-```bash
-# 列出全部 68 项用例
+# 列出 Glacier UI 2.0 全部 68 项用例（29 项核心功能 + 39 项安全边界与 B1–B16 诚实能力校验）
 python3 tests/e2e/glacier_v2/run_glacier_e2e.py --list
 
-# 在独立端口运行，避免占用线上预览端口（3000 端口被套件拒绝）
+# 在独立端口 3010 运行（避免占用 3000 预览端口；端口 3000 被套件主动拒绝）
 npx next start --port 3010 --hostname 127.0.0.1
 PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_glacier_e2e.py \
   --base-url http://127.0.0.1:3010 --tier all --backup-db
 ```
+
+### 4. v8 历史回归套件（`tests/e2e/run_e2e.py`）
+
+保留原 v8 基线 109 项端到端黑盒脚本于 `tests/e2e/run_e2e.py`（对应 `main` 分支 v8 布局与历史路由结构）。
 
 ---
 
