@@ -41,15 +41,20 @@ const TOPIC_PRESETS = [
 
 interface GalleryClientProps {
   initialPrompts: PromptItem[];
+  /** Search pre-filled from `/gallery?q=` (e.g. the global top-bar search). */
+  initialSearch?: string;
 }
 
-export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
+export default function GalleryClient({
+  initialPrompts,
+  initialSearch = "",
+}: GalleryClientProps) {
   const { user, syncVersion, globalTopic, setGlobalTopic, showToast } =
     useApp();
 
   const [prompts, setPrompts] = useState<PromptItem[]>(initialPrompts);
   const [domainTab, setDomainTab] = useState<DomainTabId>("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [scenario, setScenario] = useState<string>("全部场景");
   const [styleCategory, setStyleCategory] = useState<string>("全部风格");
   const [colorFamily, setColorFamily] = useState<ColorFamily | "all">("all");

@@ -50,8 +50,6 @@ function DrawerNavList({
           <Link
             key={item.key}
             href={item.href}
-            /* Enabled once M2 introduces /gallery/page.tsx */
-            prefetch={item.href === "/gallery" ? false : undefined}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={`gl-mobile-drawer-link ${active ? "is-active" : ""}`}

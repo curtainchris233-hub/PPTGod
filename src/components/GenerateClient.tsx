@@ -72,6 +72,8 @@ interface GenerateClientProps {
   deckForbidden: boolean;
   initialHandoff?: boolean;
   initialIntake?: boolean;
+  /** Deep-linked panel to open on arrival (`/generate?panel=audit`). */
+  initialPanel?: "audit";
 }
 
 const MAX_HISTORY_SNAPSHOTS = 40;
@@ -213,6 +215,7 @@ export default function GenerateClient({
   deckForbidden,
   initialHandoff = false,
   initialIntake = false,
+  initialPanel,
 }: GenerateClientProps) {
   const { user, openAuthModal, showToast, refreshAuth } = useApp();
 
@@ -374,10 +377,14 @@ export default function GenerateClient({
           if (intake.audience) setAudience(intake.audience);
           setSlideCount(nextSlideCount);
           if (intake.text) setSourceText(intake.text);
-          setUploadedDocMeta({
-            fileName: intake.fileName,
-            charCount: intake.charCount,
-          });
+          // A typed topic from the dashboard is not a document — don't show a file chip.
+          const isPromptIntake = intake.fileType === "prompt";
+          if (!isPromptIntake) {
+            setUploadedDocMeta({
+              fileName: intake.fileName,
+              charCount: intake.charCount,
+            });
+          }
           if (intake.analysis) setDocAnalysis(intake.analysis);
           if (intake.parsedOutline && intake.parsedOutline.length > 0) {
             setOutlineDraft(intake.parsedOutline);
@@ -416,7 +423,9 @@ export default function GenerateClient({
                 setOutlineDraft(null);
                 hasLocalEditsRef.current = true;
                 showToast(
-                  `已根据「${intake.fileName}」自动整理生成 ${data.slides.length} 页完整 PPT！`,
+                  isPromptIntake
+                    ? `已按主题「${intake.topic}」生成 ${data.slides.length} 页 PPT，可直接编辑`
+                    : `已根据「${intake.fileName}」自动整理生成 ${data.slides.length} 页完整 PPT！`,
                   "success"
                 );
               } else if (active) {
@@ -1538,6 +1547,7 @@ export default function GenerateClient({
               />
 
               <DeckAuditDrawer
+                defaultOpen={initialPanel === "audit"}
                 slides={slides}
                 spec={deckSpec}
                 topic={topic}

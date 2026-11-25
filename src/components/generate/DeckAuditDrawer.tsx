@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -20,6 +20,8 @@ interface DeckAuditDrawerProps {
   onJumpToSlide: (slideIndex: number) => void;
   onAutoFixContrast: () => void;
   onAutoFillNotes: () => void;
+  /** Opens the report on mount (e.g. deep link `/generate?panel=audit`). */
+  defaultOpen?: boolean;
 }
 
 export default function DeckAuditDrawer({
@@ -30,8 +32,17 @@ export default function DeckAuditDrawer({
   onJumpToSlide,
   onAutoFixContrast,
   onAutoFillNotes,
+  defaultOpen = false,
 }: DeckAuditDrawerProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
+  const barRef = useRef<HTMLDivElement | null>(null);
+
+  // Deep link: bring the opened report into view once, without stealing focus.
+  useEffect(() => {
+    if (!defaultOpen) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    barRef.current?.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+  }, [defaultOpen]);
 
   const report = useMemo(
     () => auditDeckQuality(slides, spec, { topic, audience }),
@@ -60,7 +71,7 @@ export default function DeckAuditDrawer({
       : "is-bad";
 
   return (
-    <div className="pg-audit-bar" id="pg-deck-audit-bar">
+    <div className="pg-audit-bar" id="pg-deck-audit-bar" ref={barRef}>
       <div className="pg-audit-bar-head">
         <button
           type="button"

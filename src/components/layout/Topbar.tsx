@@ -152,8 +152,6 @@ export default function Topbar({ showMenuOnDesktop = false }: TopbarProps) {
                 key={item.href}
                 href={item.href}
                 id={item.id}
-                /* Enabled once M2 introduces /gallery/page.tsx */
-                prefetch={item.href === "/gallery" ? false : undefined}
                 aria-current={item.active ? "page" : undefined}
                 className={`gl-topbar-nav-link ${item.active ? "is-active" : ""}`}
               >

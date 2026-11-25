@@ -23,10 +23,8 @@ export default function NotFound() {
           <Link href="/" className="gl-btn gl-btn--primary gl-btn--md">
             返回首页工作台
           </Link>
-          {/* Enabled once M2 introduces /gallery/page.tsx */}
           <Link
             href="/gallery"
-            prefetch={false}
             className="gl-btn gl-btn--secondary gl-btn--md"
           >
             浏览风格画廊

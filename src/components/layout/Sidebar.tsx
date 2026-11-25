@@ -110,8 +110,6 @@ function SidebarNavList({
           <Link
             key={item.key}
             href={item.href}
-            /* Enabled once M2 introduces /gallery/page.tsx */
-            prefetch={item.href === "/gallery" ? false : undefined}
             className={`gl-sidebar-item ${active ? "is-active" : ""}`}
             aria-current={active ? "page" : undefined}
             aria-label={collapsed ? item.label : undefined}

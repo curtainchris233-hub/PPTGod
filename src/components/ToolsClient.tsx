@@ -39,7 +39,11 @@ type ToolTab = "pacing" | "pptx-inspect" | "palette-wcag" | "visual-director";
 
 interface ToolsClientProps {
   styles: PromptItem[];
+  /** Deep-linked tab (`/tools?tab=…`); unknown values fall back to pacing. */
+  initialTab?: string;
 }
+
+const TOOL_TABS: ToolTab[] = ["pacing", "pptx-inspect", "palette-wcag", "visual-director"];
 
 interface ParsedPptxSummary {
   fileName: string;
@@ -73,10 +77,12 @@ function countSpeechUnits(text: string): number {
   return cjk + words;
 }
 
-export default function ToolsClient({ styles }: ToolsClientProps) {
+export default function ToolsClient({ styles, initialTab }: ToolsClientProps) {
   const router = useRouter();
   const { showToast } = useApp();
-  const [activeTab, setActiveTab] = useState<ToolTab>("pacing");
+  const [activeTab, setActiveTab] = useState<ToolTab>(() =>
+    TOOL_TABS.includes(initialTab as ToolTab) ? (initialTab as ToolTab) : "pacing"
+  );
 
   // 1. Talk-Time & Pacing Calculator
   const [scriptText, setScriptText] = useState(
