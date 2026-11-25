@@ -27,6 +27,7 @@ import {
   Wand2,
   X,
 } from "lucide-react";
+import AiAmbientAccent from "@/components/AiAmbientAccent";
 import SlideCanvas from "@/components/SlideCanvas";
 import DeckAuditDrawer from "@/components/generate/DeckAuditDrawer";
 import DeckSpecTweaker from "@/components/generate/DeckSpecTweaker";
@@ -45,11 +46,16 @@ import { autoFillMissingSpeakerNotes } from "@/lib/deckLinter";
 import { exportStandaloneHtmlDeck } from "@/lib/htmlExporter";
 import { autoFixPaletteContrast } from "@/lib/paletteExtractor";
 import { buildSlideImagePrompt } from "@/lib/promptCompiler";
+import {
+  clearDocIntakeHandoff,
+  readDocIntakeHandoff,
+} from "@/lib/docIntakeHandoff";
 import { clearStudioHandoff, readStudioHandoff } from "@/lib/studioHandoff";
 import {
   DOMAIN_TABS,
   SLIDE_TYPE_LABELS,
   type DeckSlideItem,
+  type DocumentAnalysisResult,
   type OutlineDraftItem,
   type PromptItem,
   type SavedDeck,
@@ -65,6 +71,7 @@ interface GenerateClientProps {
   initialDeck: SavedDeck | null;
   deckForbidden: boolean;
   initialHandoff?: boolean;
+  initialIntake?: boolean;
 }
 
 const MAX_HISTORY_SNAPSHOTS = 40;
@@ -205,6 +212,7 @@ export default function GenerateClient({
   initialDeck,
   deckForbidden,
   initialHandoff = false,
+  initialIntake = false,
 }: GenerateClientProps) {
   const { user, openAuthModal, showToast, refreshAuth } = useApp();
 
@@ -249,7 +257,7 @@ export default function GenerateClient({
   const [apiKey, setApiKey] = useState("");
   const [modelName, setModelName] = useState("gpt-4o-mini");
 
-  // Document Upload State (v3 + v4 reverse .pptx)
+  // Document Upload State (v3 + v4 reverse .pptx + v7 smart style analysis)
   const docInputRef = useRef<HTMLInputElement | null>(null);
   const [docDragging, setDocDragging] = useState(false);
   const [parsingDoc, setParsingDoc] = useState(false);
@@ -258,6 +266,9 @@ export default function GenerateClient({
     charCount: number;
     warning?: string;
   } | null>(null);
+  const [docAnalysis, setDocAnalysis] = useState<DocumentAnalysisResult | null>(
+    null
+  );
 
   // 2-Step Controllable Outline State (v3)
   const [outlineDraft, setOutlineDraft] = useState<OutlineDraftItem[] | null>(
@@ -332,11 +343,101 @@ export default function GenerateClient({
   const currentSlide = slides[safeIndex];
   const title = topic.trim() || activeStyle?.sampleTopic || "PPTGod Deck";
 
-  // Mount effect: consume Studio -> Generate handoff OR check local auto-save draft
+  // Mount effect: consume Drop-a-Doc intake OR Studio handoff OR check local auto-save draft
   useEffect(() => {
     let active = true;
-    Promise.resolve().then(() => {
+    Promise.resolve().then(async () => {
       if (!active) return;
+
+      // v7: Seamless Drop-a-Doc Intake -> Auto-Generate PPT Pipeline
+      if (!initialDeck && initialIntake) {
+        const intake = readDocIntakeHandoff();
+        if (intake) {
+          clearDocIntakeHandoff();
+          const matchedStyle =
+            styles.find((s) => s.slug === intake.styleSlug) ||
+            initialStyle ||
+            styles[0];
+          const nextSlideCount = Math.max(
+            5,
+            Math.min(20, intake.parsedOutline?.length || intake.slideCount || 8)
+          );
+
+          if (matchedStyle) {
+            setSelectedSlug(matchedStyle.slug);
+            setDeckSpec(matchedStyle.visualSpec);
+          }
+          if (intake.topic) setTopic(intake.topic);
+          if (intake.subtitle) setSubtitle(intake.subtitle);
+          if (intake.audience) setAudience(intake.audience);
+          setSlideCount(nextSlideCount);
+          if (intake.text) setSourceText(intake.text);
+          setUploadedDocMeta({
+            fileName: intake.fileName,
+            charCount: intake.charCount,
+          });
+          if (intake.analysis) setDocAnalysis(intake.analysis);
+          if (intake.parsedOutline && intake.parsedOutline.length > 0) {
+            setOutlineDraft(intake.parsedOutline);
+          }
+
+          if (intake.autoGenerate) {
+            setGenerating(true);
+            try {
+              const res = await fetch("/api/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  topic: intake.topic,
+                  subtitle: intake.subtitle,
+                  audience: intake.audience,
+                  sourceText: intake.text,
+                  slideCount: nextSlideCount,
+                  scenario:
+                    intake.analysis?.detectedScenario || matchedStyle?.scenario,
+                  archetype: matchedStyle?.visualSpec.layout.archetype,
+                  outline: intake.parsedOutline,
+                  mode: "smart",
+                }),
+              });
+              const data = await res.json();
+              if (
+                active &&
+                res.ok &&
+                Array.isArray(data.slides) &&
+                data.slides.length > 0
+              ) {
+                setSlides(data.slides);
+                setActiveIndex(0);
+                setOutlineDraft(null);
+                hasLocalEditsRef.current = true;
+                showToast(
+                  `已根据「${intake.fileName}」自动整理生成 ${data.slides.length} 页完整 PPT！`,
+                  "success"
+                );
+              } else if (active) {
+                showToast(
+                  data.error || "自动整理演示文稿失败，请点击下方生成重试",
+                  "error"
+                );
+              }
+            } catch {
+              if (active) {
+                showToast("自动整理演示文稿网络异常，请点击下方生成重试", "error");
+              }
+            } finally {
+              if (active) setGenerating(false);
+            }
+          } else {
+            showToast(
+              `已载入资料「${intake.fileName}」与推荐风格，可随时点击生成整套 PPT`,
+              "success"
+            );
+          }
+          return;
+        }
+      }
+
       if (!initialDeck) {
         const handoff = readStudioHandoff(initialStyleSlug || undefined);
         if (handoff && (initialHandoff || handoff.slug === initialStyleSlug)) {
@@ -364,7 +465,7 @@ export default function GenerateClient({
         }
       }
 
-      if (!initialDeck && !initialHandoff) {
+      if (!initialDeck && !initialHandoff && !initialIntake) {
         const draft = readLocalDraft();
         if (draft) {
           setPendingDraft(draft);
@@ -599,6 +700,12 @@ export default function GenerateClient({
         warning: data.warning,
       });
 
+      const parsedAnalysis: DocumentAnalysisResult | null =
+        data.analysis && typeof data.analysis === "object"
+          ? (data.analysis as DocumentAnalysisResult)
+          : null;
+      setDocAnalysis(parsedAnalysis);
+
       if (typeof data.text === "string" && data.text.trim()) {
         setSourceText(data.text);
       }
@@ -619,6 +726,18 @@ export default function GenerateClient({
       if (data.suggestedSubtitle && !data.isScannedPdf) {
         setSubtitle(data.suggestedSubtitle);
       }
+      if (parsedAnalysis && !data.isScannedPdf) {
+        if (parsedAnalysis.suggestedAudience) {
+          setAudience(parsedAnalysis.suggestedAudience);
+        }
+        if (
+          !(Array.isArray(data.parsedOutline) && data.parsedOutline.length > 0)
+        ) {
+          setSlideCount(
+            Math.max(5, Math.min(20, parsedAnalysis.suggestedSlideCount || 8))
+          );
+        }
+      }
 
       // v4: Reverse .pptx upload populates Step 1 Outline Editor immediately!
       if (Array.isArray(data.parsedOutline) && data.parsedOutline.length > 0) {
@@ -636,7 +755,9 @@ export default function GenerateClient({
         showToast("检测到扫描版 PDF，请查看提示说明", "error");
       } else {
         showToast(
-          `已成功解析「${data.fileName}」（提取 ${data.charCount} 字）`,
+          parsedAnalysis
+            ? `已解析「${data.fileName}」（${data.charCount} 字）· 识别为「${parsedAnalysis.detectedScenario}」并推荐 Top 3 风格`
+            : `已成功解析「${data.fileName}」（提取 ${data.charCount} 字）`,
           "success"
         );
       }
@@ -749,6 +870,7 @@ export default function GenerateClient({
     setAudience(preset.audience);
     setSourceText(preset.rawText);
     setUploadedDocMeta(null);
+    setDocAnalysis(null);
     const nextSlides = generateStructuredDeck({
       topic: preset.topic,
       subtitle: preset.subtitle,
@@ -1133,7 +1255,7 @@ export default function GenerateClient({
         <header className="pg-gen-topbar">
           <div>
             <p className="pg-kicker">
-              ONLINE PPT GENERATION &amp; DELIVERY WORKSHOP · V6
+              ONLINE PPT GENERATION &amp; DELIVERY WORKSHOP · V7
             </p>
             <h1 className="pg-subpage-title">在线 PPT 生成与编辑工坊</h1>
             <p className="pg-subpage-lead">
@@ -1283,6 +1405,7 @@ export default function GenerateClient({
 
         {/* Style Re-Skinning Strip, Brand Tweaker & Generation Input Drawer */}
         <section className="pg-gen-config-card">
+          <AiAmbientAccent variant="panel-corner" />
           <div className="pg-gen-config-head">
             <div className="pg-panel-title-wrap">
               <Wand2 size={15} />
@@ -1491,7 +1614,10 @@ export default function GenerateClient({
                       <button
                         type="button"
                         className="pg-gen-mini-icon"
-                        onClick={() => setUploadedDocMeta(null)}
+                        onClick={() => {
+                          setUploadedDocMeta(null);
+                          setDocAnalysis(null);
+                        }}
                         aria-label="清除文档提示"
                       >
                         <X size={13} />
@@ -1502,6 +1628,101 @@ export default function GenerateClient({
                   {uploadedDocMeta?.warning && (
                     <div className="pg-upload-warning" id="pg-doc-scan-warning">
                       {uploadedDocMeta.warning}
+                    </div>
+                  )}
+
+                  {docAnalysis && docAnalysis.recommendedStyles.length > 0 && (
+                    <div className="pg-gen-doc-recs" id="pg-gen-doc-recs">
+                      <div className="pg-gen-doc-recs-head">
+                        <div className="pg-gen-doc-recs-title">
+                          <Sparkles size={13} />
+                          <span>
+                            智能识别场景：
+                            <strong>{docAnalysis.detectedScenario}</strong>（
+                            {docAnalysis.confidence}%）· 为你推荐 Top 3 匹配风格
+                          </span>
+                        </div>
+                        {docAnalysis.keyMetrics.length > 0 && (
+                          <span className="pg-gen-doc-metrics-hint">
+                            提炼 {docAnalysis.keyMetrics.length} 组数据：
+                            {docAnalysis.keyMetrics.slice(0, 3).join(" / ")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div
+                        className="pg-gen-doc-rec-pills"
+                        role="group"
+                        aria-label="文档智能推荐 PPT 风格"
+                      >
+                        {docAnalysis.recommendedStyles.map((rec, idx) => {
+                          const matchedStyle = styles.find(
+                            (s) => s.slug === rec.slug || s.id === rec.id
+                          );
+                          const isCurrent = activeStyle.slug === rec.slug;
+                          return (
+                            <button
+                              key={rec.slug}
+                              type="button"
+                              data-rec-slug={rec.slug}
+                              className={`pg-gen-doc-rec-btn ${
+                                isCurrent ? "is-active" : ""
+                              }`}
+                              title={rec.reasons.join(" · ")}
+                              onClick={() => {
+                                handleSelectStyle(rec.slug);
+                                showToast(
+                                  `已一键切换推荐风格「${rec.title}」（匹配度 ${rec.score}%）`,
+                                  "success"
+                                );
+                              }}
+                            >
+                              {matchedStyle && (
+                                <span
+                                  className="pg-gen-style-dot"
+                                  style={{
+                                    background: `linear-gradient(135deg, ${matchedStyle.visualSpec.palette.bg} 45%, ${matchedStyle.visualSpec.palette.accent} 45%)`,
+                                  }}
+                                />
+                              )}
+                              <span className="pg-gen-doc-rec-name">
+                                #{idx + 1} {rec.title}
+                              </span>
+                              <span className="pg-gen-doc-rec-score">
+                                {rec.score}%
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="pg-gen-doc-recs-actions">
+                        <button
+                          type="button"
+                          id="pg-gen-doc-autogen-btn"
+                          className="pg-btn pg-btn-primary pg-btn-xs"
+                          disabled={generating}
+                          onClick={() =>
+                            handleGenerate(outlineDraft ?? undefined)
+                          }
+                        >
+                          <Sparkles size={12} />
+                          <span>
+                            {generating
+                              ? "正在自动整理生成..."
+                              : "立即按文档整理生成整套 PPT"}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          id="pg-gen-doc-prompt-btn"
+                          className="pg-btn pg-btn-secondary pg-btn-xs"
+                          onClick={() => setExportModalOpen(true)}
+                        >
+                          <FileCode size={12} />
+                          <span>导出 Marp / 精准提示词</span>
+                        </button>
+                      </div>
                     </div>
                   )}
 

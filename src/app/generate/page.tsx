@@ -20,6 +20,7 @@ export default async function GeneratePage({
     topic?: string;
     deck?: string;
     handoff?: string;
+    intake?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -52,6 +53,7 @@ export default async function GeneratePage({
       initialDeck={initialDeck}
       deckForbidden={deckForbidden}
       initialHandoff={sp.handoff === "1"}
+      initialIntake={sp.intake === "1"}
     />
   );
 }

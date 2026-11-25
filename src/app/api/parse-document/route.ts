@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import mammoth from "mammoth";
 import { extractText } from "unpdf";
+import { listPrompts } from "@/lib/db";
+import { analyzeDocumentAndRecommendStyles } from "@/lib/documentAnalyzer";
 import { parsePptxBuffer } from "@/lib/pptxParser";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -67,6 +69,16 @@ export async function POST(request: Request) {
   const fileName = (fileEntry.name || "document.txt").slice(0, 180);
   const ext = getExtension(fileName);
 
+  if (ext === "doc") {
+    return NextResponse.json(
+      {
+        error:
+          "检测到旧版二进制 .doc 格式，请先在 Word / WPS 中另存为标准 .docx 格式后再上传",
+      },
+      { status: 400 }
+    );
+  }
+
   if (!ALLOWED_EXTS.has(ext)) {
     return NextResponse.json(
       {
@@ -93,10 +105,18 @@ export async function POST(request: Request) {
   try {
     const arrayBuffer = await fileEntry.arrayBuffer();
     const uint8 = new Uint8Array(arrayBuffer);
+    const catalogStyles = listPrompts({});
 
     if (ext === "pptx") {
       try {
         const parsed = parsePptxBuffer(uint8);
+        const analysis = analyzeDocumentAndRecommendStyles({
+          text: parsed.text,
+          fileName,
+          suggestedTopic: parsed.suggestedTopic,
+          suggestedSubtitle: parsed.suggestedSubtitle,
+          styles: catalogStyles,
+        });
         return NextResponse.json({
           ok: true,
           fileName,
@@ -108,6 +128,7 @@ export async function POST(request: Request) {
           suggestedTopic: parsed.suggestedTopic,
           suggestedSubtitle: parsed.suggestedSubtitle,
           parsedOutline: parsed.parsedOutline,
+          analysis,
         });
       } catch (err) {
         return NextResponse.json(
@@ -162,6 +183,13 @@ export async function POST(request: Request) {
       cleanText,
       fileName
     );
+    const analysis = analyzeDocumentAndRecommendStyles({
+      text: cleanText.slice(0, 16000),
+      fileName,
+      suggestedTopic,
+      suggestedSubtitle,
+      styles: catalogStyles,
+    });
 
     return NextResponse.json({
       ok: true,
@@ -175,6 +203,7 @@ export async function POST(request: Request) {
       text: cleanText.slice(0, 16000),
       suggestedTopic,
       suggestedSubtitle,
+      analysis,
     });
   } catch (err) {
     console.error(

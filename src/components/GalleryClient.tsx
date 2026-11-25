@@ -1,18 +1,25 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Compass,
+  FileUp,
   RotateCcw,
   Search,
   SlidersHorizontal,
   Sparkles,
+  Upload,
   Wand2,
 } from "lucide-react";
+import AiAmbientAccent from "@/components/AiAmbientAccent";
+import DocIntakeWorkbench, {
+  type DocIntakeParsedState,
+} from "@/components/DocIntakeWorkbench";
 import PromptCard from "@/components/PromptCard";
 import StyleMatcherModal from "@/components/StyleMatcherModal";
 import { useApp } from "@/context/AppContext";
+import { analyzeDocumentAndRecommendStyles } from "@/lib/documentAnalyzer";
 import {
   COLOR_FAMILY_LABELS,
   DOMAIN_TABS,
@@ -39,7 +46,8 @@ interface GalleryClientProps {
 }
 
 export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
-  const { user, syncVersion, globalTopic, setGlobalTopic } = useApp();
+  const { user, syncVersion, globalTopic, setGlobalTopic, showToast } =
+    useApp();
 
   const [prompts, setPrompts] = useState<PromptItem[]>(initialPrompts);
   const [domainTab, setDomainTab] = useState<DomainTabId>("all");
@@ -52,6 +60,15 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
     "popular"
   );
   const [matcherOpen, setMatcherOpen] = useState(false);
+
+  // v7 Drop-a-Doc Intake Hub state
+  const heroDocInputRef = useRef<HTMLInputElement | null>(null);
+  const [heroDocDragging, setHeroDocDragging] = useState(false);
+  const [heroParsingDoc, setHeroParsingDoc] = useState(false);
+  const [docIntakeOpen, setDocIntakeOpen] = useState(false);
+  const [heroParsedDoc, setHeroParsedDoc] =
+    useState<DocIntakeParsedState | null>(null);
+  const [intakeSessionKey, setIntakeSessionKey] = useState(0);
 
   // Re-sync liked/favorited state when auth or cloud favorite sync completes
   useEffect(() => {
@@ -184,6 +201,65 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
     );
   };
 
+  const handleHeroDocUpload = async (file: File) => {
+    if (heroParsingDoc) return;
+    setHeroParsingDoc(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/parse-document", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "文档解析失败，请检查文件格式", "error");
+        return;
+      }
+
+      const analysis =
+        data.analysis ||
+        analyzeDocumentAndRecommendStyles({
+          text: String(data.text || ""),
+          fileName: data.fileName || file.name,
+          suggestedTopic: data.suggestedTopic,
+          suggestedSubtitle: data.suggestedSubtitle,
+          styles: prompts,
+        });
+
+      const parsedState: DocIntakeParsedState = {
+        fileName: data.fileName || file.name,
+        fileType: data.fileType || "txt",
+        charCount: Number(data.charCount) || String(data.text || "").length,
+        text: String(data.text || ""),
+        suggestedTopic: data.suggestedTopic || file.name,
+        suggestedSubtitle:
+          data.suggestedSubtitle || "基于源文档自动提炼的结构化演示方案",
+        isScannedPdf: Boolean(data.isScannedPdf),
+        warning: data.warning,
+        parsedOutline: Array.isArray(data.parsedOutline)
+          ? data.parsedOutline
+          : undefined,
+        analysis,
+      };
+
+      if (parsedState.suggestedTopic && !parsedState.isScannedPdf) {
+        setGlobalTopic(parsedState.suggestedTopic);
+      }
+      setHeroParsedDoc(parsedState);
+      setIntakeSessionKey((k) => k + 1);
+      setDocIntakeOpen(true);
+      showToast(
+        `已解析「${parsedState.fileName}」· 识别为「${analysis.detectedScenario}」并生成 Top 3 推荐`,
+        "success"
+      );
+    } catch {
+      showToast("文档解析网络异常，请稍后重试", "error");
+    } finally {
+      setHeroParsingDoc(false);
+    }
+  };
+
   const quickGenerateHref = globalTopic.trim()
     ? `/generate?topic=${encodeURIComponent(globalTopic.trim())}`
     : "/generate";
@@ -192,6 +268,7 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
     <main className="pg-page">
       {/* Compact Editorial Hero + Live Topic Stage Bar */}
       <section className="pg-hero">
+        <AiAmbientAccent variant="hero-neural" />
         <div className="pg-container">
           <div className="pg-hero-grid">
             <div className="pg-hero-copy">
@@ -230,8 +307,9 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
               </div>
             </div>
 
-            {/* Live Global Topic Injector */}
+            {/* Live Global Topic Injector + Drop-a-Doc Intake Bar (v7) */}
             <div className="pg-live-topic-panel">
+              <AiAmbientAccent variant="panel-corner" />
               <div className="pg-live-topic-head">
                 <span className="pg-live-topic-label">
                   <Wand2 size={14} />
@@ -273,6 +351,69 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
                     {preset}
                   </button>
                 ))}
+              </div>
+
+              {/* v7 Drop-a-Doc Quick Intake Bar */}
+              <div
+                id="pg-hero-doc-dropzone"
+                className={`pg-hero-doc-dropzone ${
+                  heroDocDragging ? "is-drag-over" : ""
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setHeroDocDragging(true);
+                }}
+                onDragLeave={() => setHeroDocDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setHeroDocDragging(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) handleHeroDocUpload(file);
+                }}
+              >
+                <input
+                  ref={heroDocInputRef}
+                  id="pg-hero-doc-input"
+                  type="file"
+                  accept=".pdf,.docx,.pptx,.md,.txt"
+                  className="pg-hero-doc-file-input"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleHeroDocUpload(file);
+                    e.target.value = "";
+                  }}
+                />
+                <div className="pg-hero-doc-copy">
+                  <FileUp size={16} className="pg-hero-doc-icon" />
+                  <div>
+                    <div className="pg-hero-doc-title">
+                      丢入 PDF / Word / TXT · 推风格 · 出词 · 生成 PPT
+                    </div>
+                    <div className="pg-hero-doc-sub">
+                      拖拽或上传资料即刻匹配 Top 3 视觉系统，也可粘贴文本直接试跑
+                    </div>
+                  </div>
+                </div>
+                <div className="pg-hero-doc-btns">
+                  <button
+                    type="button"
+                    id="pg-hero-doc-upload-btn"
+                    className="pg-btn pg-btn-ink pg-btn-xs"
+                    disabled={heroParsingDoc}
+                    onClick={() => heroDocInputRef.current?.click()}
+                  >
+                    <Upload size={12} />
+                    <span>{heroParsingDoc ? "解析中..." : "上传资料"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    id="pg-open-doc-intake-btn"
+                    className="pg-btn pg-btn-secondary pg-btn-xs"
+                    onClick={() => setDocIntakeOpen(true)}
+                  >
+                    <span>打开工作台</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -504,6 +645,15 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
         onClose={() => setMatcherOpen(false)}
         prompts={prompts}
         liveTopic={globalTopic}
+      />
+
+      <DocIntakeWorkbench
+        key={intakeSessionKey}
+        open={docIntakeOpen}
+        onClose={() => setDocIntakeOpen(false)}
+        prompts={prompts}
+        initialParsed={heroParsedDoc}
+        onApplyTopic={(t) => setGlobalTopic(t)}
       />
     </main>
   );

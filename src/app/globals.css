@@ -1,49 +1,68 @@
 /* ==========================================================================
-   PPTGod — Editorial Design Specimen & Studio Light System (Vanilla CSS)
+   PPTGod — Glassmorphism + Soft Neumorphism & AI Ambient System (Vanilla CSS)
    ========================================================================== */
 
 :root {
-  /* Warm Studio Paper & Archival Ink Palette */
-  --bg-canvas: #f5f2eb;
-  --bg-surface: #ffffff;
-  --bg-subtle: #ede9df;
-  --bg-inset: #f9f7f2;
+  /* Luminous Frosted Pearl Canvas & Translucent Glass Surfaces */
+  --bg-canvas: #f2f3ef;
+  --bg-surface: rgba(255, 255, 255, 0.68);
+  --bg-surface-strong: rgba(255, 255, 255, 0.86);
+  --bg-subtle: rgba(235, 241, 250, 0.62);
+  --bg-inset: rgba(242, 246, 253, 0.62);
 
-  --ink-primary: #171615;
-  --ink-secondary: #524e49;
-  --ink-muted: #7c766d;
+  /* Crisp Slate Ink Hierarchy (WCAG AAA on frosted glass) */
+  --ink-primary: #172033;
+  --ink-secondary: #475569;
+  --ink-muted: #64748b;
 
-  /* Swiss Vermilion Editorial Accent */
-  --accent: #c84b31;
-  --accent-hover: #ab3c24;
-  --accent-soft: rgba(200, 75, 49, 0.09);
-  --accent-ring: rgba(200, 75, 49, 0.24);
+  /* Refined AI Cobalt-Indigo Luminous Accent */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --accent-ring: rgba(37, 99, 235, 0.22);
 
   /* Semantic Accents */
-  --teal: #0f766e;
-  --teal-soft: rgba(15, 118, 110, 0.1);
-  --cobalt: #1d4ed8;
-  --cobalt-soft: rgba(29, 78, 216, 0.1);
-  --danger: #b91c1c;
-  --danger-soft: rgba(185, 28, 28, 0.09);
+  --teal: #0d9488;
+  --teal-soft: rgba(13, 148, 136, 0.11);
+  --cobalt: #3b82f6;
+  --cobalt-soft: rgba(59, 130, 246, 0.12);
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.09);
 
-  /* Structural Borders & Layered Elevation */
-  --border-hairline: rgba(23, 22, 21, 0.09);
-  --border-strong: rgba(23, 22, 21, 0.18);
-  --shadow-xs: 0 1px 2px rgba(23, 22, 21, 0.04);
-  --shadow-sm: 0 2px 8px rgba(23, 22, 21, 0.05), 0 1px 2px rgba(23, 22, 21, 0.04);
-  --shadow-md: 0 10px 28px rgba(23, 22, 21, 0.08), 0 2px 6px rgba(23, 22, 21, 0.04);
-  --shadow-lg: 0 22px 48px rgba(23, 22, 21, 0.16), 0 4px 12px rgba(23, 22, 21, 0.06);
+  /* Frosted Glass Blur & Specular Edge Borders (single-pass GPU-safe) */
+  --glass-blur: blur(14px);
+  --glass-blur-heavy: blur(18px);
+  --border-hairline: rgba(255, 255, 255, 0.78);
+  --border-glass-edge: rgba(148, 163, 184, 0.22);
+  --border-strong: rgba(148, 163, 184, 0.34);
 
-  /* Geometry & Rhythm */
-  --radius-xs: 5px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  /* Soft Neumorphism Dual-Light Elevation Shadows & Recessed Inset Wells */
+  --shadow-xs: -2px -2px 6px rgba(255, 255, 255, 0.9),
+    3px 4px 10px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --shadow-sm: -5px -5px 14px rgba(255, 255, 255, 0.88),
+    7px 9px 22px rgba(15, 23, 42, 0.075),
+    inset 0 1px 1px rgba(255, 255, 255, 0.95);
+  --shadow-md: -7px -7px 18px rgba(255, 255, 255, 0.84),
+    10px 14px 32px rgba(15, 23, 42, 0.095),
+    inset 0 1px 1px rgba(255, 255, 255, 0.96);
+  --shadow-lg: -8px -8px 24px rgba(255, 255, 255, 0.62),
+    16px 24px 52px rgba(15, 23, 42, 0.15),
+    inset 0 1px 1px rgba(255, 255, 255, 0.96);
+  --neu-inset: inset 2px 3px 6px rgba(15, 23, 42, 0.065),
+    inset -2px -2px 6px rgba(255, 255, 255, 0.92);
+  --neu-inset-soft: inset 1.5px 2px 4px rgba(15, 23, 42, 0.05),
+    inset -1.5px -1.5px 4px rgba(255, 255, 255, 0.88);
+
+  /* Soft Rounded Geometry & Rhythm */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
   --radius-full: 999px;
 
   --container-max: 1360px;
-  --nav-height: 64px;
+  --nav-height: 66px;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -67,15 +86,34 @@ body {
   line-height: 1.55;
 }
 
-/* Subtle paper depth texture overlay (tactile, not grid/mesh) */
+/* Soft diffused luminous frost washes behind glassmorphic panels (zero grid clutter) */
 body {
   background-image: radial-gradient(
-      at 12% 0%,
-      rgba(255, 255, 255, 0.72) 0%,
-      transparent 48%
+      ellipse 55% 44% at 10% 4%,
+      rgba(191, 219, 254, 0.42) 0%,
+      transparent 68%
     ),
-    radial-gradient(at 88% 8%, rgba(200, 75, 49, 0.035) 0%, transparent 40%);
-  background-attachment: fixed;
+    radial-gradient(
+      ellipse 48% 42% at 88% 8%,
+      rgba(199, 210, 254, 0.38) 0%,
+      transparent 66%
+    ),
+    radial-gradient(
+      ellipse 44% 38% at 62% 38%,
+      rgba(153, 246, 228, 0.24) 0%,
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 40% 34% at 18% 72%,
+      rgba(224, 231, 255, 0.3) 0%,
+      transparent 66%
+    ),
+    radial-gradient(
+      ellipse 36% 30% at 86% 84%,
+      rgba(254, 215, 170, 0.16) 0%,
+      transparent 64%
+    );
+  background-repeat: no-repeat;
 }
 
 a {
@@ -119,7 +157,7 @@ code {
 }
 
 /* ==========================================================================
-   Editorial Sticky Navbar
+   Frosted Glass Sticky Navbar
    ========================================================================== */
 
 .pg-navbar {
@@ -127,10 +165,12 @@ code {
   top: 0;
   z-index: 40;
   height: var(--nav-height);
-  background: rgba(245, 242, 235, 0.86);
+  background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--border-hairline);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.045),
+    inset 0 -1px 0 rgba(148, 163, 184, 0.16);
 }
 
 .pg-navbar-inner {
@@ -152,22 +192,24 @@ code {
 }
 
 .pg-brand-mark {
-  width: 34px;
-  height: 26px;
-  border-radius: 5px;
-  background: var(--ink-primary);
+  width: 36px;
+  height: 28px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #172033 0%, #243b6b 100%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
-  box-shadow: var(--shadow-xs);
+  padding: 4.5px;
+  box-shadow: -2px -2px 5px rgba(255, 255, 255, 0.85),
+    3px 4px 10px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .pg-brand-slide-outer {
   width: 100%;
   height: 100%;
   border: 1.5px solid rgba(255, 255, 255, 0.85);
-  border-radius: 2px;
+  border-radius: 3px;
   display: flex;
   align-items: flex-end;
   padding: 2.5px;
@@ -176,8 +218,8 @@ code {
 .pg-brand-slide-bar {
   width: 12px;
   height: 4px;
-  border-radius: 1px;
-  background: var(--accent);
+  border-radius: 2px;
+  background: #38bdf8;
 }
 
 .pg-brand-text {
@@ -202,32 +244,39 @@ code {
 .pg-nav-links {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--radius-full);
+  background: rgba(235, 241, 250, 0.56);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: var(--neu-inset-soft);
 }
 
 .pg-nav-link {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 7px 13px;
-  border-radius: var(--radius-sm);
+  padding: 7px 14px;
+  border-radius: var(--radius-full);
   font-size: 13.5px;
   font-weight: 500;
   color: var(--ink-secondary);
-  transition: background 0.16s var(--ease-out), color 0.16s var(--ease-out);
+  border: 1px solid transparent;
+  transition: background 0.18s var(--ease-out), color 0.18s var(--ease-out),
+    box-shadow 0.18s var(--ease-out);
 }
 
 .pg-nav-link:hover {
-  background: rgba(23, 22, 21, 0.05);
+  background: rgba(255, 255, 255, 0.62);
   color: var(--ink-primary);
 }
 
 .pg-nav-link.is-active {
-  background: var(--bg-surface);
+  background: rgba(255, 255, 255, 0.9);
   color: var(--ink-primary);
   font-weight: 600;
   box-shadow: var(--shadow-xs);
-  border: 1px solid var(--border-hairline);
+  border-color: rgba(255, 255, 255, 0.92);
 }
 
 .pg-nav-badge {
@@ -321,35 +370,47 @@ code {
 }
 
 .pg-btn-primary {
-  background: var(--accent);
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   color: #ffffff;
-  box-shadow: 0 1px 2px rgba(200, 75, 49, 0.28);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: -2px -2px 6px rgba(255, 255, 255, 0.7),
+    0 6px 14px rgba(37, 99, 235, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.36);
 }
 
 .pg-btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-  box-shadow: 0 4px 12px rgba(200, 75, 49, 0.25);
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  transform: translateY(-1px);
+  box-shadow: -3px -3px 8px rgba(255, 255, 255, 0.78),
+    0 8px 18px rgba(37, 99, 235, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44);
 }
 
 .pg-btn-ink {
-  background: var(--ink-primary);
+  background: linear-gradient(135deg, #172033 0%, #27354f 100%);
   color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: -2px -2px 6px rgba(255, 255, 255, 0.72),
+    4px 6px 14px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .pg-btn-ink:hover:not(:disabled) {
-  background: #2c2a28;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  transform: translateY(-1px);
 }
 
 .pg-btn-secondary {
-  background: var(--bg-surface);
+  background: rgba(255, 255, 255, 0.82);
   color: var(--ink-primary);
-  border-color: var(--border-strong);
+  border-color: rgba(255, 255, 255, 0.92);
   box-shadow: var(--shadow-xs);
 }
 
 .pg-btn-secondary:hover:not(:disabled) {
-  background: var(--bg-inset);
-  border-color: rgba(23, 22, 21, 0.3);
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(148, 163, 184, 0.34);
+  transform: translateY(-1px);
 }
 
 .pg-btn-ghost {
@@ -358,8 +419,9 @@ code {
 }
 
 .pg-btn-ghost:hover:not(:disabled) {
-  background: rgba(23, 22, 21, 0.06);
+  background: rgba(255, 255, 255, 0.56);
   color: var(--ink-primary);
+  box-shadow: var(--neu-inset-soft);
 }
 
 .pg-btn-sm {
@@ -553,6 +615,74 @@ code {
   background: var(--ink-primary);
   color: #ffffff;
   border-color: var(--ink-primary);
+}
+
+/* v7: Compact Drop-a-Doc Quick Intake Bar inside Hero Live Topic Panel */
+.pg-hero-doc-dropzone {
+  position: relative;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1.5px dashed var(--border-strong);
+  background: var(--bg-inset);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pg-hero-doc-dropzone:hover {
+  border-color: rgba(37, 99, 235, 0.48);
+}
+
+.pg-hero-doc-dropzone.is-drag-over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.pg-hero-doc-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pg-hero-doc-copy {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
+.pg-hero-doc-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.pg-hero-doc-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-primary);
+  line-height: 1.3;
+}
+
+.pg-hero-doc-sub {
+  font-size: 11px;
+  color: var(--ink-muted);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.pg-hero-doc-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 /* ==========================================================================
@@ -2513,6 +2643,300 @@ code {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ==========================================================================
+   Glassmorphism + Soft Neumorphism Unified Surface & AI Accent System
+   ========================================================================== */
+
+.pg-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.pg-hero > .pg-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* Localized AI decorative accents (data-flow streams, neural nodes, micro-particles) */
+.pg-ai-ambient {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+.pg-ai-ambient--hero {
+  inset: 0;
+  overflow: hidden;
+}
+
+.pg-ai-ambient--corner {
+  top: 0;
+  right: 0;
+  width: 220px;
+  height: 100px;
+  opacity: 0.72;
+  overflow: hidden;
+}
+
+.pg-ai-ambient--footer {
+  top: -12px;
+  left: 0;
+  right: 0;
+  height: 24px;
+  overflow: hidden;
+}
+
+.pg-ai-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pg-ai-flow-pulse {
+  stroke-dasharray: 72 220;
+  stroke-dashoffset: 40;
+  opacity: 0.72;
+}
+
+.pg-ai-flow-pulse--slow {
+  stroke-dasharray: 56 260;
+  stroke-dashoffset: 110;
+  opacity: 0.62;
+}
+
+.pg-ai-particle {
+  opacity: 0.48;
+}
+
+.pg-ai-particle--d2 {
+  opacity: 0.36;
+}
+
+.pg-ai-particle--d3 {
+  opacity: 0.56;
+}
+
+/* Primary Focal Frosted Glass Panels (true single-pass backdrop-filter refraction) */
+.pg-live-topic-panel,
+.pg-filter-shell,
+.pg-compare-toolbar,
+.pg-creator-hero {
+  background: var(--bg-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.84);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Lightweight frosted translucent glass + soft neumorphism for dense panels & 36-item grids (60fps GPU-friendly) */
+.pg-card,
+.pg-deck-card,
+.pg-stage-frame,
+.pg-panel,
+.pg-studio-author-card,
+.pg-compare-col,
+.pg-picker-panel,
+.pg-empty-state,
+.pg-gen-config-card,
+.pg-gen-sidebar,
+.pg-gen-stage,
+.pg-gen-inspector,
+.pg-impact-card {
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.86) 0%,
+    rgba(248, 251, 255, 0.72) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  box-shadow: var(--shadow-sm);
+}
+
+.pg-live-topic-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.pg-live-topic-panel > *:not(.pg-ai-ambient) {
+  position: relative;
+  z-index: 1;
+}
+
+.pg-filter-shell {
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+}
+
+.pg-card {
+  border-radius: var(--radius-md);
+}
+
+.pg-card:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.84);
+  border-color: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-md);
+}
+
+.pg-card-stage-wrap {
+  background: rgba(235, 242, 252, 0.46);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.pg-card-canvas-link {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.pg-card-slide-tabs {
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: rgba(226, 234, 246, 0.52);
+  box-shadow: var(--neu-inset-soft);
+}
+
+.pg-slide-tab {
+  border-radius: 7px;
+}
+
+.pg-slide-tab.is-active {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Soft Neumorphic Recessed Inputs, Search & Select Controls */
+.pg-live-topic-input,
+.pg-search-box,
+.pg-select,
+.pg-field input,
+.pg-field textarea,
+.pg-field select,
+.pg-intake-field input {
+  background: rgba(242, 246, 253, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow: var(--neu-inset);
+  border-radius: var(--radius-sm);
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.pg-live-topic-input:focus,
+.pg-search-box:focus-within,
+.pg-select:focus,
+.pg-field input:focus,
+.pg-field textarea:focus,
+.pg-field select:focus,
+.pg-intake-field input:focus {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(37, 99, 235, 0.55);
+  box-shadow: 0 0 0 3px var(--accent-ring), var(--shadow-xs);
+}
+
+/* Soft Tactile Pills & Chips */
+.pg-preset-chip,
+.pg-pill,
+.pg-mini-pill,
+.pg-domain-tab {
+  border-radius: var(--radius-full);
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease,
+    border-color 0.16s ease, transform 0.14s var(--ease-out);
+}
+
+.pg-preset-chip,
+.pg-pill,
+.pg-mini-pill {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  box-shadow: var(--shadow-xs);
+}
+
+.pg-preset-chip:hover,
+.pg-pill:hover,
+.pg-mini-pill:hover {
+  background: rgba(255, 255, 255, 0.92);
+  transform: translateY(-1px);
+}
+
+.pg-preset-chip.is-active,
+.pg-pill.is-active,
+.pg-mini-pill.is-active,
+.pg-domain-tab.is-active {
+  background: linear-gradient(135deg, #172033 0%, #27354f 100%);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: -2px -2px 5px rgba(255, 255, 255, 0.72),
+    3px 5px 12px rgba(15, 23, 42, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.pg-hero-doc-dropzone {
+  background: rgba(240, 246, 255, 0.56);
+  border: 1.5px dashed rgba(37, 99, 235, 0.34);
+  border-radius: var(--radius-md);
+  box-shadow: var(--neu-inset-soft);
+}
+
+.pg-user-pill {
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-xs);
+}
+
+.pg-demo-banner:hover {
+  background: rgba(37, 99, 235, 0.16);
+}
+
+/* Frosted Milk-Glass Modals & Smoked Obsidian Floating Dock */
+.pg-modal-backdrop {
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.pg-modal {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  border-radius: var(--radius-lg);
+}
+
+.pg-segmented {
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  box-shadow: var(--neu-inset-soft);
+  padding: 4px;
+}
+
+.pg-seg-btn {
+  border-radius: 9px;
+  padding: 7px 8px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.pg-compare-dock-inner {
+  background: rgba(15, 23, 42, 0.84);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+/* Translucent Glass Footer with Localized AI Data-Flow Whisper Line */
+.pg-footer {
+  position: relative;
+  border-top: 1px solid rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.pg-toast {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-md);
 }
 
 /* ==========================================================================

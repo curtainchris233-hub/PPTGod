@@ -6,6 +6,7 @@ import {
   Noto_Serif_SC,
   Plus_Jakarta_Sans,
 } from "next/font/google";
+import AiAmbientAccent from "@/components/AiAmbientAccent";
 import AuthModal from "@/components/AuthModal";
 import CompareDock from "@/components/CompareDock";
 import Navbar from "@/components/Navbar";
@@ -75,6 +76,7 @@ export default function RootLayout({
             <Navbar />
             {children}
             <footer className="pg-footer">
+              <AiAmbientAccent variant="footer-stream" />
               <div className="pg-container pg-footer-inner">
                 <div className="pg-footer-brand">
                   <strong>PPTGod</strong>
