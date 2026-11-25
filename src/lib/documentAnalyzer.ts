@@ -1,10 +1,15 @@
 import {
   DOMAIN_TABS,
+  MATERIAL_KIND_LABELS,
   getDefaultAudienceForScenario,
   type DocumentAnalysisResult,
   type DomainTabId,
+  type EvidenceDensity,
+  type GenerationRouteMode,
+  type MaterialKind,
   type PromptItem,
   type RecommendedStyleMatch,
+  type SlideType,
   type SourceDocumentSection,
 } from "@/types/prompt";
 
@@ -460,9 +465,87 @@ function extractKeySections(
   return sections.slice(0, 6);
 }
 
+/**
+ * Automatically classifies raw user input into via-ppt-rescue-maker's 6 material
+ * states without asking the user a single extra question.
+ */
+export function detectMaterialKind(opts: {
+  text: string;
+  fileName: string;
+  fileType?: string;
+  keyMetricsCount: number;
+  keySectionsCount: number;
+}): MaterialKind {
+  const ext = (opts.fileType || opts.fileName.split(".").pop() || "").toLowerCase();
+  if (ext === "pptx" || ext === "ppt") {
+    return "existing-pptx";
+  }
+
+  const trimmed = opts.text.trim();
+  const lines = trimmed
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (trimmed.length < 90 && lines.length <= 3) {
+    return "topic-only";
+  }
+
+  // Detect Markdown tables, CSV-like rows, or dense KPI reports
+  const tableRows = lines.filter(
+    (l) => (l.includes("|") && l.split("|").length >= 3) || l.split(/[\t,，]/).length >= 4
+  ).length;
+  if (
+    tableRows >= 3 ||
+    (opts.keyMetricsCount >= 5 && trimmed.length < 900)
+  ) {
+    return "data-table";
+  }
+
+  const headingLines = lines.filter((l) =>
+    /^(?:#{1,3}\s+|[一二三四五六七八九十]+[、.．]|第[一二三四五六七八九十\d]+[章节部分]|[\d]+[.、]\s*|\-\s+|\*\s+)/.test(
+      l
+    )
+  ).length;
+  const avgLineLen =
+    lines.reduce((s, l) => s + l.length, 0) / Math.max(1, lines.length);
+
+  if (headingLines >= 3 && avgLineLen < 38) {
+    return "rough-outline";
+  }
+  if (trimmed.length >= 380 && opts.keySectionsCount >= 2) {
+    return "full-document";
+  }
+  return "scattered-notes";
+}
+
+function inferRepresentativeSlideType(
+  scenario: string,
+  hasHeavyData: boolean,
+  materialKind: MaterialKind
+): SlideType {
+  if (materialKind === "data-table" || hasHeavyData) {
+    return "data";
+  }
+  if (scenario === "科研基金" || scenario === "学术答辩" || scenario === "技术分享") {
+    return "process";
+  }
+  if (scenario === "商业路演" || scenario === "咨询汇报" || scenario === "年度总结") {
+    return "data";
+  }
+  if (scenario === "项目汇报" || scenario === "政务党建") {
+    return "timeline";
+  }
+  if (scenario === "课堂教学" || scenario === "教育培训") {
+    return "comparison";
+  }
+  return "image-split";
+}
+
 export function analyzeDocumentAndRecommendStyles(input: {
   text: string;
   fileName: string;
+  fileType?: string;
   suggestedTopic: string;
   suggestedSubtitle: string;
   styles: PromptItem[];
@@ -500,7 +583,33 @@ export function analyzeDocumentAndRecommendStyles(input: {
   const keyMetrics = extractKeyMetrics(input.text);
   const keySections = extractKeySections(input.text, input.suggestedTopic);
 
-  // 3. Estimate ideal slide count from length & extracted chapters
+  // 3. Auto-triage 6 material states + evidence density + talk-time estimate
+  const materialKind = detectMaterialKind({
+    text: input.text,
+    fileName: input.fileName,
+    fileType: input.fileType,
+    keyMetricsCount: keyMetrics.length,
+    keySectionsCount: keySections.length,
+  });
+  const materialStrategy = MATERIAL_KIND_LABELS[materialKind].strategy;
+
+  const isHighEvidenceScenario =
+    detectedScenario === "科研基金" ||
+    detectedScenario === "学术答辩" ||
+    detectedScenario === "咨询汇报" ||
+    detectedScenario === "项目汇报" ||
+    materialKind === "data-table";
+  const isLightScenario =
+    detectedScenario === "生活纪实" || detectedScenario === "文化创意";
+  const recommendedEvidenceDensity: EvidenceDensity = isHighEvidenceScenario
+    ? "high-evidence"
+    : isLightScenario
+    ? "light"
+    : "balanced";
+  const recommendedRouteMode: GenerationRouteMode =
+    materialKind === "existing-pptx" ? "beautify-1to1" : "restructure";
+
+  // 4. Estimate ideal slide count & speaking minutes from length & extracted chapters
   const charCount = input.text.length;
   const rawSuggested =
     keySections.length >= 5
@@ -513,10 +622,19 @@ export function analyzeDocumentAndRecommendStyles(input: {
       ? 8
       : 7;
   const suggestedSlideCount = Math.max(6, Math.min(16, rawSuggested));
+  const estimatedTalkMinutes = Math.max(
+    3,
+    Math.round(suggestedSlideCount * (recommendedEvidenceDensity === "high-evidence" ? 1.2 : 0.85))
+  );
   const suggestedAudience = getDefaultAudienceForScenario(detectedScenario);
 
-  // 4. Score all public styles and pick Top 3
+  // 5. Score all public styles and pick Top 3
   const hasHeavyData = keyMetrics.length >= 3;
+  const representativeSlideType = inferRepresentativeSlideType(
+    detectedScenario,
+    hasHeavyData,
+    materialKind
+  );
   const isFormalPrint =
     detectedScenario === "科研基金" ||
     detectedScenario === "学术答辩" ||
@@ -600,6 +718,12 @@ export function analyzeDocumentAndRecommendStyles(input: {
     suggestedAudience,
     suggestedSlideCount,
     suggestedTone,
+    materialKind,
+    materialStrategy,
+    recommendedEvidenceDensity,
+    recommendedRouteMode,
+    estimatedTalkMinutes,
+    representativeSlideType,
     keyMetrics,
     keySections,
     recommendedStyles,

@@ -230,6 +230,29 @@ export function auditDeckQuality(
     passedChecks.push("全部页面均已配齐演讲者提词备注");
   }
 
+  // 5. Evidence & source attribution check (via-ppt-rescue-maker / Tosea evidence-first)
+  const unverifiedSlides = slides
+    .map((s, idx) => ({ slide: s, idx }))
+    .filter(
+      ({ slide }) =>
+        slide.sourceStatus === "needs-verify" || slide.sourceStatus === "placeholder"
+    );
+  if (unverifiedSlides.length > 0) {
+    const first = unverifiedSlides[0];
+    issues.push({
+      id: "evidence-unverified",
+      category: "structure",
+      severity: "low",
+      slideIndex: first.idx,
+      title: `有 ${unverifiedSlides.length} 页标注为「待核验 / 模拟假设」`,
+      detail: `汇报前请复核 P${String(first.idx + 1).padStart(2, "0")} 等页面的数据口径，或在导出提纲中附注来源说明。`,
+      fixAction: "jump-slide",
+      fixLabel: `核验第 ${first.idx + 1} 页`,
+    });
+  } else if (slides.some((s) => s.sourceStatus === "source-material")) {
+    passedChecks.push("源材料页面已完成来源状态标注");
+  }
+
   // Estimate speaking duration: ~210 units/min (fallback 0.8 min/slide when notes absent)
   const notesMinutes = totalNotesChars / 210;
   const fallbackMinutes = missingNotesCount * 0.75;

@@ -346,17 +346,19 @@ export default function DeckShareClient({ deck }: DeckShareClientProps) {
 
             <div className="pg-share-canvas-frame">
               {currentSlide && (
-                <SlideCanvas
-                  spec={deck.visualSpec}
-                  slideType={currentSlide.slideType}
-                  topic={deck.title}
-                  subtitle={deck.subtitle}
-                  audience={deck.audience}
-                  slideCount={total}
-                  slideData={currentSlide}
-                  pageIndex={safeIndex}
-                  totalPages={total}
-                />
+                <div className="pg-canvas-motion-slot" key={safeIndex}>
+                  <SlideCanvas
+                    spec={deck.visualSpec}
+                    slideType={currentSlide.slideType}
+                    topic={deck.title}
+                    subtitle={deck.subtitle}
+                    audience={deck.audience}
+                    slideCount={total}
+                    slideData={currentSlide}
+                    pageIndex={safeIndex}
+                    totalPages={total}
+                  />
+                </div>
               )}
             </div>
 

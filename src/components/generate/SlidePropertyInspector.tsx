@@ -6,14 +6,25 @@ import {
   Trash2,
 } from "lucide-react";
 import ImageSlotManager from "@/components/generate/ImageSlotManager";
-import { createDefaultSlideOfType } from "@/lib/deckGenerator";
+import { remapSlideLayoutPreservingContent } from "@/lib/deckGenerator";
 import {
   ALL_SLIDE_TYPES,
   SLIDE_TYPE_LABELS,
+  SOURCE_STATUS_LABELS,
   type DeckSlideItem,
   type LayoutArchetype,
+  type SlideSourceStatus,
   type SlideType,
 } from "@/types/prompt";
+
+const QUICK_LAYOUT_CHIPS: { type: SlideType; short: string }[] = [
+  { type: "image-split", short: "图文" },
+  { type: "process", short: "流程" },
+  { type: "data", short: "数据" },
+  { type: "comparison", short: "对比" },
+  { type: "timeline", short: "时间轴" },
+  { type: "swot", short: "SWOT" },
+];
 
 interface SlidePropertyInspectorProps {
   currentSlide: DeckSlideItem;
@@ -50,39 +61,35 @@ export default function SlidePropertyInspector({
   onGenerateAiSlideImage,
   onUpdateSlide,
 }: SlidePropertyInspectorProps) {
+  const applyLayoutOnly = (nextType: SlideType) => {
+    const remapped = remapSlideLayoutPreservingContent(currentSlide, nextType, {
+      index: safeIndex,
+      topic: title,
+      subtitle,
+      audience,
+      scenario,
+      archetype,
+    });
+    onUpdateSlide(remapped, false);
+  };
+
   return (
   <aside className="pg-gen-inspector">
     <div className="pg-panel-head" style={{ marginBottom: 0 }}>
-      <h2>当前页内容编辑</h2>
+      <h2>本页编辑</h2>
+      <span className="pg-inspector-layout-hint" title="切换版式时自动保留当前标题、要点与备注原文">
+        仅换版式不动字
+      </span>
     </div>
 
     <div className="pg-form pg-form-compact">
       <div className="pg-field">
-        <label htmlFor="pg-slide-type-select">切换本页版式（12 种）</label>
+        <label htmlFor="pg-slide-type-select">版式（12 种）</label>
         <select
           id="pg-slide-type-select"
           className="pg-select pg-select-full"
           value={currentSlide.slideType}
-          onChange={(e) => {
-            const nextType = e.target.value as SlideType;
-            const template = createDefaultSlideOfType(nextType, {
-              index: safeIndex,
-              topic: title,
-              subtitle,
-              audience,
-              scenario: scenario,
-              archetype: archetype,
-            });
-            onUpdateSlide(
-              {
-                ...template,
-                id: currentSlide.id,
-                title: currentSlide.title,
-                speakerNotes: currentSlide.speakerNotes,
-              },
-              false
-            );
-          }}
+          onChange={(e) => applyLayoutOnly(e.target.value as SlideType)}
         >
           {ALL_SLIDE_TYPES.map((st) => (
             <option key={st} value={st}>
@@ -90,10 +97,31 @@ export default function SlidePropertyInspector({
             </option>
           ))}
         </select>
+
+        {/* Tosea-style 1-click Layout Only quick chips */}
+        <div
+          className="pg-layout-only-chips"
+          role="group"
+          aria-label="仅换版式不动字快捷切换"
+        >
+          {QUICK_LAYOUT_CHIPS.map((chip) => (
+            <button
+              key={chip.type}
+              type="button"
+              data-layout-chip={chip.type}
+              className={`pg-mini-pill ${
+                currentSlide.slideType === chip.type ? "is-active" : ""
+              }`}
+              onClick={() => applyLayoutOnly(chip.type)}
+            >
+              {chip.short}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="pg-field">
-        <label htmlFor="pg-edit-section-tag">页眉章节眉标</label>
+        <label htmlFor="pg-edit-section-tag">眉标</label>
         <input
           id="pg-edit-section-tag"
           type="text"
@@ -105,7 +133,7 @@ export default function SlidePropertyInspector({
       </div>
 
       <div className="pg-field">
-        <label htmlFor="pg-edit-slide-title">页面主标题</label>
+        <label htmlFor="pg-edit-slide-title">主标题</label>
         <input
           id="pg-edit-slide-title"
           type="text"
@@ -114,6 +142,49 @@ export default function SlidePropertyInspector({
             onUpdateSlide({ title: e.target.value })
           }
         />
+      </div>
+
+      {/* Compact Evidence Source Status (via-ppt-rescue-maker / Tosea evidence-first) */}
+      <div className="pg-form-2col">
+        <div className="pg-field">
+          <label htmlFor="pg-edit-source-status">来源状态</label>
+          <select
+            id="pg-edit-source-status"
+            className="pg-select pg-select-full"
+            value={currentSlide.sourceStatus || ""}
+            onChange={(e) =>
+              onUpdateSlide(
+                {
+                  sourceStatus: (e.target.value || undefined) as
+                    | SlideSourceStatus
+                    | undefined,
+                },
+                false
+              )
+            }
+          >
+            <option value="">自动（未标注）</option>
+            {(Object.keys(SOURCE_STATUS_LABELS) as SlideSourceStatus[]).map(
+              (st) => (
+                <option key={st} value={st}>
+                  {SOURCE_STATUS_LABELS[st].label}
+                </option>
+              )
+            )}
+          </select>
+        </div>
+        <div className="pg-field">
+          <label htmlFor="pg-edit-source-note">脚注来源（可选）</label>
+          <input
+            id="pg-edit-source-note"
+            type="text"
+            placeholder="如：年报 P14 / 实测"
+            value={currentSlide.sourceNote || ""}
+            onChange={(e) =>
+              onUpdateSlide({ sourceNote: e.target.value })
+            }
+          />
+        </div>
       </div>
 
       {(currentSlide.slideType === "cover" ||

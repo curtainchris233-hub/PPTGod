@@ -1,4 +1,9 @@
-import type { DocumentAnalysisResult, OutlineDraftItem } from "@/types/prompt";
+import type {
+  DocumentAnalysisResult,
+  EvidenceDensity,
+  GenerationRouteMode,
+  OutlineDraftItem,
+} from "@/types/prompt";
 
 const DOC_INTAKE_KEY = "pptgod_doc_intake_v1";
 const DOC_INTAKE_MAX_AGE_MS = 30 * 60 * 1000;
@@ -14,6 +19,8 @@ export interface DocIntakePayload {
   slideCount: number;
   styleSlug: string;
   autoGenerate: boolean;
+  routeMode?: GenerationRouteMode;
+  evidenceDensity?: EvidenceDensity;
   parsedOutline?: OutlineDraftItem[];
   analysis?: DocumentAnalysisResult;
   savedAt: number;

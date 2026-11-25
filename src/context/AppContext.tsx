@@ -298,6 +298,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       {children}
       {toast && (
         <div
+          key={toast.id}
           className={`pg-toast pg-toast--${toast.tone}`}
           role="status"
           aria-live="polite"

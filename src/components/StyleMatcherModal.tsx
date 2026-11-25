@@ -111,6 +111,15 @@ export default function StyleMatcherModal({
   const [venue, setVenue] = useState<VenueLighting>("bright-room");
   const [density, setDensity] = useState<DensityPref>("balanced");
 
+  React.useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
   const recommendations = useMemo(() => {
     const goalDef = GOAL_OPTIONS.find((g) => g.id === goal)!;
     const publicPool = prompts.filter((p) => p.isPublic !== false);

@@ -70,9 +70,10 @@ export default function DeckSpecTweaker({
           className={`pg-btn pg-btn-ghost pg-btn-xs ${open ? "is-open" : ""}`}
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
+          title="展开品牌视觉微调（配色 / 圆角 / 机构页脚）"
         >
           <SlidersHorizontal size={13} />
-          <span>品牌视觉微调（配色 / 圆角 / 机构页脚）</span>
+          <span>品牌微调</span>
         </button>
 
         <div className="pg-tweaker-bar-badges">
@@ -89,15 +90,12 @@ export default function DeckSpecTweaker({
           >
             <ShieldCheck size={11} />
             <span>
-              WCAG {contrast.overallGrade} · {contrast.textBgRatio.toFixed(1)}:1
+              {contrast.overallGrade} {contrast.textBgRatio.toFixed(1)}:1
             </span>
-          </span>
-          <span className="pg-tweaker-meta">
-            R{deckSpec.layout.cornerRadius}px · {deckSpec.layout.density}
           </span>
           {handoffApplied && (
             <span className="pg-tag pg-tag-scenario" id="pg-handoff-badge">
-              已承接工作室定制配色
+              已承接定制配色
             </span>
           )}
           {isCustomized && (
@@ -109,7 +107,7 @@ export default function DeckSpecTweaker({
               title="恢复当前母版默认色板与版式参数"
             >
               <RotateCcw size={12} />
-              <span>恢复默认</span>
+              <span>重置</span>
             </button>
           )}
         </div>

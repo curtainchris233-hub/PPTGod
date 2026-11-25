@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
   Instrument_Serif,
   JetBrains_Mono,
@@ -80,11 +81,16 @@ export default function RootLayout({
               <div className="pg-container pg-footer-inner">
                 <div className="pg-footer-brand">
                   <strong>PPTGod</strong>
-                  <span> · 所见即所得的 PPT 视觉提示词实验室</span>
+                  <span> · 视觉驱动的 PPT 提示词与生成实验室</span>
                 </div>
-                <div className="pg-footer-meta">
-                  支持 6 大 AI 工具编译（Claude HTML · Gamma/Kimi · NotebookLM ·
-                  即梦/MJ · Slidev · Python-PPTX）与站内直出 .pptx / .html
+                <div className="pg-footer-meta pg-footer-links">
+                  <Link href="/tools" id="pg-footer-tools-link" className="pg-footer-link">
+                    PPT 效率工具箱
+                  </Link>
+                  <span>·</span>
+                  <span>6 大 AI 工具编译</span>
+                  <span>·</span>
+                  <span>原生 .pptx / .html</span>
                 </div>
               </div>
             </footer>

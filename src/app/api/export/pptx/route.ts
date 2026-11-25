@@ -356,10 +356,18 @@ export async function POST(request: Request) {
 
     const total = slides.length;
 
+    // v8: Register a real PowerPoint Slide Master (inspired by ppt-master native depth)
+    pptx.defineSlideMaster({
+      title: "PPTGOD_MASTER",
+      background: { color: cBg },
+      margin: [0.35, 0.55, 0.35, 0.55],
+    });
+
     const addHeaderAndFooter = (
       slide: PptxGenJS.Slide,
       sectionTag: string | undefined,
-      idx: number
+      idx: number,
+      sourceNote?: string
     ) => {
       const leftPad = tokens.isBauhaus ? 0.65 : 0.6;
       const barW = 9.4 - leftPad;
@@ -423,15 +431,20 @@ export async function POST(request: Request) {
         typeof layoutObj?.brandFooter === "string"
           ? layoutObj.brandFooter.replace(/[<>]/g, "").trim().slice(0, 60)
           : "";
-      slide.addText(customBrandFooter || `${styleName} · ${audience}`, {
-        x: leftPad,
-        y: 5.18,
-        w: 6.5,
-        h: 0.25,
-        fontSize: 8.5,
-        color: cMuted,
-        fontFace: fontBody,
-      });
+      const footerBase = customBrandFooter || `${styleName} · ${audience}`;
+      const cleanSource = safeText(sourceNote).trim().slice(0, 48);
+      slide.addText(
+        cleanSource ? `${footerBase}  |  来源：${cleanSource}` : footerBase,
+        {
+          x: leftPad,
+          y: 5.18,
+          w: 6.9,
+          h: 0.25,
+          fontSize: 8.5,
+          color: cMuted,
+          fontFace: fontBody,
+        }
+      );
       slide.addText(
         `${String(idx + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`,
         {
@@ -448,13 +461,33 @@ export async function POST(request: Request) {
       );
     };
 
+    const SOURCE_STATUS_ZH: Record<string, string> = {
+      "source-material": "来自源材料",
+      "derived-calc": "数据推算",
+      placeholder: "模拟假设",
+      "needs-verify": "待核验",
+    };
+
     slides.forEach((item, idx) => {
-      const slide = pptx.addSlide();
+      const slide = pptx.addSlide({ masterName: "PPTGOD_MASTER" });
       slide.background = { color: cBg };
 
-      const notes = safeText(item.speakerNotes).trim();
-      if (notes) {
-        slide.addNotes(notes);
+      const noteLines: string[] = [];
+      const baseNotes = safeText(item.speakerNotes).trim();
+      if (baseNotes) noteLines.push(baseNotes);
+      const aq = safeText(item.audienceQuestion).trim();
+      if (aq) noteLines.push(`【听众问题】${aq}`);
+      const stKey = typeof item.sourceStatus === "string" ? item.sourceStatus : "";
+      const srcNote = safeText(item.sourceNote).trim();
+      if (stKey && SOURCE_STATUS_ZH[stKey]) {
+        noteLines.push(
+          `【来源状态】${SOURCE_STATUS_ZH[stKey]}${srcNote ? ` — ${srcNote}` : ""}`
+        );
+      } else if (srcNote) {
+        noteLines.push(`【来源说明】${srcNote}`);
+      }
+      if (noteLines.length > 0) {
+        slide.addNotes(noteLines.join("\n"));
       }
 
       const isCover = item.slideType === "cover";
@@ -472,7 +505,12 @@ export async function POST(request: Request) {
         return;
       }
 
-      addHeaderAndFooter(slide, item.sectionTag, idx);
+      addHeaderAndFooter(
+        slide,
+        item.sectionTag,
+        idx,
+        typeof item.sourceNote === "string" ? item.sourceNote : undefined
+      );
 
       // Slide Heading
       slide.addText(safeText(item.title).trim() || title, {
@@ -1157,73 +1195,102 @@ export async function POST(request: Request) {
         return;
       }
 
-      /* -------- 9. COMPARISON -------- */
+      /* -------- 9. COMPARISON (v8: Native Editable PowerPoint Table) -------- */
       if (item.slideType === "comparison") {
-        addStyledCard(pptx, slide, tokens, {
-          x: 0.6,
-          y: 1.58,
-          w: 4.25,
-          h: 3.28,
-          borderColor: cBorder,
-        });
-        slide.addText(safeText(item.leftTitle).trim() || "传统方案", {
-          x: 0.85,
-          y: 1.78,
-          w: 3.75,
-          h: 0.45,
-          fontSize: 15,
-          bold: true,
-          color: cText,
-          fontFace: fontHeading,
-        });
+        const leftHeading = safeText(item.leftTitle).trim() || "传统方案";
+        const rightHeading = safeText(item.rightTitle).trim() || "升级方案（推荐）";
         const leftPoints = sanitizePoints(item.leftPoints, [
           "流程分散依赖人工经验，协作对齐成本较高",
         ]);
-        const leftBullets = leftPoints
-          .map((p, i) => `${String(i + 1).padStart(2, "0")}.  ${p}`)
-          .join("\n\n");
-        slide.addText(leftBullets, {
-          x: 0.85,
-          y: 2.38,
-          w: 3.75,
-          h: 2.25,
-          fontSize: 11,
-          color: cMuted,
-          fontFace: fontBody,
-          valign: "top",
-        });
-
-        addStyledCard(pptx, slide, tokens, {
-          x: 5.15,
-          y: 1.58,
-          w: 4.25,
-          h: 3.28,
-          borderColor: cAccent,
-          borderWidth: 1.75,
-        });
-        slide.addText(safeText(item.rightTitle).trim() || "升级方案（推荐）", {
-          x: 5.4,
-          y: 1.78,
-          w: 3.75,
-          h: 0.45,
-          fontSize: 15,
-          bold: true,
-          color: cAccent,
-          fontFace: fontHeading,
-        });
         const rightPoints = sanitizePoints(item.rightPoints, [
           "标准化端到端闭环交付，指标透明可控",
         ]);
-        const rightBullets = rightPoints.map((p) => `✓  ${p}`).join("\n\n");
-        slide.addText(rightBullets, {
-          x: 5.4,
-          y: 2.38,
-          w: 3.75,
-          h: 2.25,
-          fontSize: 11,
-          color: cText,
-          fontFace: fontBody,
-          valign: "top",
+        const rowCount = Math.max(leftPoints.length, rightPoints.length, 1);
+
+        const tableRows: PptxGenJS.TableRow[] = [
+          [
+            {
+              text: "#",
+              options: {
+                bold: true,
+                color: cMuted,
+                fill: { color: cSurface },
+                align: "center",
+                fontFace: "Consolas",
+                fontSize: 10,
+              },
+            },
+            {
+              text: leftHeading,
+              options: {
+                bold: true,
+                color: cText,
+                fill: { color: cSurface },
+                fontFace: fontHeading,
+                fontSize: 12,
+              },
+            },
+            {
+              text: rightHeading,
+              options: {
+                bold: true,
+                color: cAccentText,
+                fill: { color: cAccent },
+                fontFace: fontHeading,
+                fontSize: 12,
+              },
+            },
+          ],
+        ];
+
+        for (let r = 0; r < rowCount; r += 1) {
+          const isAlt = r % 2 === 1;
+          const rowFill = isAlt ? cBg : cSurface;
+          tableRows.push([
+            {
+              text: String(r + 1).padStart(2, "0"),
+              options: {
+                bold: true,
+                color: cAccent,
+                fill: { color: rowFill },
+                align: "center",
+                valign: "middle",
+                fontFace: "Consolas",
+                fontSize: 10,
+              },
+            },
+            {
+              text: leftPoints[r] || "—",
+              options: {
+                color: cMuted,
+                fill: { color: rowFill },
+                valign: "middle",
+                fontFace: fontBody,
+                fontSize: 10.5,
+              },
+            },
+            {
+              text: rightPoints[r] ? `✓  ${rightPoints[r]}` : "—",
+              options: {
+                color: cText,
+                bold: r === 0,
+                fill: { color: isAlt ? cAccentSoft : cSurface },
+                valign: "middle",
+                fontFace: fontBody,
+                fontSize: 10.5,
+              },
+            },
+          ]);
+        }
+
+        slide.addTable(tableRows, {
+          x: 0.6,
+          y: 1.56,
+          w: 8.8,
+          colW: [0.65, 4.0, 4.15],
+          rowH: Math.min(0.86, 3.3 / (rowCount + 1)),
+          border: { pt: 0.75, color: cBorder },
+          margin: [0.08, 0.12, 0.08, 0.12],
         });
         return;
       }

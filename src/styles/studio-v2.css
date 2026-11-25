@@ -82,7 +82,14 @@
   color: var(--ink-primary);
   font-size: 12px;
   font-weight: 600;
-  transition: border-color 0.13s ease, background 0.13s ease;
+  transition: border-color var(--dur-fast) var(--ease-apple),
+    background var(--dur-fast) var(--ease-apple),
+    color var(--dur-fast) var(--ease-apple),
+    transform var(--dur-micro) var(--ease-out-swift);
+}
+
+.pg-launch-link:active {
+  transform: scale(0.97);
 }
 
 .pg-launch-link:hover {
@@ -131,11 +138,16 @@
   cursor: pointer;
   color: var(--border-strong);
   display: inline-flex;
-  transition: transform 0.12s ease, color 0.12s ease;
+  transition: transform var(--dur-fast) var(--ease-spring),
+    color var(--dur-fast) var(--ease-apple);
 }
 
 .pg-star-btn:hover {
-  transform: scale(1.12);
+  transform: scale(1.14);
+}
+
+.pg-star-btn:active {
+  transform: scale(0.92);
 }
 
 .pg-star-btn.is-filled {

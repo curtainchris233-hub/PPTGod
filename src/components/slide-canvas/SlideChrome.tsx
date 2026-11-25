@@ -621,6 +621,33 @@ export function renderFooter(ctx: SlideRenderContext) {
   } = ctx;
   if (!layout.showPageNumber || slideType === "cover") return null;
   const customFooter = layout.brandFooter?.trim();
+  const slideSourceNote = ctx.slideData?.sourceNote?.trim();
+  const defaultFooter = isChalkboard
+    ? `CLASSROOM LESSON · 护眼黑板板书微课 · ${audience}`
+    : isScientific
+    ? `Nature Methods Okabe-Ito CVD-Safe · Evidence Deck · ${topic.slice(0, 22)}`
+    : isCivic
+    ? `规范专题工作汇报 · ${audience} · 2026`
+    : isPmo
+    ? `PMO DELIVERY GOVERNANCE · RAG STATUS ON TRACK · ${audience}`
+    : isPolaroid
+    ? `35MM ANALOG LOG · ${englishTitle.toUpperCase()} · ${audience}`
+    : isConsulting
+    ? "Source: Internal Benchmark & Market Intelligence · Confidential"
+    : isTerminal
+    ? "LIVE TERMINAL TELEMETRY · DATA VERIFIED 2026"
+    : isClinical
+    ? "Clinical Evidence Deck · n=420 · p < 0.001"
+    : isAcademic
+    ? `${topic.slice(0, 32)} · Research Symposium 2026`
+    : `${englishTitle.toUpperCase()} · ${audience}`;
+  const leftFooterText = customFooter
+    ? slideSourceNote
+      ? `${customFooter} · 来源：${slideSourceNote}`
+      : customFooter
+    : slideSourceNote
+    ? `来源：${slideSourceNote}`
+    : defaultFooter;
   return (
     <div
       style={{
@@ -634,29 +661,7 @@ export function renderFooter(ctx: SlideRenderContext) {
         fontFamily: monoFont,
       }}
     >
-      <span>
-        {customFooter
-          ? customFooter
-          : isChalkboard
-          ? `CLASSROOM LESSON · 护眼黑板板书微课 · ${audience}`
-          : isScientific
-          ? `Nature Methods Okabe-Ito CVD-Safe · Evidence Deck · ${topic.slice(0, 22)}`
-          : isCivic
-          ? `规范专题工作汇报 · ${audience} · 2026`
-          : isPmo
-          ? `PMO DELIVERY GOVERNANCE · RAG STATUS ON TRACK · ${audience}`
-          : isPolaroid
-          ? `35MM ANALOG LOG · ${englishTitle.toUpperCase()} · ${audience}`
-          : isConsulting
-          ? "Source: Internal Benchmark & Market Intelligence · Confidential"
-          : isTerminal
-          ? "LIVE TERMINAL TELEMETRY · DATA VERIFIED 2026"
-          : isClinical
-          ? "Clinical Evidence Deck · n=420 · p < 0.001"
-          : isAcademic
-          ? `${topic.slice(0, 32)} · Research Symposium 2026`
-          : `${englishTitle.toUpperCase()} · ${audience}`}
-      </span>
+      <span>{leftFooterText}</span>
       <span style={{ color: palette.text, fontWeight: 600 }}>
         {currentPageLabel} / {String(effectiveTotalPages).padStart(2, "0")}
       </span>

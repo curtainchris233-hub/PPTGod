@@ -466,17 +466,16 @@ export default function StudioClient({
           <div className="pg-studio-crumbs">
             <Link href="/" className="pg-back-link">
               <ArrowLeft size={15} />
-              <span>返回视觉画廊</span>
+              <span>画廊</span>
             </Link>
             <span className="pg-crumb-sep">/</span>
             {!prompt.isPublic && (
               <span className="pg-tag pg-tag-private" id="pg-studio-private-badge">
                 <Lock size={11} />
-                <span>仅自己可见</span>
+                <span>私有</span>
               </span>
             )}
             <span className="pg-tag pg-tag-scenario">{prompt.scenario}</span>
-            <span className="pg-tag">{prompt.styleCategory}</span>
           </div>
 
           <div className="pg-studio-header-actions">
@@ -487,7 +486,7 @@ export default function StudioClient({
               onClick={handleOpenGenerateWorkshop}
             >
               <Sparkles size={14} />
-              <span>用此风格在线生成 PPT</span>
+              <span>在线生成 PPT</span>
             </Link>
 
             <Link
@@ -496,7 +495,7 @@ export default function StudioClient({
               id="pg-studio-remix-btn"
             >
               <GitFork size={14} />
-              <span>Remix 二创</span>
+              <span>Remix</span>
             </Link>
 
             {isOwner && (
@@ -506,7 +505,7 @@ export default function StudioClient({
                 id="pg-studio-edit-btn"
               >
                 <Pencil size={14} />
-                <span>编辑模板</span>
+                <span>编辑</span>
               </Link>
             )}
 
@@ -549,7 +548,7 @@ export default function StudioClient({
               id="pg-studio-compare-btn"
             >
               <Columns2 size={14} />
-              <span>{isCompared ? "已在对比栏" : "对比"}</span>
+              <span>{isCompared ? "已对比" : "对比"}</span>
             </button>
           </div>
         </div>
@@ -570,7 +569,9 @@ export default function StudioClient({
               </div>
             )}
             <h1 className="pg-studio-h1">{prompt.title}</h1>
-            <p className="pg-studio-summary">{prompt.summary}</p>
+            <p className="pg-studio-summary" title={prompt.summary}>
+              {prompt.summary}
+            </p>
           </div>
 
           <Link
@@ -587,8 +588,7 @@ export default function StudioClient({
             <div>
               <div className="pg-author-name">{prompt.author.displayName}</div>
               <div className="pg-author-meta">
-                已复制 {prompt.copiesCount.toLocaleString()} 次 ·{" "}
-                {prompt.englishTitle}
+                {prompt.copiesCount.toLocaleString()} 次复制 · {prompt.styleCategory}
               </div>
             </div>
           </Link>
@@ -596,7 +596,7 @@ export default function StudioClient({
 
         {/* Main 2-Column Studio Workbench */}
         <div className="pg-studio-layout">
-          {/* LEFT: 16:9 Stage + 8-Slide Filmstrip + Visual Tweaker + Prompt Anatomy + Verified Reviews */}
+          {/* LEFT: 16:9 Stage + 12-Slide Filmstrip + Visual Tweaker + Prompt Anatomy + Verified Reviews */}
           <div className="pg-studio-left">
             <div className="pg-stage-frame">
               <div className="pg-stage-toolbar">
@@ -605,7 +605,7 @@ export default function StudioClient({
                     {SLIDE_TYPE_LABELS[activeSlide].en}
                   </span>
                   <span className="pg-stage-slide-desc">
-                    {SLIDE_TYPE_LABELS[activeSlide].desc}
+                    {SLIDE_TYPE_LABELS[activeSlide].label}
                   </span>
                 </div>
 
@@ -617,7 +617,7 @@ export default function StudioClient({
                       onClick={() => setPinnedDimension(null)}
                     >
                       <X size={13} />
-                      <span>取消结构透视</span>
+                      <span>取消透视</span>
                     </button>
                   )}
                   <button
@@ -627,23 +627,25 @@ export default function StudioClient({
                     id="pg-studio-fullscreen-btn"
                   >
                     <Maximize2 size={13} />
-                    <span>全屏演播 (12页)</span>
+                    <span>全屏 (12页)</span>
                   </button>
                 </div>
               </div>
 
               <div className="pg-stage-canvas-wrap">
-                <SlideCanvas
-                  spec={liveSpec}
-                  slideType={activeSlide}
-                  topic={params.topic || prompt.sampleTopic}
-                  subtitle={params.subtitle || prompt.sampleSubtitle}
-                  audience={params.audience}
-                  slideCount={params.slideCount}
-                  englishTitle={prompt.englishTitle}
-                  scenario={prompt.scenario}
-                  highlightDimension={activeHighlight}
-                />
+                <div className="pg-canvas-motion-slot" key={activeSlide}>
+                  <SlideCanvas
+                    spec={liveSpec}
+                    slideType={activeSlide}
+                    topic={params.topic || prompt.sampleTopic}
+                    subtitle={params.subtitle || prompt.sampleSubtitle}
+                    audience={params.audience}
+                    slideCount={params.slideCount}
+                    englishTitle={prompt.englishTitle}
+                    scenario={prompt.scenario}
+                    highlightDimension={activeHighlight}
+                  />
+                </div>
               </div>
 
               {/* Quick Blueprint Anatomy Inspector Strip */}
@@ -654,7 +656,7 @@ export default function StudioClient({
               >
                 <span className="pg-blueprint-bar-label">
                   <Eye size={13} />
-                  <span>提示词透视层：</span>
+                  <span>透视：</span>
                 </span>
                 {ANATOMY_ORDER.map((dim) => {
                   const meta = ANATOMY_META[dim];
@@ -1122,7 +1124,7 @@ export default function StudioClient({
               {/* Target AI Tool Switcher (6 Ecosystems) */}
               <section className="pg-panel">
                 <div className="pg-panel-head">
-                  <h2>1. 选择目标 AI 生成工具（6 大生态）</h2>
+                  <h2>1. 目标 AI 工具</h2>
                 </div>
                 <div className="pg-tool-tabs pg-tool-tabs-6" role="tablist">
                   {(Object.keys(TOOL_METADATA) as TargetTool[]).map((toolId) => {
@@ -1152,11 +1154,13 @@ export default function StudioClient({
                     );
                   })}
                 </div>
-                <p className="pg-tool-desc">{currentToolMeta.description}</p>
+                <p className="pg-tool-desc pg-tool-desc--compact" title={currentToolMeta.description}>
+                  {currentToolMeta.description}
+                </p>
 
                 {params.targetTool === "ai-image" && (
                   <div className="pg-batch-toggle">
-                    <span className="pg-batch-toggle-label">生图词模式：</span>
+                    <span className="pg-batch-toggle-label">模式：</span>
                     <div className="pg-btn-group">
                       <button
                         type="button"
@@ -1171,7 +1175,7 @@ export default function StudioClient({
                         }
                         id="pg-ai-img-single-btn"
                       >
-                        当前单页精修
+                        单页精修
                       </button>
                       <button
                         type="button"
@@ -1189,8 +1193,9 @@ export default function StudioClient({
                           }))
                         }
                         id="pg-ai-img-batch-btn"
+                        aria-label="全套 6 页连贯分页生图词包"
                       >
-                        全套 6 页连贯词包
+                        6 页连贯
                       </button>
                       <button
                         type="button"
@@ -1209,7 +1214,7 @@ export default function StudioClient({
                         }
                         id="pg-ai-img-batch-12-btn"
                       >
-                        全套 12 页全页型
+                        12 页全页型
                       </button>
                     </div>
                   </div>
@@ -1219,11 +1224,11 @@ export default function StudioClient({
               {/* PPT Content Customizer */}
               <section className="pg-panel">
                 <div className="pg-panel-head">
-                  <h2>2. 填入你的 PPT 内容参数</h2>
+                  <h2>2. 内容参数</h2>
                 </div>
                 <div className="pg-form pg-form-compact">
                   <div className="pg-field">
-                    <label htmlFor="pg-param-topic">PPT 主题标题</label>
+                    <label htmlFor="pg-param-topic">PPT 主题</label>
                     <input
                       id="pg-param-topic"
                       type="text"
@@ -1236,7 +1241,7 @@ export default function StudioClient({
                   </div>
 
                   <div className="pg-field">
-                    <label htmlFor="pg-param-subtitle">副标题 / 副叙事</label>
+                    <label htmlFor="pg-param-subtitle">副标题</label>
                     <input
                       id="pg-param-subtitle"
                       type="text"
@@ -1268,7 +1273,7 @@ export default function StudioClient({
                     </div>
                     <div className="pg-field">
                       <label htmlFor="pg-param-slides">
-                        规划页数 ({params.slideCount} 页)
+                        页数 ({params.slideCount} 页)
                       </label>
                       <input
                         id="pg-param-slides"
@@ -1333,7 +1338,7 @@ export default function StudioClient({
               {/* Compiled Prompt + Quick Launch + Direct Sample Deck Exports */}
               <section className="pg-panel pg-compiled-panel">
                 <div className="pg-panel-head">
-                  <h2>3. 实时组装的最终提示词</h2>
+                  <h2>3. 最终提示词</h2>
                   <span className="pg-char-count">
                     {compiledText.length} 字
                   </span>
