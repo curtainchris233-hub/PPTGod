@@ -274,6 +274,14 @@ export async function POST(request: Request) {
       });
     }
 
+    const routeMode =
+      body.routeMode === "beautify-1to1" ? "beautify-1to1" : "restructure";
+    const evidenceDensity =
+      body.evidenceDensity === "light" ||
+      body.evidenceDensity === "high-evidence"
+        ? body.evidenceDensity
+        : "balanced";
+
     const slides = generateStructuredDeck({
       topic,
       subtitle,
@@ -283,9 +291,11 @@ export async function POST(request: Request) {
       scenario,
       archetype: archetype || undefined,
       outline: outline && outline.length > 0 ? outline : undefined,
+      routeMode,
+      evidenceDensity,
     });
 
-    return NextResponse.json({ slides, engine: "smart" });
+    return NextResponse.json({ slides, engine: "smart", routeMode, evidenceDensity });
   } catch (err) {
     console.error(
       "Generate Deck API error:",

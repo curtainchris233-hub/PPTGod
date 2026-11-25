@@ -1,9 +1,12 @@
 import { pickDefaultArtworkForArchetype } from "@/lib/slideArtworks";
 import type {
   DeckSlideItem,
+  EvidenceDensity,
+  GenerationRouteMode,
   LayoutArchetype,
   OutlineDraftItem,
   PromptItem,
+  SlideSourceStatus,
   SlideType,
 } from "@/types/prompt";
 
@@ -224,6 +227,77 @@ export interface GenerateDeckInput {
   scenario?: string;
   archetype?: LayoutArchetype;
   outline?: OutlineDraftItem[];
+  routeMode?: GenerationRouteMode;
+  evidenceDensity?: EvidenceDensity;
+}
+
+function inferContentRelation(slideType: SlideType): string {
+  const map: Record<SlideType, string> = {
+    cover: "开篇定调",
+    agenda: "叙事导航",
+    "image-split": "视觉主张",
+    process: "机制流程",
+    data: "数据证据",
+    "funnel-donut": "结构转化",
+    comparison: "对比论证",
+    swot: "态势研判",
+    timeline: "行动路径",
+    "team-grid": "组织保障",
+    quote: "核心洞察",
+    closing: "决策收束",
+  };
+  return map[slideType] || "核心论述";
+}
+
+function inferAudienceQuestion(
+  slideType: SlideType,
+  title: string,
+  audience?: string
+): string {
+  const cleanTitle = title.slice(0, 18);
+  switch (slideType) {
+    case "cover":
+      return `这次汇报要帮${audience || "听众"}解决什么核心决策？`;
+    case "agenda":
+      return "整场汇报分几步展开、重点落在哪里？";
+    case "data":
+    case "funnel-donut":
+      return `支撑「${cleanTitle}」的关键数字和变化幅度是什么？`;
+    case "comparison":
+      return "新旧方案拉开差距的关键胜负手是什么？";
+    case "process":
+      return "这套方案具体如何一步步运转落地？";
+    case "swot":
+      return "最大的机会窗口与必须防范的风险分别在哪？";
+    case "timeline":
+      return "每个阶段谁负责、何时交出可验收成果？";
+    case "team-grid":
+      return "为什么由这支团队来做能确保交付确定性？";
+    case "quote":
+      return "如果全场只记住一句话，核心共识是什么？";
+    case "closing":
+      return "会后需要立即拍板或启动的下一步动作是什么？";
+    default:
+      return `围绕「${cleanTitle}」，最值得关注的落地证据是什么？`;
+  }
+}
+
+function inferHonestSourceStatus(
+  slideType: SlideType,
+  hasSourceText: boolean,
+  hasRealMetrics: boolean,
+  isBeautify1to1: boolean
+): SlideSourceStatus | undefined {
+  if (slideType === "cover" || slideType === "agenda" || slideType === "closing") {
+    return isBeautify1to1 ? "source-material" : undefined;
+  }
+  if (isBeautify1to1) return "source-material";
+  if (slideType === "data" || slideType === "funnel-donut") {
+    if (hasRealMetrics) return "source-material";
+    return hasSourceText ? "needs-verify" : "placeholder";
+  }
+  if (hasSourceText) return "source-material";
+  return "placeholder";
 }
 
 export interface DefaultSlideOptions {
@@ -795,6 +869,10 @@ export function generateOutlineDraft(
       : middlePool.slice(0, middleCount);
 
   const combined = [coverBp, ...selectedMiddle, closingBp];
+  const hasSourceText = raw.length >= 40;
+  const hasRealMetrics =
+    hasSourceText && /\d+(?:\.\d+)?\s*(?:%|倍|x|X|亿|万|ms|天|小时|pp|元|美元)/.test(raw);
+  const isBeautify = input.routeMode === "beautify-1to1";
 
   return combined.map((bp, idx) => ({
     id: `outline_${idx + 1}`,
@@ -803,6 +881,14 @@ export function generateOutlineDraft(
       idx === 0 ? bp.tag : `${String(idx).padStart(2, "0")} / ${bp.tag}`,
     title: bp.title,
     summary: bp.summary,
+    audienceQuestion: inferAudienceQuestion(bp.slideType, bp.title, input.audience),
+    contentRelation: inferContentRelation(bp.slideType),
+    sourceStatus: inferHonestSourceStatus(
+      bp.slideType,
+      hasSourceText,
+      hasRealMetrics,
+      isBeautify
+    ),
   }));
 }
 
@@ -814,8 +900,11 @@ function buildSlideFromOutlineItem(
   kpis: { label: string; value: string; note: string }[],
   quoteText: string,
   donutSeenCount: { count: number },
-  imageSeenCount: { count: number }
+  imageSeenCount: { count: number },
+  hasSourceText: boolean,
+  hasRealMetrics: boolean
 ): DeckSlideItem {
+  const isBeautify = input.routeMode === "beautify-1to1";
   const chartMode =
     item.slideType === "funnel-donut"
       ? donutSeenCount.count++ % 2 === 1 ||
@@ -857,6 +946,18 @@ function buildSlideFromOutlineItem(
     id: item.id || `slide_${idx + 1}_${item.slideType}`,
     sectionTag: cleanTag,
     title: cleanTitle,
+    audienceQuestion:
+      item.audienceQuestion ||
+      inferAudienceQuestion(item.slideType, cleanTitle, input.audience),
+    contentRelation: item.contentRelation || inferContentRelation(item.slideType),
+    sourceStatus:
+      item.sourceStatus ??
+      inferHonestSourceStatus(
+        item.slideType,
+        hasSourceText,
+        hasRealMetrics,
+        isBeautify
+      ),
   };
 
   if (cleanSummary) {
@@ -872,6 +973,36 @@ function buildSlideFromOutlineItem(
     ) {
       merged.subtitle = cleanSummary;
     }
+
+    // 1:1 Beautify route strictly preserves imported PPTX wording in bullets / steps
+    if (isBeautify) {
+      const originalPoints = cleanSummary
+        .split(/[·•；;\n]+/)
+        .map((p) => p.trim())
+        .filter((p) => p.length >= 2)
+        .slice(0, 5);
+      if (originalPoints.length > 0) {
+        if (item.slideType === "image-split") {
+          merged.bullets = originalPoints.slice(0, 4);
+        } else if (item.slideType === "comparison") {
+          const mid = Math.ceil(originalPoints.length / 2);
+          merged.leftPoints = originalPoints.slice(0, mid);
+          merged.rightPoints =
+            originalPoints.slice(mid).length > 0
+              ? originalPoints.slice(mid)
+              : originalPoints.slice(0, 2);
+        } else if (item.slideType === "process" || item.slideType === "timeline") {
+          merged.steps = originalPoints.slice(0, 4).map((pt, pIdx) => ({
+            code: String(pIdx + 1).padStart(2, "0"),
+            title: pt.slice(0, 18),
+            desc: pt,
+          }));
+        } else if (item.slideType !== "cover" && item.slideType !== "quote") {
+          merged.bullets = originalPoints;
+        }
+      }
+    }
+
     merged.speakerNotes = `第 ${idx + 1} 页聚焦「${cleanTitle}」。${cleanSummary}，帮助${
       input.audience || "核心团队"
     }快速对齐关键结论与下一步动作。`;
@@ -897,6 +1028,11 @@ export function generateStructuredDeck(
     .trim()
     .slice(0, 16000);
 
+  const hasSourceText = raw.length >= 40;
+  const hasRealMetrics =
+    hasSourceText && /\d+(?:\.\d+)?\s*(?:%|倍|x|X|亿|万|ms|天|小时|pp|元|美元)/.test(raw);
+  const isBeautify = input.routeMode === "beautify-1to1";
+
   const sentences = raw ? extractSentences(raw) : [];
   const kpis = extractMetricsFromText(raw);
 
@@ -921,7 +1057,9 @@ export function generateStructuredDeck(
         kpis,
         quoteText,
         donutCounter,
-        imageCounter
+        imageCounter,
+        hasSourceText,
+        hasRealMetrics
       )
     );
   }
@@ -938,8 +1076,8 @@ export function generateStructuredDeck(
       "timeline",
       "closing",
     ];
-    const fullSequence = classicTypes.map((st, idx) =>
-      createDefaultSlideOfType(st, {
+    const fullSequence = classicTypes.map((st, idx) => {
+      const slide = createDefaultSlideOfType(st, {
         index: idx,
         topic,
         subtitle,
@@ -949,8 +1087,19 @@ export function generateStructuredDeck(
         sentences,
         kpis,
         quoteText,
-      })
-    );
+      });
+      return {
+        ...slide,
+        audienceQuestion: inferAudienceQuestion(st, slide.title, audience),
+        contentRelation: inferContentRelation(st),
+        sourceStatus: inferHonestSourceStatus(
+          st,
+          hasSourceText,
+          hasRealMetrics,
+          isBeautify
+        ),
+      };
+    });
 
     if (count === 8) return fullSequence;
     const priorityRemove: SlideType[] = ["quote", "timeline", "comparison"];
@@ -991,7 +1140,9 @@ export function generateStructuredDeck(
       kpis,
       quoteText,
       donutCounter,
-      imageCounter
+      imageCounter,
+      hasSourceText,
+      hasRealMetrics
     )
   );
 }
@@ -1176,4 +1327,268 @@ export function buildSampleDeckFromPrompt(
     scenario: prompt.scenario,
     archetype: prompt.visualSpec.layout.archetype,
   });
+}
+
+/**
+ * Collects all meaningful text lines from any existing slide regardless of layout
+ * so switching slide types in "Layout Only" mode never destroys user-approved copy.
+ */
+function extractSlideTextItems(slide: DeckSlideItem): string[] {
+  const pool: string[] = [];
+  const push = (val?: string) => {
+    const clean = (val || "").trim();
+    if (clean && !pool.includes(clean)) pool.push(clean);
+  };
+
+  (slide.bullets || []).forEach(push);
+  (slide.steps || []).forEach((st) => {
+    const joined = st.desc ? `${st.title}：${st.desc}` : st.title;
+    push(joined);
+  });
+  (slide.leftPoints || []).forEach(push);
+  (slide.rightPoints || []).forEach(push);
+  (slide.kpis || []).forEach((k) =>
+    push(`${k.label} ${k.value}${k.note ? `（${k.note}）` : ""}`)
+  );
+  (slide.funnelStages || []).forEach((f) =>
+    push(`${f.label} ${f.value}${f.unit || ""}${f.note ? ` · ${f.note}` : ""}`)
+  );
+  if (slide.swot) {
+    [
+      ...slide.swot.strengths,
+      ...slide.swot.weaknesses,
+      ...slide.swot.opportunities,
+      ...slide.swot.threats,
+    ].forEach(push);
+  }
+  (slide.teamMembers || []).forEach((m) =>
+    push(`${m.name}（${m.role}）· ${m.bio}`)
+  );
+  if (slide.quoteText) push(slide.quoteText);
+  if (slide.subtitle && pool.length === 0) push(slide.subtitle);
+
+  return pool;
+}
+
+/**
+ * Tosea-inspired "Layout Only (仅换版式不动字)":
+ * Changes the visual slideType while preserving the user's title, subtitle,
+ * speaker notes, source attribution, and real bullet/step/comparison/metric content.
+ */
+export function remapSlideLayoutPreservingContent(
+  currentSlide: DeckSlideItem,
+  nextType: SlideType,
+  opts: {
+    index: number;
+    topic: string;
+    subtitle: string;
+    audience: string;
+    scenario?: string;
+    archetype?: LayoutArchetype;
+  }
+): DeckSlideItem {
+  if (currentSlide.slideType === nextType) return currentSlide;
+
+  const template = createDefaultSlideOfType(nextType, opts);
+  const items = extractSlideTextItems(currentSlide);
+
+  const base: DeckSlideItem = {
+    ...template,
+    id: currentSlide.id,
+    sectionTag: currentSlide.sectionTag || template.sectionTag,
+    title: currentSlide.title || template.title,
+    subtitle: currentSlide.subtitle || template.subtitle,
+    speakerNotes: currentSlide.speakerNotes ?? template.speakerNotes,
+    audienceQuestion: currentSlide.audienceQuestion,
+    contentRelation: currentSlide.contentRelation,
+    sourceStatus: currentSlide.sourceStatus,
+    sourceNote: currentSlide.sourceNote,
+  };
+
+  if (items.length === 0) return base;
+
+  switch (nextType) {
+    case "agenda":
+    case "image-split":
+    case "closing": {
+      base.bullets = items.slice(0, 4);
+      if (nextType === "image-split" && currentSlide.imageSlot) {
+        base.imageSlot = currentSlide.imageSlot;
+      }
+      break;
+    }
+    case "process":
+    case "timeline": {
+      const targetLen = nextType === "timeline" ? 4 : 3;
+      const prefix = nextType === "timeline" ? "PHASE" : "STEP";
+      base.steps = items.slice(0, targetLen).map((raw, i) => {
+        const sepIdx = raw.search(/[：:·—\-]/);
+        const stepTitle =
+          sepIdx > 1 && sepIdx <= 14 ? raw.slice(0, sepIdx).trim() : raw.slice(0, 12);
+        const stepDesc =
+          sepIdx > 1 && sepIdx <= 14 ? raw.slice(sepIdx + 1).trim() : raw;
+        return {
+          code: `${prefix} 0${i + 1}`,
+          title: stepTitle || `关键环节 ${i + 1}`,
+          desc: stepDesc || raw,
+        };
+      });
+      break;
+    }
+    case "comparison": {
+      const mid = Math.max(1, Math.ceil(items.length / 2));
+      base.leftTitle = currentSlide.leftTitle || "现状与挑战";
+      base.rightTitle = currentSlide.rightTitle || "目标与举措";
+      base.leftPoints = items.slice(0, mid).slice(0, 3);
+      base.rightPoints =
+        items.slice(mid).length > 0
+          ? items.slice(mid, mid + 3)
+          : items.slice(0, 3);
+      break;
+    }
+    case "swot": {
+      const chunk = (idx: number, fb: string[]) =>
+        items[idx] ? [items[idx]] : fb;
+      base.swot = {
+        strengths: chunk(0, template.swot?.strengths || ["核心优势"]),
+        weaknesses: chunk(1, template.swot?.weaknesses || ["待补短板"]),
+        opportunities: chunk(2, template.swot?.opportunities || ["增量机会"]),
+        threats: chunk(3, template.swot?.threats || ["潜在风险"]),
+      };
+      break;
+    }
+    case "quote": {
+      base.quoteText = items[0] || currentSlide.title;
+      base.quoteAuthor = currentSlide.quoteAuthor || opts.audience || "核心洞察";
+      base.bullets = items.slice(1, 4);
+      break;
+    }
+    case "data": {
+      if (currentSlide.kpis && currentSlide.kpis.length > 0) {
+        base.kpis = currentSlide.kpis;
+      }
+      if (currentSlide.bars && currentSlide.bars.length > 0) {
+        base.bars = currentSlide.bars;
+      }
+      base.bullets = items.slice(0, 3);
+      break;
+    }
+    case "funnel-donut": {
+      if (currentSlide.funnelStages && currentSlide.funnelStages.length > 0) {
+        base.funnelStages = currentSlide.funnelStages;
+      } else {
+        base.funnelStages = items.slice(0, 4).map((raw, i) => ({
+          label: raw.slice(0, 14),
+          value: Math.max(15, 100 - i * 22),
+          unit: "%",
+          note: raw.length > 14 ? raw.slice(14, 36) : "阶段拆解",
+        }));
+      }
+      break;
+    }
+    case "team-grid": {
+      if (currentSlide.teamMembers && currentSlide.teamMembers.length > 0) {
+        base.teamMembers = currentSlide.teamMembers;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  return base;
+}
+
+/**
+ * Exports a delivery-ready Speaker Outline + Source & Assumptions Appendix (.md)
+ * inspired by via-ppt-rescue-maker's verifiable reporting contract.
+ */
+export function exportOutlineAndEvidenceMarkdown(opts: {
+  title: string;
+  subtitle?: string;
+  audience?: string;
+  styleName?: string;
+  slides: DeckSlideItem[];
+}): string {
+  const { title, subtitle, audience, styleName, slides } = opts;
+  const totalNotesChars = slides.reduce(
+    (sum, s) => sum + (s.speakerNotes || "").trim().length,
+    0
+  );
+  const estMins = Math.max(
+    1,
+    Math.round(((totalNotesChars || slides.length * 110) / 210) * 10) / 10
+  );
+
+  const statusText = (st?: DeckSlideItem["sourceStatus"]) => {
+    switch (st) {
+      case "source-material":
+        return "来自源材料";
+      case "derived-calc":
+        return "数据推算";
+      case "needs-verify":
+        return "待核验";
+      case "placeholder":
+        return "模拟假设";
+      default:
+        return "未标注（建议汇报前复核）";
+    }
+  };
+
+  const lines: string[] = [
+    `# ${title} — 演讲提纲与来源说明`,
+    "",
+    subtitle ? `> ${subtitle}` : "",
+    "",
+    `- **目标听众**：${audience || "核心决策团队"}`,
+    `- **视觉母版**：${styleName || "PPTGod Visual System"}`,
+    `- **总页数 / 预计时长**：${slides.length} 页 · 约 ${estMins} 分钟（按 210 字/分钟估算）`,
+    "",
+    "---",
+    "",
+    "## 一、逐页演讲提纲",
+    "",
+  ].filter((l) => l !== undefined);
+
+  const verifiedItems: string[] = [];
+  const verifyTodoItems: string[] = [];
+
+  slides.forEach((sl, idx) => {
+    const pNo = `P${String(idx + 1).padStart(2, "0")}`;
+    const stLabel = statusText(sl.sourceStatus);
+    lines.push(`### ${pNo} · ${sl.title}`);
+    if (sl.audienceQuestion) {
+      lines.push(`- **听众问题**：${sl.audienceQuestion}`);
+    }
+    lines.push(`- **来源状态**：\`${stLabel}\`${sl.sourceNote ? ` — ${sl.sourceNote}` : ""}`);
+    const note = (sl.speakerNotes || "").trim();
+    lines.push(
+      `- **讲稿串词**：${
+        note || `围绕「${sl.title}」展开核心论据与页面视觉重点，衔接下一页。`
+      }`
+    );
+    lines.push("");
+
+    if (sl.sourceStatus === "source-material" || sl.sourceStatus === "derived-calc") {
+      verifiedItems.push(
+        `- **${pNo}（${sl.title}）**：${stLabel}${sl.sourceNote ? ` · ${sl.sourceNote}` : ""}`
+      );
+    } else if (sl.sourceStatus === "needs-verify" || sl.sourceStatus === "placeholder") {
+      verifyTodoItems.push(
+        `- **${pNo}（${sl.title}）**：\`${stLabel}\` — 正式汇报前请替换为实测数据或删去占位项`
+      );
+    }
+  });
+
+  lines.push("---", "", "## 二、来源与假设说明（防幻觉核验清单）", "");
+  if (verifiedItems.length > 0) {
+    lines.push("### 已溯源 / 推算依据", ...verifiedItems, "");
+  }
+  if (verifyTodoItems.length > 0) {
+    lines.push("### 模拟假设 / 待核验清单（汇报前请确认）", ...verifyTodoItems, "");
+  } else {
+    lines.push("- 当前文稿未标记模拟假设或待核验页面，建议终审核心数字口径与脚注。", "");
+  }
+
+  return lines.join("\n");
 }

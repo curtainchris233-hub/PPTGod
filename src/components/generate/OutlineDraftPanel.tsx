@@ -13,9 +13,18 @@ import {
 import {
   ALL_SLIDE_TYPES,
   SLIDE_TYPE_LABELS,
+  SOURCE_STATUS_LABELS,
   type OutlineDraftItem,
+  type SlideSourceStatus,
   type SlideType,
 } from "@/types/prompt";
+
+const SOURCE_CYCLE: SlideSourceStatus[] = [
+  "source-material",
+  "derived-calc",
+  "placeholder",
+  "needs-verify",
+];
 
 let outlineClientSeq = 1;
 function nextOutlineId(): string {
@@ -47,7 +56,7 @@ export default function OutlineDraftPanel({
           <ListOrdered size={15} style={{ color: "var(--accent)" }} />
           <span>
             第 1 步 · 可控大纲草案（共 {outlineDraft.length}{" "}
-            页 · 可逐页修改标题、要点与版式）
+            页 · 可逐页修改标题、要点、版式与来源核验）
           </span>
         </div>
         <button
@@ -61,79 +70,114 @@ export default function OutlineDraftPanel({
       </div>
 
       <div className="pg-outline-list">
-        {outlineDraft.map((item, oIdx) => (
-          <div key={item.id} className="pg-outline-row">
-            <span className="pg-outline-num">
-              P{String(oIdx + 1).padStart(2, "0")}
-            </span>
-            <select
-              aria-label={`第 ${oIdx + 1} 页大纲版式`}
-              value={item.slideType}
-              onChange={(e) => {
-                const nextType = e.target.value as SlideType;
-                onChangeOutline((prev) =>
-                  prev
-                    ? prev.map((it, i) =>
-                        i === oIdx ? { ...it, slideType: nextType } : it
-                      )
-                    : prev
-                );
-              }}
+        {outlineDraft.map((item, oIdx) => {
+          const statusInfo = item.sourceStatus
+            ? SOURCE_STATUS_LABELS[item.sourceStatus]
+            : null;
+          return (
+            <div
+              key={item.id}
+              className="pg-outline-row"
+              title={
+                item.audienceQuestion
+                  ? `听众追问：${item.audienceQuestion}`
+                  : undefined
+              }
             >
-              {ALL_SLIDE_TYPES.map((st) => (
-                <option key={st} value={st}>
-                  {SLIDE_TYPE_LABELS[st].label}
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              aria-label={`第 ${oIdx + 1} 页大纲标题`}
-              value={item.title}
-              placeholder="本页结论标题..."
-              onChange={(e) => {
-                const val = e.target.value;
-                onChangeOutline((prev) =>
-                  prev
-                    ? prev.map((it, i) =>
-                        i === oIdx ? { ...it, title: val } : it
-                      )
-                    : prev
-                );
-              }}
-            />
-            <input
-              type="text"
-              aria-label={`第 ${oIdx + 1} 页大纲摘要`}
-              value={item.summary}
-              placeholder="本页核心论据或数据摘要..."
-              onChange={(e) => {
-                const val = e.target.value;
-                onChangeOutline((prev) =>
-                  prev
-                    ? prev.map((it, i) =>
-                        i === oIdx ? { ...it, summary: val } : it
-                      )
-                    : prev
-                );
-              }}
-            />
-            <div className="pg-outline-row-controls">
-              <button
-                type="button"
-                className="pg-gen-mini-icon"
-                disabled={oIdx === 0}
-                aria-label="上移大纲项"
-                onClick={() =>
-                  onChangeOutline((prev) => {
-                    if (!prev || oIdx === 0) return prev;
-                    const next = [...prev];
-                    const [m] = next.splice(oIdx, 1);
-                    next.splice(oIdx - 1, 0, m);
-                    return next;
-                  })
-                }
+              <span className="pg-outline-num">
+                P{String(oIdx + 1).padStart(2, "0")}
+              </span>
+              <select
+                aria-label={`第 ${oIdx + 1} 页大纲版式`}
+                value={item.slideType}
+                onChange={(e) => {
+                  const nextType = e.target.value as SlideType;
+                  onChangeOutline((prev) =>
+                    prev
+                      ? prev.map((it, i) =>
+                          i === oIdx ? { ...it, slideType: nextType } : it
+                        )
+                      : prev
+                  );
+                }}
               >
+                {ALL_SLIDE_TYPES.map((st) => (
+                  <option key={st} value={st}>
+                    {SLIDE_TYPE_LABELS[st].label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                aria-label={`第 ${oIdx + 1} 页大纲标题`}
+                value={item.title}
+                placeholder="本页结论标题..."
+                onChange={(e) => {
+                  const val = e.target.value;
+                  onChangeOutline((prev) =>
+                    prev
+                      ? prev.map((it, i) =>
+                          i === oIdx ? { ...it, title: val } : it
+                        )
+                      : prev
+                  );
+                }}
+              />
+              <input
+                type="text"
+                aria-label={`第 ${oIdx + 1} 页大纲摘要`}
+                value={item.summary}
+                placeholder="本页核心论据或数据摘要..."
+                onChange={(e) => {
+                  const val = e.target.value;
+                  onChangeOutline((prev) =>
+                    prev
+                      ? prev.map((it, i) =>
+                          i === oIdx ? { ...it, summary: val } : it
+                        )
+                      : prev
+                  );
+                }}
+              />
+              <div className="pg-outline-row-controls">
+                {statusInfo && (
+                  <button
+                    type="button"
+                    className={`pg-outline-source-pill is-${statusInfo.tone}`}
+                    title={`来源状态：${statusInfo.label}（点击切换）`}
+                    onClick={() => {
+                      const curIdx = SOURCE_CYCLE.indexOf(
+                        item.sourceStatus || "source-material"
+                      );
+                      const nextStatus =
+                        SOURCE_CYCLE[(curIdx + 1) % SOURCE_CYCLE.length];
+                      onChangeOutline((prev) =>
+                        prev
+                          ? prev.map((it, i) =>
+                              i === oIdx ? { ...it, sourceStatus: nextStatus } : it
+                            )
+                          : prev
+                      );
+                    }}
+                  >
+                    {statusInfo.short}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="pg-gen-mini-icon"
+                  disabled={oIdx === 0}
+                  aria-label="上移大纲项"
+                  onClick={() =>
+                    onChangeOutline((prev) => {
+                      if (!prev || oIdx === 0) return prev;
+                      const next = [...prev];
+                      const [m] = next.splice(oIdx, 1);
+                      next.splice(oIdx - 1, 0, m);
+                      return next;
+                    })
+                  }
+                >
                 <ArrowUp size={12} />
               </button>
               <button
@@ -170,7 +214,8 @@ export default function OutlineDraftPanel({
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="pg-outline-footer">

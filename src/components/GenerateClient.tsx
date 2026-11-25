@@ -234,6 +234,8 @@ export default function GenerateClient({
   const [handoffApplied, setHandoffApplied] = useState(false);
 
   const [configOpen, setConfigOpen] = useState(!initialDeck);
+  const [styleStripOpen, setStyleStripOpen] = useState(false);
+  const [advConfigOpen, setAdvConfigOpen] = useState(false);
   const [topic, setTopic] = useState(
     initialDeck?.title ||
       initialTopic ||
@@ -397,6 +399,8 @@ export default function GenerateClient({
                     intake.analysis?.detectedScenario || matchedStyle?.scenario,
                   archetype: matchedStyle?.visualSpec.layout.archetype,
                   outline: intake.parsedOutline,
+                  routeMode: intake.routeMode,
+                  evidenceDensity: intake.evidenceDensity,
                   mode: "smart",
                 }),
               });
@@ -927,6 +931,7 @@ export default function GenerateClient({
     }
     commitSlides((prev) => prev.filter((_, i) => i !== idx));
     setActiveIndex((cur) => Math.max(0, cur >= idx ? cur - 1 : cur));
+    showToast(`已删除第 ${idx + 1} 页 · 可点撤销恢复`);
   };
 
   const handleMoveSlide = (idx: number, dir: -1 | 1) => {
@@ -1251,17 +1256,64 @@ export default function GenerateClient({
   return (
     <main className="pg-page">
       <div className="pg-container">
-        {/* Top Bar & Multi-Format Delivery Controls */}
-        <header className="pg-gen-topbar">
-          <div>
-            <p className="pg-kicker">
-              ONLINE PPT GENERATION &amp; DELIVERY WORKSHOP · V7
-            </p>
-            <h1 className="pg-subpage-title">在线 PPT 生成与编辑工坊</h1>
-            <p className="pg-subpage-lead">
-              上传 PDF / Word / PPTX / Markdown 文档，两步可控编排 5–20 页全套 12 种页型，在{" "}
-              {styles.length} 套全领域视觉体系间一键无损换肤、自定义机构署名与智能体检，直出原生 .pptx / 离线 .html / Marp 源码。
-            </p>
+        {/* Compact Single-Row Top Bar (Figma Slides Style) */}
+        <header className="pg-gen-topbar pg-gen-topbar--compact">
+          <div className="pg-gen-title-group">
+            <h1 className="pg-gen-compact-title">在线 PPT 工坊</h1>
+            <select
+              id="pg-gen-style-select"
+              className="pg-select pg-gen-style-select-inline"
+              aria-label="选择视觉母版风格"
+              value={activeStyle.slug}
+              onChange={(e) => handleSelectStyle(e.target.value)}
+            >
+              {(() => {
+                const assigned = new Set<string>();
+                const groups = DOMAIN_TABS.filter((t) => t.id !== "all").map(
+                  (tab) => {
+                    const items = styles.filter((st) => {
+                      if (assigned.has(st.id)) return false;
+                      if (tab.scenarios.includes(st.scenario)) {
+                        assigned.add(st.id);
+                        return true;
+                      }
+                      return false;
+                    });
+                    return { label: tab.label, items };
+                  }
+                );
+                const remaining = styles.filter((st) => !assigned.has(st.id));
+                if (remaining.length > 0) {
+                  groups.push({ label: "社区自定义风格", items: remaining });
+                }
+                return groups
+                  .filter((g) => g.items.length > 0)
+                  .map((g) => (
+                    <optgroup
+                      key={g.label}
+                      label={`${g.label} (${g.items.length})`}
+                    >
+                      {g.items.map((st) => (
+                        <option key={st.id} value={st.slug}>
+                          {st.title}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ));
+              })()}
+            </select>
+            <button
+              type="button"
+              className={`pg-btn pg-btn-ghost pg-btn-xs ${
+                styleStripOpen ? "is-open" : ""
+              }`}
+              onClick={() => setStyleStripOpen((v) => !v)}
+              id="pg-gen-toggle-styles-btn"
+              title="展开 36 套风格可视化换肤条"
+            >
+              <Wand2 size={13} />
+              <span>换肤 ({styles.length})</span>
+            </button>
           </div>
 
           <div className="pg-gen-delivery-bar">
@@ -1272,10 +1324,14 @@ export default function GenerateClient({
               }`}
               onClick={handleToggleVisibility}
               id="pg-gen-visibility-btn"
-              title="切换云端文稿的公开/私有访问权限"
+              title={
+                isPublic
+                  ? "公开演播链接可访问（点击切换私有）"
+                  : "仅自己可见（点击开启公开分享）"
+              }
             >
-              {isPublic ? <Globe size={14} /> : <Lock size={14} />}
-              <span>{isPublic ? "公开链接可访问" : "仅自己可见（私有）"}</span>
+              {isPublic ? <Globe size={13} /> : <Lock size={13} />}
+              <span>{isPublic ? "公开" : "私有"}</span>
             </button>
 
             {savedDeckId && isPublic && (
@@ -1287,16 +1343,17 @@ export default function GenerateClient({
                   title="打开纯净演播分享页"
                 >
                   <Play size={13} />
-                  <span>演播页</span>
+                  <span>演播</span>
                 </Link>
                 <button
                   type="button"
                   className="pg-btn pg-btn-secondary pg-btn-sm"
                   onClick={handleCopyShareLink}
                   id="pg-gen-copy-share-btn"
+                  title="复制纯净演播分享链接"
                 >
-                  {linkCopied ? <Check size={14} /> : <Link2 size={14} />}
-                  <span>{linkCopied ? "已复制链接" : "复制分享链接"}</span>
+                  {linkCopied ? <Check size={13} /> : <Link2 size={13} />}
+                  <span>{linkCopied ? "已复制" : "分享"}</span>
                 </button>
               </>
             )}
@@ -1307,16 +1364,23 @@ export default function GenerateClient({
               onClick={() => handleSaveCloudDeck()}
               disabled={saving}
               id="pg-gen-save-deck-btn"
+              aria-label={
+                isViewingForeignSharedDeck
+                  ? "克隆保存到我的云端文稿"
+                  : savedDeckId
+                  ? "保存更新到云端文稿"
+                  : "保存到云端文稿"
+              }
             >
-              <Save size={14} />
+              <Save size={13} />
               <span>
                 {saving
                   ? "保存中..."
                   : isViewingForeignSharedDeck
-                  ? "克隆保存到我的空间"
+                  ? "克隆保存"
                   : savedDeckId
-                  ? "更新云端文稿"
-                  : "保存到云端"}
+                  ? "更新"
+                  : "保存"}
               </span>
             </button>
 
@@ -1325,10 +1389,10 @@ export default function GenerateClient({
               className="pg-btn pg-btn-secondary pg-btn-sm"
               onClick={() => setExportModalOpen(true)}
               id="pg-gen-export-md-btn"
-              title="将当前真实文稿导出为可运行 Marp Markdown 或 Claude/Gamma 精准提示词"
+              title="导出 Marp Markdown 或 6 工具提示词"
             >
-              <FileCode size={14} />
-              <span>Marp / 提示词</span>
+              <FileCode size={13} />
+              <span>Marp / 词</span>
             </button>
 
             <button
@@ -1336,9 +1400,11 @@ export default function GenerateClient({
               className="pg-btn pg-btn-secondary pg-btn-sm"
               onClick={handleExportHtml}
               id="pg-gen-export-html-btn"
+              title="导出离线交互 .html / 打印 PDF"
+              aria-label="导出离线交互 .html"
             >
-              <FileCode2 size={14} />
-              <span>导出交互 .html / PDF</span>
+              <FileCode2 size={13} />
+              <span>.html</span>
             </button>
 
             <button
@@ -1348,8 +1414,8 @@ export default function GenerateClient({
               disabled={exportingPptx}
               id="pg-gen-export-pptx-btn"
             >
-              <FileSpreadsheet size={14} />
-              <span>{exportingPptx ? "生成中..." : "导出原生 .pptx"}</span>
+              <FileSpreadsheet size={13} />
+              <span>{exportingPptx ? "导出中..." : "导出 .pptx"}</span>
             </button>
           </div>
         </header>
@@ -1360,8 +1426,7 @@ export default function GenerateClient({
             <div className="pg-draft-banner-info">
               <History size={15} style={{ color: "var(--accent)", flexShrink: 0 }} />
               <span>
-                检测到本地未保存草稿「<strong>{pendingDraft.topic}</strong>」（共{" "}
-                {pendingDraft.slides.length} 页），是否立即恢复继续编辑？
+                本地草稿「<strong>{pendingDraft.topic}</strong>」（{pendingDraft.slides.length} 页）
               </span>
             </div>
             <div className="pg-btn-group">
@@ -1371,7 +1436,7 @@ export default function GenerateClient({
                 onClick={handleRestoreDraft}
                 id="pg-draft-restore-btn"
               >
-                一键恢复草稿
+                恢复草稿
               </button>
               <button
                 type="button"
@@ -1379,7 +1444,7 @@ export default function GenerateClient({
                 onClick={handleDismissDraft}
                 id="pg-draft-dismiss-btn"
               >
-                忽略并清空
+                忽略
               </button>
             </div>
           </div>
@@ -1388,431 +1453,419 @@ export default function GenerateClient({
         {deckForbidden && (
           <div
             className="pg-form-error"
-            style={{ marginBottom: "14px" }}
+            style={{ marginBottom: "12px" }}
             id="pg-gen-deck-forbidden"
           >
-            请求的演示文稿为私有状态（仅原作者可见），已为你打开全新工作台。
+            请求的演示文稿为私有状态，已为你打开全新工作台。
           </div>
         )}
 
         {isViewingForeignSharedDeck && (
           <div className="pg-gen-banner" id="pg-gen-shared-banner">
             <span>
-              你正在预览他人公开分享的演示文稿「{initialDeck?.title}」，可以自由换肤试编辑或导出；点击「克隆保存到我的空间」将生成一份属于你的独立副本。
+              预览公开文稿「{initialDeck?.title}」· 可自由换肤试编，点击「克隆保存」生成个人副本
             </span>
           </div>
         )}
 
-        {/* Style Re-Skinning Strip, Brand Tweaker & Generation Input Drawer */}
-        <section className="pg-gen-config-card">
+        {/* Slim Canvas-First Command Bar (Tweaker + Audit + Single-Row Composer) */}
+        <section
+          className={`pg-gen-config-card pg-gen-config-card--slim ${
+            docDragging ? "is-drag-over" : ""
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDocDragging(true);
+          }}
+          onDragLeave={() => setDocDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDocDragging(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file) handleDocumentFile(file);
+          }}
+        >
           <AiAmbientAccent variant="panel-corner" />
-          <div className="pg-gen-config-head">
-            <div className="pg-panel-title-wrap">
-              <Wand2 size={15} />
-              <strong style={{ fontSize: "13.5px" }}>
-                当前视觉母版：{activeStyle.title}（支持一键无损换肤）
-              </strong>
+
+          {/* Optional Expandable 36-Style Visual Strip */}
+          {styleStripOpen && (
+            <div
+              className="pg-gen-style-strip"
+              role="radiogroup"
+              aria-label="选择或一键切换 PPT 视觉风格"
+            >
+              {styles.map((st) => {
+                const isSelected = st.slug === activeStyle.slug;
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    className={`pg-gen-style-pill ${isSelected ? "is-active" : ""}`}
+                    onClick={() => handleSelectStyle(st.slug)}
+                  >
+                    <span
+                      className="pg-gen-style-dot"
+                      style={{
+                        background: `linear-gradient(135deg, ${st.visualSpec.palette.bg} 45%, ${st.visualSpec.palette.accent} 45%)`,
+                      }}
+                    />
+                    <span>{st.title}</span>
+                  </button>
+                );
+              })}
             </div>
-            <div className="pg-btn-group" style={{ alignItems: "center" }}>
-              <select
-                id="pg-gen-style-select"
-                className="pg-select"
-                aria-label="选择视觉母版风格"
-                value={activeStyle.slug}
-                onChange={(e) => handleSelectStyle(e.target.value)}
-              >
-                {(() => {
-                  const assigned = new Set<string>();
-                  const groups = DOMAIN_TABS.filter((t) => t.id !== "all").map(
-                    (tab) => {
-                      const items = styles.filter((st) => {
-                        if (assigned.has(st.id)) return false;
-                        if (tab.scenarios.includes(st.scenario)) {
-                          assigned.add(st.id);
-                          return true;
-                        }
-                        return false;
-                      });
-                      return { label: tab.label, items };
-                    }
+          )}
+
+          {/* Slim 1-Row Utility Bar: Brand Tweaker + Deck Audit + Toggle Composer */}
+          <div className="pg-gen-utility-row">
+            <div className="pg-gen-utility-modules">
+              <DeckSpecTweaker
+                deckSpec={deckSpec}
+                baseSpec={activeStyle.visualSpec}
+                handoffApplied={handoffApplied}
+                onChangeSpec={(next) => {
+                  hasLocalEditsRef.current = true;
+                  setDeckSpec(next);
+                }}
+                onResetSpec={() => {
+                  setDeckSpec(activeStyle.visualSpec);
+                  setHandoffApplied(false);
+                  clearStudioHandoff();
+                  showToast("已恢复当前母版默认配色与版式", "default");
+                }}
+              />
+
+              <DeckAuditDrawer
+                slides={slides}
+                spec={deckSpec}
+                topic={topic}
+                audience={audience}
+                onJumpToSlide={(idx) => {
+                  setActiveIndex(idx);
+                  showToast(`已定位到第 ${idx + 1} 页，可在右侧直接优化`);
+                }}
+                onAutoFixContrast={() => {
+                  hasLocalEditsRef.current = true;
+                  setDeckSpec((prev) => ({
+                    ...prev,
+                    palette: autoFixPaletteContrast(prev.palette),
+                  }));
+                  showToast("已按 WCAG AA 投影可读标准一键校正色板对比度", "success");
+                }}
+                onAutoFillNotes={() => {
+                  commitSlides((prev) =>
+                    autoFillMissingSpeakerNotes(prev, topic, audience)
                   );
-                  const remaining = styles.filter((st) => !assigned.has(st.id));
-                  if (remaining.length > 0) {
-                    groups.push({ label: "社区自定义风格", items: remaining });
-                  }
-                  return groups
-                    .filter((g) => g.items.length > 0)
-                    .map((g) => (
-                      <optgroup
-                        key={g.label}
-                        label={`${g.label} (${g.items.length})`}
-                      >
-                        {g.items.map((st) => (
-                          <option key={st.id} value={st.slug}>
-                            {st.title}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ));
-                })()}
-              </select>
-              <button
-                type="button"
-                className="pg-btn pg-btn-ghost pg-btn-xs"
-                onClick={() => setConfigOpen((v) => !v)}
-                id="pg-gen-toggle-config-btn"
-              >
-                <span>
-                  {configOpen ? "收起生成素材面板" : "展开生成素材与 AI 引擎"}
-                </span>
-                {configOpen ? (
-                  <ChevronUp size={14} />
-                ) : (
-                  <ChevronDown size={14} />
-                )}
-              </button>
+                  showToast("已为所有缺失备注页一键补齐自然口语提词讲稿", "success");
+                }}
+              />
             </div>
+
+            <button
+              type="button"
+              className="pg-btn pg-btn-ghost pg-btn-xs pg-gen-collapse-btn"
+              onClick={() => setConfigOpen((v) => !v)}
+              id="pg-gen-toggle-config-btn"
+            >
+              <span>{configOpen ? "收起素材" : "展开素材配置"}</span>
+              {configOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
           </div>
-
-          {/* 36+ Live Re-Skinning Strip */}
-          <div
-            className="pg-gen-style-strip"
-            role="radiogroup"
-            aria-label="选择或一键切换 PPT 视觉风格"
-          >
-            {styles.map((st) => {
-              const isSelected = st.slug === activeStyle.slug;
-              return (
-                <button
-                  key={st.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
-                  className={`pg-gen-style-pill ${isSelected ? "is-active" : ""}`}
-                  onClick={() => handleSelectStyle(st.slug)}
-                >
-                  <span
-                    className="pg-gen-style-dot"
-                    style={{
-                      background: `linear-gradient(135deg, ${st.visualSpec.palette.bg} 45%, ${st.visualSpec.palette.accent} 45%)`,
-                    }}
-                  />
-                  <span>{st.title}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* v4/v6: Inline Deck-Level VisualSpec Brand Tweaker + WCAG + Custom Brand Footer */}
-          <DeckSpecTweaker
-            deckSpec={deckSpec}
-            baseSpec={activeStyle.visualSpec}
-            handoffApplied={handoffApplied}
-            onChangeSpec={(next) => {
-              hasLocalEditsRef.current = true;
-              setDeckSpec(next);
-            }}
-            onResetSpec={() => {
-              setDeckSpec(activeStyle.visualSpec);
-              setHandoffApplied(false);
-              clearStudioHandoff();
-              showToast("已恢复当前母版默认配色与版式", "default");
-            }}
-          />
-
-          {/* v6: 100-Point Real-Time Deck Quality & Pacing Linter */}
-          <DeckAuditDrawer
-            slides={slides}
-            spec={deckSpec}
-            topic={topic}
-            audience={audience}
-            onJumpToSlide={(idx) => {
-              setActiveIndex(idx);
-              showToast(`已定位到第 ${idx + 1} 页，可在右侧直接优化`);
-            }}
-            onAutoFixContrast={() => {
-              hasLocalEditsRef.current = true;
-              setDeckSpec((prev) => ({
-                ...prev,
-                palette: autoFixPaletteContrast(prev.palette),
-              }));
-              showToast("已按 WCAG AA 投影可读标准一键校正色板对比度", "success");
-            }}
-            onAutoFillNotes={() => {
-              commitSlides((prev) =>
-                autoFillMissingSpeakerNotes(prev, topic, audience)
-              );
-              showToast("已为所有缺失备注页一键补齐自然口语提词讲稿", "success");
-            }}
-          />
 
           {configOpen && (
-            <>
-              <div className="pg-gen-config-grid">
-                {/* Left: Document Upload (.pdf/.docx/.pptx/.md/.txt) + Topic + Presets */}
-                <div className="pg-form pg-form-compact">
-                  <div
-                    className={`pg-upload-zone ${
-                      docDragging ? "is-drag-over" : ""
-                    }`}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDocDragging(true);
+            <div className="pg-gen-composer">
+              {/* Row 1: Single-Line Command Input + Upload + Page Count + Outline/Generate CTAs */}
+              <div className="pg-gen-composer-bar">
+                <input
+                  ref={docInputRef}
+                  id="pg-doc-upload-input"
+                  type="file"
+                  accept=".pdf,.docx,.pptx,.md,.txt"
+                  className="pg-upload-file-input"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleDocumentFile(file);
+                    e.target.value = "";
+                  }}
+                />
+
+                <div className="pg-gen-topic-wrap">
+                  <input
+                    id="pg-gen-topic"
+                    type="text"
+                    className="pg-gen-topic-input"
+                    value={topic}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      hasLocalEditsRef.current = true;
+                      setTopic(val);
+                      setSlides((prev) =>
+                        prev.map((sl, i) =>
+                          i === 0 && sl.slideType === "cover"
+                            ? { ...sl, title: val }
+                            : sl
+                        )
+                      );
                     }}
-                    onDragLeave={() => setDocDragging(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDocDragging(false);
-                      const file = e.dataTransfer.files?.[0];
-                      if (file) handleDocumentFile(file);
-                    }}
-                  >
-                    <input
-                      ref={docInputRef}
-                      id="pg-doc-upload-input"
-                      type="file"
-                      accept=".pdf,.docx,.pptx,.md,.txt"
-                      className="pg-upload-file-input"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleDocumentFile(file);
-                        e.target.value = "";
-                      }}
-                    />
-                    <div className="pg-upload-zone-info">
-                      <FileText
-                        size={18}
-                        style={{ color: "var(--accent)", flexShrink: 0 }}
-                      />
-                      <div>
-                        <div className="pg-upload-zone-title">
-                          拖拽或上传文档提炼素材，或上传旧 .pptx 一键翻新换肤
-                        </div>
-                        <div className="pg-upload-zone-sub">
-                          支持 .pdf、.docx、.pptx（自动反解逐页大纲）、.md、.txt（最大 10MB）
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="pg-btn pg-btn-secondary pg-btn-xs"
-                      disabled={parsingDoc}
-                      onClick={() => docInputRef.current?.click()}
-                      id="pg-doc-upload-btn"
-                    >
-                      <Upload size={13} />
-                      <span>{parsingDoc ? "解析中..." : "选择文档"}</span>
-                    </button>
-                  </div>
-
-                  {uploadedDocMeta && (
-                    <div className="pg-upload-badge" id="pg-doc-upload-badge">
-                      <span>
-                        已载入文档：{uploadedDocMeta.fileName}（提取{" "}
-                        {uploadedDocMeta.charCount} 字）
-                      </span>
-                      <button
-                        type="button"
-                        className="pg-gen-mini-icon"
-                        onClick={() => {
-                          setUploadedDocMeta(null);
-                          setDocAnalysis(null);
-                        }}
-                        aria-label="清除文档提示"
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
-                  )}
-
-                  {uploadedDocMeta?.warning && (
-                    <div className="pg-upload-warning" id="pg-doc-scan-warning">
-                      {uploadedDocMeta.warning}
-                    </div>
-                  )}
-
-                  {docAnalysis && docAnalysis.recommendedStyles.length > 0 && (
-                    <div className="pg-gen-doc-recs" id="pg-gen-doc-recs">
-                      <div className="pg-gen-doc-recs-head">
-                        <div className="pg-gen-doc-recs-title">
-                          <Sparkles size={13} />
-                          <span>
-                            智能识别场景：
-                            <strong>{docAnalysis.detectedScenario}</strong>（
-                            {docAnalysis.confidence}%）· 为你推荐 Top 3 匹配风格
-                          </span>
-                        </div>
-                        {docAnalysis.keyMetrics.length > 0 && (
-                          <span className="pg-gen-doc-metrics-hint">
-                            提炼 {docAnalysis.keyMetrics.length} 组数据：
-                            {docAnalysis.keyMetrics.slice(0, 3).join(" / ")}
-                          </span>
-                        )}
-                      </div>
-
-                      <div
-                        className="pg-gen-doc-rec-pills"
-                        role="group"
-                        aria-label="文档智能推荐 PPT 风格"
-                      >
-                        {docAnalysis.recommendedStyles.map((rec, idx) => {
-                          const matchedStyle = styles.find(
-                            (s) => s.slug === rec.slug || s.id === rec.id
-                          );
-                          const isCurrent = activeStyle.slug === rec.slug;
-                          return (
-                            <button
-                              key={rec.slug}
-                              type="button"
-                              data-rec-slug={rec.slug}
-                              className={`pg-gen-doc-rec-btn ${
-                                isCurrent ? "is-active" : ""
-                              }`}
-                              title={rec.reasons.join(" · ")}
-                              onClick={() => {
-                                handleSelectStyle(rec.slug);
-                                showToast(
-                                  `已一键切换推荐风格「${rec.title}」（匹配度 ${rec.score}%）`,
-                                  "success"
-                                );
-                              }}
-                            >
-                              {matchedStyle && (
-                                <span
-                                  className="pg-gen-style-dot"
-                                  style={{
-                                    background: `linear-gradient(135deg, ${matchedStyle.visualSpec.palette.bg} 45%, ${matchedStyle.visualSpec.palette.accent} 45%)`,
-                                  }}
-                                />
-                              )}
-                              <span className="pg-gen-doc-rec-name">
-                                #{idx + 1} {rec.title}
-                              </span>
-                              <span className="pg-gen-doc-rec-score">
-                                {rec.score}%
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <div className="pg-gen-doc-recs-actions">
-                        <button
-                          type="button"
-                          id="pg-gen-doc-autogen-btn"
-                          className="pg-btn pg-btn-primary pg-btn-xs"
-                          disabled={generating}
-                          onClick={() =>
-                            handleGenerate(outlineDraft ?? undefined)
-                          }
-                        >
-                          <Sparkles size={12} />
-                          <span>
-                            {generating
-                              ? "正在自动整理生成..."
-                              : "立即按文档整理生成整套 PPT"}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          id="pg-gen-doc-prompt-btn"
-                          className="pg-btn pg-btn-secondary pg-btn-xs"
-                          onClick={() => setExportModalOpen(true)}
-                        >
-                          <FileCode size={12} />
-                          <span>导出 Marp / 精准提示词</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="pg-field">
-                    <label htmlFor="pg-gen-topic">PPT 核心主题 *</label>
-                    <input
-                      id="pg-gen-topic"
-                      type="text"
-                      value={topic}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        hasLocalEditsRef.current = true;
-                        setTopic(val);
-                        setSlides((prev) =>
-                          prev.map((sl, i) =>
-                            i === 0 && sl.slideType === "cover"
-                              ? { ...sl, title: val }
-                              : sl
-                          )
-                        );
-                      }}
-                      placeholder="输入演示主题..."
-                    />
-                  </div>
-                  <div className="pg-form-2col">
-                    <div className="pg-field">
-                      <label htmlFor="pg-gen-subtitle">副标题 / 副叙事</label>
-                      <input
-                        id="pg-gen-subtitle"
-                        type="text"
-                        value={subtitle}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          hasLocalEditsRef.current = true;
-                          setSubtitle(val);
-                          setSlides((prev) =>
-                            prev.map((sl, i) =>
-                              i === 0 && sl.slideType === "cover"
-                                ? { ...sl, subtitle: val }
-                                : sl
-                            )
-                          );
-                        }}
-                      />
-                    </div>
-                    <div className="pg-field">
-                      <label htmlFor="pg-gen-audience">目标受众</label>
-                      <input
-                        id="pg-gen-audience"
-                        type="text"
-                        value={audience}
-                        onChange={(e) => {
-                          hasLocalEditsRef.current = true;
-                          setAudience(e.target.value);
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="pg-field">
-                    <label htmlFor="pg-gen-source">
-                      原始素材 / 会议纪要 / PRD / 论文摘要（可选）
-                    </label>
-                    <textarea
-                      id="pg-gen-source"
-                      rows={4}
-                      value={sourceText}
-                      onChange={(e) => setSourceText(e.target.value)}
-                      placeholder="粘贴你的原始文档或要点，系统将自动提取指标、对比观点、金句与章节架构..."
-                    />
-                  </div>
-                  <div className="pg-topic-presets" style={{ marginTop: 0 }}>
-                    <span className="pg-preset-hint">一键载入真实范例：</span>
-                    {SOURCE_MATERIAL_PRESETS.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className="pg-preset-chip"
-                        onClick={() => handleApplyPreset(p.id)}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
+                    placeholder="输入 PPT 主题，或直接拖入 PDF / Word / PPTX / TXT 文档..."
+                  />
                 </div>
 
-                {/* Right: Dual Generation Engine Settings + 2-Step Outline Controls */}
-                <div className="pg-gen-engine-box">
-                  <div className="pg-form-2col">
+                <button
+                  type="button"
+                  className="pg-btn pg-btn-secondary pg-btn-sm"
+                  disabled={parsingDoc}
+                  onClick={() => docInputRef.current?.click()}
+                  id="pg-doc-upload-btn"
+                  title="支持 .pdf、.docx、.pptx、.md、.txt（最大 10MB）"
+                >
+                  <Upload size={13} />
+                  <span>{parsingDoc ? "解析中..." : "传文档"}</span>
+                </button>
+
+                <label
+                  className="pg-gen-pages-pill"
+                  htmlFor="pg-gen-count"
+                  title="滑动调整规划页数（5–20 页）"
+                >
+                  <span>{slideCount} 页</span>
+                  <input
+                    id="pg-gen-count"
+                    type="range"
+                    min={5}
+                    max={20}
+                    value={slideCount}
+                    onChange={(e) => setSlideCount(Number(e.target.value))}
+                    className="pg-range pg-range--mini"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  className="pg-btn pg-btn-secondary pg-btn-sm"
+                  onClick={handleBuildOutline}
+                  disabled={generatingOutline || generating}
+                  id="pg-gen-outline-btn"
+                >
+                  <ListOrdered size={14} />
+                  <span>{generatingOutline ? "规划中..." : "大纲"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="pg-btn pg-btn-primary pg-btn-sm"
+                  onClick={() => handleGenerate()}
+                  disabled={generating || generatingOutline}
+                  id="pg-gen-run-btn"
+                >
+                  <Sparkles size={14} />
+                  <span>{generating ? "生成中..." : "一键生成"}</span>
+                </button>
+              </div>
+
+              {/* Row 2: Single-Line Scrollable Presets + Progressive Disclosure Advanced Settings Toggle */}
+              <div className="pg-gen-composer-sub">
+                <div className="pg-gen-presets-scroll">
+                  <span className="pg-preset-hint">范例：</span>
+                  {SOURCE_MATERIAL_PRESETS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="pg-preset-chip"
+                      onClick={() => handleApplyPreset(p.id)}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className={`pg-btn pg-btn-ghost pg-btn-xs pg-gen-adv-toggle ${
+                    advConfigOpen ? "is-open" : ""
+                  }`}
+                  onClick={() => setAdvConfigOpen((v) => !v)}
+                  id="pg-gen-adv-toggle-btn"
+                  aria-expanded={advConfigOpen}
+                >
+                  <FileText size={12} />
+                  <span>{advConfigOpen ? "收起详情" : "展开更多配置"}</span>
+                  {advConfigOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </button>
+              </div>
+
+              {/* Uploaded Doc Badge + Warning + v7 Smart Top-3 Style Recommendations */}
+              {uploadedDocMeta && (
+                <div className="pg-upload-badge" id="pg-doc-upload-badge">
+                  <span>
+                    已载入：{uploadedDocMeta.fileName}（{uploadedDocMeta.charCount} 字）
+                  </span>
+                  <button
+                    type="button"
+                    className="pg-gen-mini-icon"
+                    onClick={() => {
+                      setUploadedDocMeta(null);
+                      setDocAnalysis(null);
+                    }}
+                    aria-label="清除文档提示"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+
+              {uploadedDocMeta?.warning && (
+                <div className="pg-upload-warning" id="pg-doc-scan-warning">
+                  {uploadedDocMeta.warning}
+                </div>
+              )}
+
+              {docAnalysis && docAnalysis.recommendedStyles.length > 0 && (
+                <div className="pg-gen-doc-recs" id="pg-gen-doc-recs">
+                  <div className="pg-gen-doc-recs-head">
+                    <div className="pg-gen-doc-recs-title">
+                      <Sparkles size={13} />
+                      <span>
+                        识别场景：<strong>{docAnalysis.detectedScenario}</strong>（
+                        {docAnalysis.confidence}%）· Top 3 风格
+                      </span>
+                    </div>
+                    {docAnalysis.keyMetrics.length > 0 && (
+                      <span className="pg-gen-doc-metrics-hint">
+                        {docAnalysis.keyMetrics.slice(0, 3).join(" · ")}
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    className="pg-gen-doc-rec-pills"
+                    role="group"
+                    aria-label="文档智能推荐 PPT 风格"
+                  >
+                    {docAnalysis.recommendedStyles.map((rec, idx) => {
+                      const matchedStyle = styles.find(
+                        (s) => s.slug === rec.slug || s.id === rec.id
+                      );
+                      const isCurrent = activeStyle.slug === rec.slug;
+                      return (
+                        <button
+                          key={rec.slug}
+                          type="button"
+                          data-rec-slug={rec.slug}
+                          className={`pg-gen-doc-rec-btn ${
+                            isCurrent ? "is-active" : ""
+                          }`}
+                          title={rec.reasons.join(" · ")}
+                          onClick={() => {
+                            handleSelectStyle(rec.slug);
+                            showToast(
+                              `已切换推荐风格「${rec.title}」（匹配度 ${rec.score}%）`,
+                              "success"
+                            );
+                          }}
+                        >
+                          {matchedStyle && (
+                            <span
+                              className="pg-gen-style-dot"
+                              style={{
+                                background: `linear-gradient(135deg, ${matchedStyle.visualSpec.palette.bg} 45%, ${matchedStyle.visualSpec.palette.accent} 45%)`,
+                              }}
+                            />
+                          )}
+                          <span className="pg-gen-doc-rec-name">
+                            #{idx + 1} {rec.title}
+                          </span>
+                          <span className="pg-gen-doc-rec-score">
+                            {rec.score}%
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="pg-gen-doc-recs-actions">
+                    <button
+                      type="button"
+                      id="pg-gen-doc-autogen-btn"
+                      className="pg-btn pg-btn-primary pg-btn-xs"
+                      disabled={generating}
+                      onClick={() =>
+                        handleGenerate(outlineDraft ?? undefined)
+                      }
+                    >
+                      <Sparkles size={12} />
+                      <span>
+                        {generating ? "生成中..." : "按文档生成整套 PPT"}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      id="pg-gen-doc-prompt-btn"
+                      className="pg-btn pg-btn-secondary pg-btn-xs"
+                      onClick={() => setExportModalOpen(true)}
+                    >
+                      <FileCode size={12} />
+                      <span>导出 Marp / 提示词</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Progressive Disclosure Drawer: Subtitle, Audience, Source Text & Custom LLM API */}
+              {advConfigOpen && (
+                <div className="pg-gen-config-grid pg-gen-adv-drawer">
+                  <div className="pg-form pg-form-compact">
+                    <div className="pg-form-2col">
+                      <div className="pg-field">
+                        <label htmlFor="pg-gen-subtitle">副标题</label>
+                        <input
+                          id="pg-gen-subtitle"
+                          type="text"
+                          value={subtitle}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            hasLocalEditsRef.current = true;
+                            setSubtitle(val);
+                            setSlides((prev) =>
+                              prev.map((sl, i) =>
+                                i === 0 && sl.slideType === "cover"
+                                  ? { ...sl, subtitle: val }
+                                  : sl
+                              )
+                            );
+                          }}
+                        />
+                      </div>
+                      <div className="pg-field">
+                        <label htmlFor="pg-gen-audience">目标受众</label>
+                        <input
+                          id="pg-gen-audience"
+                          type="text"
+                          value={audience}
+                          onChange={(e) => {
+                            hasLocalEditsRef.current = true;
+                            setAudience(e.target.value);
+                          }}
+                        />
+                      </div>
+                    </div>
                     <div className="pg-field">
-                      <label>生成引擎模式</label>
+                      <label htmlFor="pg-gen-source">原始素材 / 正文要点（可选）</label>
+                      <textarea
+                        id="pg-gen-source"
+                        rows={3}
+                        value={sourceText}
+                        onChange={(e) => setSourceText(e.target.value)}
+                        placeholder="粘贴会议纪要、PRD、教案或论文摘要，系统自动提炼章节与指标..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pg-gen-engine-box">
+                    <div className="pg-field">
+                      <label>生成引擎</label>
                       <div className="pg-segmented">
                         <button
                           type="button"
@@ -1837,96 +1890,49 @@ export default function GenerateClient({
                       </div>
                     </div>
 
-                    <div className="pg-field">
-                      <label htmlFor="pg-gen-count">
-                        规划页数（{slideCount} 页 · 支持 5–20 页）
-                      </label>
-                      <input
-                        id="pg-gen-count"
-                        type="range"
-                        min={5}
-                        max={20}
-                        value={slideCount}
-                        onChange={(e) => setSlideCount(Number(e.target.value))}
-                        className="pg-range"
-                      />
-                    </div>
-                  </div>
-
-                  {engineMode === "smart" ? (
-                    <p className="pg-tool-desc" style={{ margin: 0 }}>
-                      免配置开箱即用：支持 5–20 页长文档编排与全部 12 种商业页型（图文分栏、SWOT 矩阵、漏斗/环形图、团队页等）。推荐先点「先生成可编辑大纲」确认每页版式，再一键渲染整套 PPT。
-                    </p>
-                  ) : (
-                    <div className="pg-form pg-form-compact">
-                      <div className="pg-form-2col">
-                        <div className="pg-field">
-                          <label htmlFor="pg-llm-base">API Base URL</label>
-                          <input
-                            id="pg-llm-base"
-                            type="text"
-                            value={apiBase}
-                            onChange={(e) => setApiBase(e.target.value)}
-                            placeholder="https://api.deepseek.com/v1"
-                          />
+                    {engineMode === "smart" ? (
+                      <p className="pg-tool-desc" style={{ margin: 0 }}>
+                        开箱即用，支持 5–20 页全 12 种页型编排。
+                      </p>
+                    ) : (
+                      <div className="pg-form pg-form-compact">
+                        <div className="pg-form-2col">
+                          <div className="pg-field">
+                            <label htmlFor="pg-llm-base">API Base URL</label>
+                            <input
+                              id="pg-llm-base"
+                              type="text"
+                              value={apiBase}
+                              onChange={(e) => setApiBase(e.target.value)}
+                              placeholder="https://api.deepseek.com/v1"
+                            />
+                          </div>
+                          <div className="pg-field">
+                            <label htmlFor="pg-llm-model">模型名称</label>
+                            <input
+                              id="pg-llm-model"
+                              type="text"
+                              value={modelName}
+                              onChange={(e) => setModelName(e.target.value)}
+                              placeholder="gpt-4o-mini / deepseek-chat"
+                            />
+                          </div>
                         </div>
                         <div className="pg-field">
-                          <label htmlFor="pg-llm-model">模型名称</label>
+                          <label htmlFor="pg-llm-key">API Key（仅本次转发，不留存）</label>
                           <input
-                            id="pg-llm-model"
-                            type="text"
-                            value={modelName}
-                            onChange={(e) => setModelName(e.target.value)}
-                            placeholder="gpt-4o-mini / deepseek-chat"
+                            id="pg-llm-key"
+                            type="password"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            placeholder="sk-..."
                           />
                         </div>
                       </div>
-                      <div className="pg-field">
-                        <label htmlFor="pg-llm-key">
-                          API Key（仅本次请求转发，绝不入库留存）
-                        </label>
-                        <input
-                          id="pg-llm-key"
-                          type="password"
-                          value={apiKey}
-                          onChange={(e) => setApiKey(e.target.value)}
-                          placeholder="sk-..."
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="pg-gen-action-stack">
-                    <button
-                      type="button"
-                      className="pg-btn pg-btn-secondary"
-                      onClick={handleBuildOutline}
-                      disabled={generatingOutline || generating}
-                      id="pg-gen-outline-btn"
-                    >
-                      <ListOrdered size={15} />
-                      <span>
-                        {generatingOutline ? "正在规划大纲..." : "先生成可编辑大纲"}
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="pg-btn pg-btn-primary"
-                      onClick={() => handleGenerate()}
-                      disabled={generating || generatingOutline}
-                      id="pg-gen-run-btn"
-                    >
-                      <Sparkles size={15} />
-                      <span>
-                        {generating
-                          ? "正在智能编排整套幻灯片..."
-                          : `一键生成 ${slideCount} 页完整 PPT`}
-                      </span>
-                    </button>
+                    )}
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Step 1 Editable Outline Panel */}
               {outlineDraft && (
@@ -1938,7 +1944,7 @@ export default function GenerateClient({
                   onConfirmRender={(draft) => handleGenerate(draft)}
                 />
               )}
-            </>
+            </div>
           )}
         </section>
 
@@ -2015,18 +2021,23 @@ export default function GenerateClient({
               </div>
 
               <div className="pg-stage-canvas-wrap">
-                <SlideCanvas
-                  spec={deckSpec}
-                  slideType={currentSlide.slideType}
-                  topic={title}
-                  subtitle={subtitle}
-                  audience={audience}
-                  slideData={currentSlide}
-                  pageIndex={safeIndex}
-                  totalPages={slides.length}
-                  englishTitle={activeStyle.englishTitle}
-                  scenario={activeStyle.scenario}
-                />
+                <div
+                  className="pg-canvas-motion-slot"
+                  key={`${currentSlide.id}-${currentSlide.slideType}`}
+                >
+                  <SlideCanvas
+                    spec={deckSpec}
+                    slideType={currentSlide.slideType}
+                    topic={title}
+                    subtitle={subtitle}
+                    audience={audience}
+                    slideData={currentSlide}
+                    pageIndex={safeIndex}
+                    totalPages={slides.length}
+                    englishTitle={activeStyle.englishTitle}
+                    scenario={activeStyle.scenario}
+                  />
+                </div>
               </div>
             </div>
 

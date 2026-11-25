@@ -26,10 +26,16 @@ import { analyzeDocumentAndRecommendStyles } from "@/lib/documentAnalyzer";
 import { compilePrompt } from "@/lib/promptCompiler";
 import {
   DOMAIN_TABS,
+  EVIDENCE_DENSITY_LABELS,
+  MATERIAL_KIND_LABELS,
+  SLIDE_TYPE_LABELS,
   TOOL_METADATA,
   type DocumentAnalysisResult,
+  type EvidenceDensity,
+  type GenerationRouteMode,
   type OutlineDraftItem,
   type PromptItem,
+  type SlideType,
   type SourceDocumentDigest,
   type TargetTool,
 } from "@/types/prompt";
@@ -192,6 +198,13 @@ export default function DocIntakeWorkbench({
   );
   const [targetTool, setTargetTool] = useState<TargetTool>("claude-html");
   const [language, setLanguage] = useState<"zh" | "en" | "bilingual">("zh");
+  const [proofSlideMode, setProofSlideMode] = useState<"cover" | "content">("cover");
+  const [routeMode, setRouteMode] = useState<GenerationRouteMode>(
+    () => initialParsed?.analysis.recommendedRouteMode || "restructure"
+  );
+  const [evidenceDensity, setEvidenceDensity] = useState<EvidenceDensity>(
+    () => initialParsed?.analysis.recommendedEvidenceDensity || "balanced"
+  );
   const [copied, setCopied] = useState(false);
 
   // Close on Escape
@@ -212,6 +225,9 @@ export default function DocIntakeWorkbench({
     setAudience(next.analysis.suggestedAudience);
     setSlideCount(next.analysis.suggestedSlideCount);
     setTone(next.analysis.suggestedTone);
+    setRouteMode(next.analysis.recommendedRouteMode || "restructure");
+    setEvidenceDensity(next.analysis.recommendedEvidenceDensity || "balanced");
+    setProofSlideMode("cover");
     const topSlug = next.analysis.recommendedStyles[0]?.slug;
     if (topSlug) {
       setSelectedSlug(topSlug);
@@ -345,11 +361,14 @@ export default function DocIntakeWorkbench({
       fileName: parsed.fileName,
       charCount: parsed.charCount,
       detectedScenario: parsed.analysis.detectedScenario,
+      materialKind: parsed.analysis.materialKind,
+      evidenceDensity,
+      routeMode,
       keyMetrics: parsed.analysis.keyMetrics,
       keySections: parsed.analysis.keySections,
       excerpt: parsed.text.slice(0, 1400),
     };
-  }, [parsed]);
+  }, [parsed, evidenceDensity, routeMode]);
 
   const compiledPrompt = useMemo(() => {
     if (!parsed || !selectedPrompt) return "";
@@ -434,6 +453,8 @@ export default function DocIntakeWorkbench({
       slideCount,
       styleSlug: chosenSlug,
       autoGenerate: true,
+      routeMode,
+      evidenceDensity,
       parsedOutline: parsed.parsedOutline,
       analysis: parsed.analysis,
     });
@@ -489,19 +510,12 @@ export default function DocIntakeWorkbench({
     >
       <div className="pg-intake-modal">
         <AiAmbientAccent variant="panel-corner" />
-        {/* Header */}
+        {/* Minimal Modal Header */}
         <div className="pg-intake-head-row">
           <div>
-            <p className="pg-kicker" style={{ marginBottom: "4px" }}>
-              DROP-A-DOC INTELLIGENT PPT HUB · 资料直通车
-            </p>
             <h2 id="pg-intake-title" className="pg-modal-title">
-              丢入 PDF / Word / TXT，一站式推荐风格 · 生成提示词 · 自动整理 PPT
+              丢入资料 · 推风格 · 出词 · 生成 PPT
             </h2>
-            <p className="pg-modal-sub">
-              自动识别文档场景、提炼关键数字与章节骨架，从 {prompts.length}{" "}
-              套视觉系统中匹配 Top 3 风格，一键直出可编辑 .pptx 或带真实资料的 6 工具提示词。
-            </p>
           </div>
           <button
             type="button"
@@ -528,7 +542,7 @@ export default function DocIntakeWorkbench({
               onClick={() => setInputMode("upload")}
             >
               <FileUp size={13} />
-              <span>上传文档 (.pdf / .docx / .txt / .md / .pptx)</span>
+              <span>上传文档</span>
             </button>
             <button
               type="button"
@@ -541,12 +555,12 @@ export default function DocIntakeWorkbench({
               onClick={() => setInputMode("paste")}
             >
               <FileText size={13} />
-              <span>直接粘贴笔记/大纲</span>
+              <span>粘贴正文</span>
             </button>
           </div>
 
           <div className="pg-intake-samples">
-            <span className="pg-intake-sample-label">快速体验示例资料：</span>
+            <span className="pg-intake-sample-label">示例：</span>
             {SAMPLE_DOCS.map((sample) => (
               <button
                 key={sample.id}
@@ -595,17 +609,19 @@ export default function DocIntakeWorkbench({
             />
             <div className="pg-intake-drop-info">
               <span className="pg-intake-drop-icon">
-                <FileUp size={parsed ? 16 : 20} />
+                <FileUp size={parsed ? 15 : 18} />
               </span>
               <div>
                 <div className="pg-intake-drop-title">
                   {parsed
-                    ? `已解析「${parsed.fileName}」—— 拖拽或点击可随时更换新资料`
-                    : "将 PDF、Word (.docx)、TXT、Markdown 或旧 PPTX 拖到这里"}
+                    ? `已解析「${parsed.fileName}」`
+                    : "拖入 PDF / Word (.docx) / TXT / MD / PPTX"}
                 </div>
-                <div className="pg-intake-drop-sub">
-                  最大支持 10MB · 纯本地与服务端即时解析，不落盘留存您的私有文稿
-                </div>
+                {!parsed && (
+                  <div className="pg-intake-drop-sub">
+                    最大 10MB · 即时解析，不留存私有文稿
+                  </div>
+                )}
               </div>
             </div>
             <button
@@ -615,8 +631,8 @@ export default function DocIntakeWorkbench({
               disabled={parsing}
               onClick={() => fileInputRef.current?.click()}
             >
-              <Upload size={14} />
-              <span>{parsing ? "解析识别中..." : parsed ? "更换文档" : "选择文档"}</span>
+              <Upload size={13} />
+              <span>{parsing ? "解析中..." : parsed ? "更换文档" : "选择文档"}</span>
             </button>
           </div>
         ) : (
@@ -624,13 +640,13 @@ export default function DocIntakeWorkbench({
             <textarea
               id="pg-intake-paste-textarea"
               className="pg-intake-paste-textarea"
-              placeholder="在此粘贴你的论文摘要、教案讲义、项目周报、会议纪要或商业计划书正文，系统将自动识别领域并推荐 Top 3 PPT 风格与专属提示词..."
+              placeholder="粘贴论文摘要、教案、项目周报或商业计划书正文..."
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
             />
             <div className="pg-intake-paste-foot">
               <span style={{ fontSize: "12px", color: "var(--ink-muted)" }}>
-                当前已输入 {pasteText.trim().length} 字
+                {pasteText.trim().length} 字
               </span>
               <button
                 type="button"
@@ -641,7 +657,7 @@ export default function DocIntakeWorkbench({
                 }
               >
                 <Wand2 size={14} />
-                <span>立即智能识别并推荐风格</span>
+                <span>识别并推荐风格</span>
               </button>
             </div>
           </div>
@@ -662,31 +678,39 @@ export default function DocIntakeWorkbench({
         {/* Parsed Results Hub */}
         {parsed && selectedPrompt && (
           <>
-            {/* Analysis Insight Strip */}
+            {/* Compact Analysis Insight Strip + Collapsible Parameter Tweaks */}
             <div className="pg-intake-insight" id="pg-intake-insight-bar">
               <div className="pg-intake-insight-top">
                 <div className="pg-intake-badges">
-                  <span className="pg-intake-file-pill" title={parsed.fileName}>
-                    <FileText size={12} />
-                    <span>
-                      {parsed.fileName.length > 22
-                        ? `${parsed.fileName.slice(0, 20)}…`
-                        : parsed.fileName}
-                      （{parsed.charCount} 字）
-                    </span>
-                  </span>
                   <span
                     className="pg-intake-scene-pill"
                     id="pg-intake-detected-scenario"
                   >
                     <Sparkles size={12} />
                     <span>
-                      场景：{parsed.analysis.detectedScenario}（
-                      {parsed.analysis.confidence}%）
+                      {parsed.analysis.detectedScenario} ·{" "}
+                      {parsed.analysis.confidence}%
                     </span>
                   </span>
-                  <span className="pg-intake-domain-pill">
-                    {parsed.analysis.detectedDomainLabel}
+                  {parsed.analysis.materialKind && (
+                    <span
+                      className="pg-intake-domain-pill"
+                      id="pg-intake-material-kind"
+                      title={
+                        parsed.analysis.materialStrategy ||
+                        MATERIAL_KIND_LABELS[parsed.analysis.materialKind].strategy
+                      }
+                    >
+                      {MATERIAL_KIND_LABELS[parsed.analysis.materialKind].label}
+                    </span>
+                  )}
+                  <span className="pg-intake-file-pill" title={parsed.fileName}>
+                    <span>
+                      {parsed.charCount} 字 · {slideCount} 页
+                      {parsed.analysis.estimatedTalkMinutes
+                        ? ` · 约 ${parsed.analysis.estimatedTalkMinutes} 分钟`
+                        : ""}
+                    </span>
                   </span>
                 </div>
                 <button
@@ -696,61 +720,14 @@ export default function DocIntakeWorkbench({
                   onClick={() => handleAutoGeneratePpt()}
                 >
                   <Sparkles size={14} />
-                  <span>一键自动整理生成整套 PPT (.pptx)</span>
+                  <span>一键生成 PPT</span>
                   <ArrowRight size={14} />
                 </button>
               </div>
 
-              <div className="pg-intake-edit-grid">
-                <div className="pg-intake-field">
-                  <label htmlFor="pg-intake-topic">提炼 PPT 主标题（可改）</label>
-                  <input
-                    id="pg-intake-topic"
-                    type="text"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                  />
-                </div>
-                <div className="pg-intake-field">
-                  <label htmlFor="pg-intake-subtitle">副标题 / 叙事摘要</label>
-                  <input
-                    id="pg-intake-subtitle"
-                    type="text"
-                    value={subtitle}
-                    onChange={(e) => setSubtitle(e.target.value)}
-                  />
-                </div>
-                <div className="pg-intake-field">
-                  <label htmlFor="pg-intake-audience">推荐受众</label>
-                  <input
-                    id="pg-intake-audience"
-                    type="text"
-                    value={audience}
-                    onChange={(e) => setAudience(e.target.value)}
-                  />
-                </div>
-                <div className="pg-intake-field">
-                  <label htmlFor="pg-intake-slide-count">建议页数</label>
-                  <input
-                    id="pg-intake-slide-count"
-                    type="number"
-                    min={5}
-                    max={20}
-                    value={slideCount}
-                    onChange={(e) =>
-                      setSlideCount(
-                        Math.max(5, Math.min(20, Number(e.target.value) || 8))
-                      )
-                    }
-                  />
-                </div>
-              </div>
-
               {parsed.analysis.keyMetrics.length > 0 && (
                 <div className="pg-intake-metrics-row">
-                  <span className="pg-intake-metric-label">
-                    提炼出 {parsed.analysis.keyMetrics.length} 组量化指标：
-                  </span>
+                  <span className="pg-intake-metric-label">核心数据：</span>
                   {parsed.analysis.keyMetrics.map((m, idx) => (
                     <span key={`${m}-${idx}`} className="pg-intake-metric-chip">
                       {m}
@@ -759,12 +736,118 @@ export default function DocIntakeWorkbench({
                 </div>
               )}
 
-              {parsed.analysis.keySections.length > 0 && (
-                <details className="pg-intake-sections-details">
-                  <summary>
-                    查看系统提炼的 {parsed.analysis.keySections.length}{" "}
-                    段核心章节结构（将自动注入 PPT 页面与提示词）
-                  </summary>
+              {/* Compact 3-Item Scenario Contract Pills (Auto-Preselected, Zero Clutter) */}
+              <div className="pg-intake-contract-row" id="pg-intake-contract-row">
+                {parsed.analysis.materialKind === "existing-pptx" && (
+                  <div className="pg-intake-contract-group">
+                    <span className="pg-intake-contract-label">路由：</span>
+                    <div
+                      className="pg-intake-contract-seg"
+                      role="group"
+                      aria-label="旧 PPT 处理路由"
+                    >
+                      <button
+                        type="button"
+                        id="pg-intake-route-beautify"
+                        className={`pg-intake-contract-btn ${
+                          routeMode === "beautify-1to1" ? "is-active" : ""
+                        }`}
+                        onClick={() => setRouteMode("beautify-1to1")}
+                      >
+                        1:1 保词换肤
+                      </button>
+                      <button
+                        type="button"
+                        id="pg-intake-route-restructure"
+                        className={`pg-intake-contract-btn ${
+                          routeMode === "restructure" ? "is-active" : ""
+                        }`}
+                        onClick={() => setRouteMode("restructure")}
+                      >
+                        重构故事
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pg-intake-contract-group">
+                  <span className="pg-intake-contract-label">证据密度：</span>
+                  <div
+                    className="pg-intake-contract-seg"
+                    role="group"
+                    aria-label="证据密度契约"
+                  >
+                    {(
+                      ["light", "balanced", "high-evidence"] as EvidenceDensity[]
+                    ).map((dens) => (
+                      <button
+                        key={dens}
+                        type="button"
+                        id={`pg-intake-density-${dens}`}
+                        className={`pg-intake-contract-btn ${
+                          evidenceDensity === dens ? "is-active" : ""
+                        }`}
+                        title={EVIDENCE_DENSITY_LABELS[dens].label}
+                        onClick={() => setEvidenceDensity(dens)}
+                      >
+                        {EVIDENCE_DENSITY_LABELS[dens].short}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <details className="pg-intake-sections-details">
+                <summary>
+                  微调主题、受众、页数与 {parsed.analysis.keySections.length} 段章节提炼
+                </summary>
+
+                <div className="pg-intake-edit-grid" style={{ marginTop: "10px" }}>
+                  <div className="pg-intake-field">
+                    <label htmlFor="pg-intake-topic">PPT 主标题</label>
+                    <input
+                      id="pg-intake-topic"
+                      type="text"
+                      value={topic}
+                      onChange={(e) => setTopic(e.target.value)}
+                    />
+                  </div>
+                  <div className="pg-intake-field">
+                    <label htmlFor="pg-intake-subtitle">副标题</label>
+                    <input
+                      id="pg-intake-subtitle"
+                      type="text"
+                      value={subtitle}
+                      onChange={(e) => setSubtitle(e.target.value)}
+                    />
+                  </div>
+                  <div className="pg-intake-field">
+                    <label htmlFor="pg-intake-audience">目标受众</label>
+                    <input
+                      id="pg-intake-audience"
+                      type="text"
+                      value={audience}
+                      onChange={(e) => setAudience(e.target.value)}
+                    />
+                  </div>
+                  <div className="pg-intake-field">
+                    <label htmlFor="pg-intake-slide-count">页数</label>
+                    <input
+                      id="pg-intake-slide-count"
+                      type="number"
+                      min={5}
+                      max={20}
+                      value={slideCount}
+                      onChange={(e) =>
+                        setSlideCount(
+                          Math.max(5, Math.min(20, Number(e.target.value) || 8))
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+
+                {parsed.analysis.keySections.length > 0 && (
                   <ul className="pg-intake-sections-list">
                     {parsed.analysis.keySections.map((sec, idx) => (
                       <li key={`${sec.heading}-${idx}`}>
@@ -775,65 +858,118 @@ export default function DocIntakeWorkbench({
                       </li>
                     ))}
                   </ul>
-                </details>
-              )}
+                )}
+              </details>
             </div>
 
-            {/* Section 1: Top 3 Recommended Styles with Live 16:9 Canvas */}
-            <section id="pg-intake-rec-styles">
-              <div className="pg-intake-section-head" style={{ marginBottom: "10px" }}>
-                <h3>
-                  <span className="pg-intake-step-badge">1</span>
-                  <span>
-                    智能推荐最匹配的 Top 3 PPT 视觉风格（点击切换即可实时刷新下方提示词）
-                  </span>
-                </h3>
-                <button
-                  type="button"
-                  id="pg-intake-compare-top3-btn"
-                  className="pg-btn pg-btn-secondary pg-btn-xs"
-                  onClick={handleCompareTop3}
-                >
-                  <Columns3 size={13} />
-                  <span>把 Top 3 送入并排对比台</span>
-                </button>
-              </div>
+            {/* Section 1: Top 3 Recommended Styles with 2-Slide Calibration Proof */}
+            {(() => {
+              const repSlideType: SlideType =
+                parsed.analysis.representativeSlideType || "data";
+              const activeProofType: SlideType =
+                proofSlideMode === "cover" ? "cover" : repSlideType;
+              const repLabel = (
+                SLIDE_TYPE_LABELS[repSlideType]?.label || "内容页"
+              ).replace(/页$/, "");
 
-              <div className="pg-intake-rec-grid">
-                {recommendedEntries.map(({ match, prompt }, idx) => {
-                  const isSelected = prompt.slug === selectedPrompt.slug;
-                  return (
-                    <div
-                      key={prompt.id}
-                      data-style-slug={prompt.slug}
-                      className={`pg-intake-rec-card ${
-                        isSelected ? "is-selected" : ""
-                      }`}
-                      onClick={() => setSelectedSlug(prompt.slug)}
-                    >
-                      <div className="pg-intake-rec-top">
-                        <span className="pg-intake-rank-pill">
-                          {idx === 0 ? "首选推荐 #1" : `推荐 #${idx + 1}`}
-                        </span>
-                        <span className="pg-intake-score-pill">
-                          匹配度 {match.score}%
-                        </span>
+              return (
+                <section id="pg-intake-rec-styles">
+                  <div
+                    className="pg-intake-section-head"
+                    style={{ marginBottom: "10px" }}
+                  >
+                    <h3>
+                      <span className="pg-intake-step-badge">1</span>
+                      <span>推荐风格 Top 3</span>
+                    </h3>
+
+                    <div className="pg-intake-proof-controls">
+                      <div
+                        className="pg-intake-proof-switch"
+                        role="tablist"
+                        aria-label="双样张风格校准切换"
+                      >
+                        <button
+                          type="button"
+                          role="tab"
+                          id="pg-intake-proof-cover"
+                          aria-selected={proofSlideMode === "cover"}
+                          className={`pg-intake-proof-tab ${
+                            proofSlideMode === "cover" ? "is-active" : ""
+                          }`}
+                          onClick={() => setProofSlideMode("cover")}
+                        >
+                          封面样张
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          id="pg-intake-proof-content"
+                          aria-selected={proofSlideMode === "content"}
+                          className={`pg-intake-proof-tab ${
+                            proofSlideMode === "content" ? "is-active" : ""
+                          }`}
+                          onClick={() => setProofSlideMode("content")}
+                        >
+                          {repLabel}样张
+                        </button>
                       </div>
 
-                      <div className="pg-intake-rec-canvas">
-                        <SlideCanvas
-                          spec={prompt.visualSpec}
-                          slideType="cover"
-                          topic={topic || parsed.suggestedTopic}
-                          subtitle={subtitle || parsed.suggestedSubtitle}
-                          englishTitle={prompt.englishTitle}
-                          scenario={prompt.scenario}
-                        />
-                      </div>
+                      <button
+                        type="button"
+                        id="pg-intake-compare-top3-btn"
+                        className="pg-btn pg-btn-secondary pg-btn-xs"
+                        onClick={handleCompareTop3}
+                      >
+                        <Columns3 size={13} />
+                        <span>对比 Top 3</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pg-intake-rec-grid">
+                    {recommendedEntries.map(({ match, prompt }, idx) => {
+                      const isSelected = prompt.slug === selectedPrompt.slug;
+                      return (
+                        <div
+                          key={prompt.id}
+                          data-style-slug={prompt.slug}
+                          className={`pg-intake-rec-card ${
+                            isSelected ? "is-selected" : ""
+                          }`}
+                          onClick={() => setSelectedSlug(prompt.slug)}
+                        >
+                          <div className="pg-intake-rec-top">
+                            <span className="pg-intake-rank-pill">
+                              {idx === 0 ? "首选 #1" : `推荐 #${idx + 1}`}
+                            </span>
+                            <span className="pg-intake-score-pill">
+                              {match.score}%
+                            </span>
+                          </div>
+
+                          <div className="pg-intake-rec-canvas">
+                            <div
+                              className="pg-canvas-motion-slot"
+                              key={`${prompt.id}-${activeProofType}`}
+                            >
+                              <SlideCanvas
+                                spec={prompt.visualSpec}
+                                slideType={activeProofType}
+                                topic={topic || parsed.suggestedTopic}
+                                subtitle={subtitle || parsed.suggestedSubtitle}
+                                englishTitle={prompt.englishTitle}
+                                scenario={prompt.scenario}
+                              />
+                            </div>
+                          </div>
 
                       <h4 className="pg-intake-rec-title">{prompt.title}</h4>
-                      <p className="pg-intake-rec-reason">
-                        {match.reasons.join(" · ")}
+                      <p
+                        className="pg-intake-rec-reason"
+                        title={match.reasons.join(" · ")}
+                      >
+                        {match.reasons[0] || prompt.scenario}
                       </p>
 
                       <div className="pg-intake-rec-actions">
@@ -850,10 +986,10 @@ export default function DocIntakeWorkbench({
                           {isSelected ? (
                             <>
                               <Check size={12} />
-                              <span>已选中出词</span>
+                              <span>已选中</span>
                             </>
                           ) : (
-                            <span>选用此风格</span>
+                            <span>选用</span>
                           )}
                         </button>
                         <button
@@ -865,14 +1001,16 @@ export default function DocIntakeWorkbench({
                           }}
                         >
                           <Sparkles size={12} />
-                          <span>直接生成 PPT</span>
+                          <span>生成 PPT</span>
                         </button>
                       </div>
                     </div>
                   );
                 })}
-              </div>
-            </section>
+                  </div>
+                </section>
+              );
+            })()}
 
             {/* Section 2: Document-Enriched 6-Tool Prompt Compiler */}
             <section
@@ -882,9 +1020,7 @@ export default function DocIntakeWorkbench({
               <div className="pg-intake-section-head">
                 <h3>
                   <span className="pg-intake-step-badge">2</span>
-                  <span>
-                    融合源文档素材的专属提示词（当前风格：{selectedPrompt.title}）
-                  </span>
+                  <span>融合提示词 · {selectedPrompt.title}</span>
                 </h3>
 
                 <div className="pg-intake-prompt-controls">
@@ -918,9 +1054,9 @@ export default function DocIntakeWorkbench({
                       setLanguage(e.target.value as "zh" | "en" | "bilingual")
                     }
                   >
-                    <option value="zh">全中文演示</option>
+                    <option value="zh">全中文</option>
                     <option value="bilingual">中英双语</option>
-                    <option value="en">全英文演示</option>
+                    <option value="en">English</option>
                   </select>
                 </div>
               </div>
@@ -954,7 +1090,7 @@ export default function DocIntakeWorkbench({
                 className="pg-intake-compiled-textarea"
                 readOnly
                 value={compiledPrompt}
-                rows={11}
+                rows={9}
               />
 
               <div className="pg-intake-footer">
@@ -963,10 +1099,8 @@ export default function DocIntakeWorkbench({
                     size={13}
                     style={{ verticalAlign: "-2px", marginRight: "5px" }}
                   />
-                  共 {compiledPrompt.length} 字符 · 已自动嵌入源文档{" "}
-                  {parsed.analysis.keySections.length} 段章节、
-                  {parsed.analysis.keyMetrics.length} 组数字与「
-                  {parsed.analysis.detectedScenario}」领域防幻觉护栏
+                  {compiledPrompt.length} 字符 · 含 {parsed.analysis.keySections.length} 章节与{" "}
+                  {parsed.analysis.keyMetrics.length} 组数据
                 </span>
 
                 <div className="pg-btn-group">
@@ -975,7 +1109,7 @@ export default function DocIntakeWorkbench({
                     className="pg-btn pg-btn-ghost pg-btn-sm"
                     onClick={onClose}
                   >
-                    <span>工作室微调色板</span>
+                    <span>工作室</span>
                     <ArrowUpRight size={14} />
                   </Link>
                   <button
@@ -985,7 +1119,7 @@ export default function DocIntakeWorkbench({
                     onClick={handleDownloadPrompt}
                   >
                     <Download size={14} />
-                    <span>下载 .md</span>
+                    <span>.md</span>
                   </button>
                   <button
                     type="button"
@@ -996,8 +1130,8 @@ export default function DocIntakeWorkbench({
                     {copied ? <Check size={14} /> : <Copy size={14} />}
                     <span>
                       {copied
-                        ? "已复制融合提示词"
-                        : `一键复制 ${TOOL_METADATA[targetTool].shortName} 提示词`}
+                        ? "已复制"
+                        : `复制 ${TOOL_METADATA[targetTool].shortName} 提示词`}
                     </span>
                   </button>
                 </div>

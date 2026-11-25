@@ -312,12 +312,26 @@ export function sanitizeOutlineItems(
         : `${String(idx).padStart(2, "0")} / ${slideType.toUpperCase()}`);
     const title = toSafeString(item.title) || `${fallbackTopic} · 第 ${idx + 1} 页`;
     const summary = toSafeString(item.summary) || "";
+    const audienceQuestion = toSafeString(item.audienceQuestion);
+    const contentRelation = toSafeString(item.contentRelation);
+    const rawStatus = toSafeString(item.sourceStatus);
+    const validStatuses = new Set([
+      "source-material",
+      "derived-calc",
+      "placeholder",
+      "needs-verify",
+    ]);
     return {
       id,
       slideType,
       sectionTag,
       title,
       summary,
+      ...(audienceQuestion ? { audienceQuestion } : {}),
+      ...(contentRelation ? { contentRelation } : {}),
+      ...(rawStatus && validStatuses.has(rawStatus)
+        ? { sourceStatus: rawStatus as OutlineDraftItem["sourceStatus"] }
+        : {}),
     };
   });
 }
@@ -464,6 +478,25 @@ export function sanitizeLlmSlide(
 
   const speakerNotes = toSafeString(raw.speakerNotes);
   if (speakerNotes) slide.speakerNotes = speakerNotes;
+
+  const audienceQuestion = toSafeString(raw.audienceQuestion);
+  if (audienceQuestion) slide.audienceQuestion = audienceQuestion;
+
+  const contentRelation = toSafeString(raw.contentRelation);
+  if (contentRelation) slide.contentRelation = contentRelation;
+
+  const sourceNote = toSafeString(raw.sourceNote);
+  if (sourceNote) slide.sourceNote = sourceNote;
+
+  const rawStatus = toSafeString(raw.sourceStatus);
+  if (
+    rawStatus === "source-material" ||
+    rawStatus === "derived-calc" ||
+    rawStatus === "placeholder" ||
+    rawStatus === "needs-verify"
+  ) {
+    slide.sourceStatus = rawStatus;
+  }
 
   return slide;
 }

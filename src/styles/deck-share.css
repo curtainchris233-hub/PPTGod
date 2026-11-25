@@ -96,7 +96,13 @@
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+  transition: background var(--dur-fast) var(--ease-apple),
+    border-color var(--dur-fast) var(--ease-apple),
+    transform var(--dur-micro) var(--ease-out-swift);
+}
+
+.pg-share-btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .pg-share-btn:hover {
@@ -157,7 +163,13 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.15s ease, opacity 0.15s ease;
+  transition: background var(--dur-fast) var(--ease-apple),
+    opacity var(--dur-fast) var(--ease-apple),
+    transform var(--dur-micro) var(--ease-out-swift);
+}
+
+.pg-share-nav-arrow:active:not(:disabled) {
+  transform: scale(0.94);
 }
 
 .pg-share-nav-arrow:hover:not(:disabled) {
@@ -186,6 +198,7 @@
   border-left: 3px solid #3b82f6;
   border-radius: 8px;
   padding: 14px 18px;
+  animation: pgDrawerReveal var(--dur-base) var(--ease-apple) both;
 }
 
 .pg-share-notes-head {
@@ -237,7 +250,14 @@
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition: background var(--dur-fast) var(--ease-apple),
+    color var(--dur-fast) var(--ease-apple),
+    border-color var(--dur-fast) var(--ease-apple),
+    transform var(--dur-micro) var(--ease-out-swift);
+}
+
+.pg-share-pill:active {
+  transform: scale(0.97);
 }
 
 .pg-share-pill:hover {
@@ -280,6 +300,7 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  animation: pgDrawerReveal var(--dur-base) var(--ease-apple) both;
 }
 
 .pg-rehearsal-card {
@@ -325,11 +346,13 @@
 
 .pg-rehearsal-clock {
   font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
   font-size: 36px;
   font-weight: 700;
   letter-spacing: 0.04em;
   line-height: 1.08;
   color: #ffffff;
+  transition: color var(--dur-fast) var(--ease-apple);
 }
 
 .pg-rehearsal-clock.is-warning {
@@ -352,7 +375,8 @@
   height: 100%;
   background: #22c55e;
   border-radius: 999px;
-  transition: width 0.25s ease;
+  transition: width var(--dur-base) var(--ease-apple),
+    background var(--dur-fast) var(--ease-apple);
 }
 
 .pg-rehearsal-progress-fill.is-warning {
@@ -367,6 +391,7 @@
   margin: 0;
   font-size: 11.5px;
   color: rgba(245, 242, 235, 0.65);
+  font-variant-numeric: tabular-nums;
 }
 
 .pg-rehearsal-presets {
@@ -384,7 +409,14 @@
   padding: 3px 8px;
   border-radius: 5px;
   cursor: pointer;
-  transition: all 0.14s ease;
+  transition: background var(--dur-fast) var(--ease-apple),
+    color var(--dur-fast) var(--ease-apple),
+    border-color var(--dur-fast) var(--ease-apple),
+    transform var(--dur-micro) var(--ease-out-swift);
+}
+
+.pg-rehearsal-preset-btn:active {
+  transform: scale(0.96);
 }
 
 .pg-rehearsal-preset-btn:hover {
@@ -420,12 +452,13 @@
   overflow: hidden;
   background: transparent;
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: border-color var(--dur-fast) var(--ease-apple),
+    transform var(--dur-fast) var(--ease-apple);
 }
 
 .pg-rehearsal-next-canvas-btn:hover {
   border-color: #3b82f6;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .pg-rehearsal-next-canvas {

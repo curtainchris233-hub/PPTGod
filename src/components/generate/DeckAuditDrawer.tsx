@@ -68,9 +68,10 @@ export default function DeckAuditDrawer({
           className={`pg-btn pg-btn-ghost pg-btn-xs ${open ? "is-open" : ""}`}
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
+          title="展开整套 PPT 智能体检与一键修复"
         >
-          <ShieldCheck size={14} />
-          <span>整套 PPT 智能体检</span>
+          <ShieldCheck size={13} />
+          <span>智能体检</span>
         </button>
 
         <div className="pg-audit-bar-metrics">
@@ -79,17 +80,17 @@ export default function DeckAuditDrawer({
             className={`pg-audit-score-pill ${scoreTone}`}
             data-score={report.score}
           >
-            质量评分 {report.score}/100 ({report.grade})
+            {report.score} 分 ({report.grade})
           </span>
           <span className="pg-audit-meta-chip" title="按中文 210 字/分钟估算演示时长">
             <Clock size={12} />
-            <span>预计 {report.estimatedMinutes} 分钟</span>
+            <span>{report.estimatedMinutes}m</span>
           </span>
-          <span className="pg-audit-meta-chip">
-            {report.issues.length === 0
-              ? "全部通过"
-              : `${report.issues.length} 项待优化`}
-          </span>
+          {report.issues.length > 0 && (
+            <span className="pg-audit-meta-chip">
+              {report.issues.length} 项待优化
+            </span>
+          )}
         </div>
       </div>
 

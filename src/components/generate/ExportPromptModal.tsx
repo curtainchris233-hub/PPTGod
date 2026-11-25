@@ -2,13 +2,14 @@
 
 import React, { useMemo, useState } from "react";
 import { Check, Copy, Download, FileCode, X } from "lucide-react";
+import { exportOutlineAndEvidenceMarkdown } from "@/lib/deckGenerator";
 import {
   compileDeckToMarpMarkdown,
   compileRealDeckPrompt,
 } from "@/lib/promptCompiler";
 import type { DeckSlideItem, VisualSpec } from "@/types/prompt";
 
-type ExportMode = "marp" | "claude-html" | "gamma-kimi";
+type ExportMode = "marp" | "claude-html" | "gamma-kimi" | "evidence-outline";
 
 interface ExportPromptModalProps {
   open: boolean;
@@ -41,8 +42,26 @@ export default function ExportPromptModal({
     if (mode === "marp") {
       return compileDeckToMarpMarkdown(baseOpts);
     }
+    if (mode === "evidence-outline") {
+      return exportOutlineAndEvidenceMarkdown({
+        title,
+        subtitle,
+        audience,
+        styleName,
+        slides,
+      });
+    }
     return compileRealDeckPrompt({ ...baseOpts, target: mode });
   }, [mode, title, subtitle, audience, styleName, spec, slides]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -53,6 +72,8 @@ export default function ExportPromptModal({
       onNotify(
         mode === "marp"
           ? "已复制可运行 Marp / Slidev Markdown 全文"
+          : mode === "evidence-outline"
+          ? "已复制演讲提纲与来源/假设核验清单"
           : "已复制真实文稿精准 AI 提示词",
         "success"
       );
@@ -63,7 +84,12 @@ export default function ExportPromptModal({
   };
 
   const handleDownload = () => {
-    const ext = mode === "marp" ? "marp.md" : `${mode}-prompt.md`;
+    const ext =
+      mode === "marp"
+        ? "marp.md"
+        : mode === "evidence-outline"
+        ? "speaker-outline.md"
+        : `${mode}-prompt.md`;
     const safeName = (title || "pptgod-deck")
       .replace(/[\\/:*?"<>|]+/g, "-")
       .slice(0, 36);
@@ -97,7 +123,7 @@ export default function ExportPromptModal({
             <FileCode size={16} style={{ color: "var(--accent)" }} />
             <div>
               <h3 style={{ margin: 0, fontSize: "15px" }}>
-                真实文稿一键导出（Marp Markdown / AI 精准提示词）
+                导出源码、提示词与演讲提纲
               </h3>
               <p
                 style={{
@@ -106,8 +132,7 @@ export default function ExportPromptModal({
                   color: "var(--ink-muted)",
                 }}
               >
-                基于当前已编辑的 {slides.length} 页真实标题、KPI 数值、讲稿备注与
-                VisualSpec 色卡实时编译
+                同步编译当前 {slides.length} 页真实文稿、色卡 Token 与来源清单
               </p>
             </div>
           </div>
@@ -131,7 +156,7 @@ export default function ExportPromptModal({
             className={`pg-mini-pill ${mode === "marp" ? "is-active" : ""}`}
             onClick={() => setMode("marp")}
           >
-            Marp / Slidev 可运行源码 (.md)
+            Marp / Slidev (.md)
           </button>
           <button
             type="button"
@@ -143,7 +168,7 @@ export default function ExportPromptModal({
             }`}
             onClick={() => setMode("claude-html")}
           >
-            Claude HTML 真实文稿提示词
+            Claude HTML 提示词
           </button>
           <button
             type="button"
@@ -155,7 +180,19 @@ export default function ExportPromptModal({
             }`}
             onClick={() => setMode("gamma-kimi")}
           >
-            Gamma / Kimi 定稿导入指令
+            Gamma / Kimi 指令
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="pg-export-tab-outline"
+            aria-selected={mode === "evidence-outline"}
+            className={`pg-mini-pill ${
+              mode === "evidence-outline" ? "is-active" : ""
+            }`}
+            onClick={() => setMode("evidence-outline")}
+          >
+            演讲提纲 &amp; 来源清单
           </button>
         </div>
 
@@ -169,7 +206,7 @@ export default function ExportPromptModal({
 
         <div className="pg-export-modal-foot">
           <span style={{ fontSize: "12px", color: "var(--ink-muted)" }}>
-            共 {outputText.length} 字符 · 含 {slides.length} 页完整结构与色卡 Token
+            {outputText.length} 字符 · {slides.length} 页
           </span>
           <div className="pg-btn-group">
             <button
@@ -188,7 +225,7 @@ export default function ExportPromptModal({
               onClick={handleCopy}
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copied ? "已复制全文" : "一键复制全文"}</span>
+              <span>{copied ? "已复制" : "复制全文"}</span>
             </button>
           </div>
         </div>

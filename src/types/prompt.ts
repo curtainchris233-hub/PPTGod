@@ -187,6 +187,89 @@ export interface PromptComment {
   createdAt: string;
 }
 
+export type MaterialKind =
+  | "topic-only"
+  | "rough-outline"
+  | "full-document"
+  | "scattered-notes"
+  | "existing-pptx"
+  | "data-table";
+
+export type EvidenceDensity = "light" | "balanced" | "high-evidence";
+
+export type GenerationRouteMode = "restructure" | "beautify-1to1";
+
+export type SlideSourceStatus =
+  | "source-material"
+  | "derived-calc"
+  | "placeholder"
+  | "needs-verify";
+
+export const MATERIAL_KIND_LABELS: Record<
+  MaterialKind,
+  { label: string; strategy: string }
+> = {
+  "topic-only": {
+    label: "主题起草",
+    strategy: "按场景结构补齐主线与听众问题链，未提供数据将标注为模拟假设",
+  },
+  "rough-outline": {
+    label: "粗略大纲",
+    strategy: "将章节标题转化为结论句与听众问题，保留原逻辑顺序",
+  },
+  "full-document": {
+    label: "完整文档",
+    strategy: "从阅读结构提炼为口头汇报节奏，1:1 保留原始量化数据与章节",
+  },
+  "scattered-notes": {
+    label: "散乱素材",
+    strategy: "自动归类事实证据、观点与待办行动，清理碎片重复项",
+  },
+  "existing-pptx": {
+    label: "旧 PPT 翻新",
+    strategy: "支持「1:1 保词换肤」锁定原措辞，或切换「重构故事」优化结构",
+  },
+  "data-table": {
+    label: "数据报表",
+    strategy: "优先采用图表与对照矩阵承载核心指标，强调异常归因与决策建议",
+  },
+};
+
+export const EVIDENCE_DENSITY_LABELS: Record<
+  EvidenceDensity,
+  { label: string; short: string }
+> = {
+  light: { label: "轻巧讲解", short: "低认知负担" },
+  balanced: { label: "均衡汇报", short: "观点与数据均衡" },
+  "high-evidence": { label: "高证据答辩", short: "严谨证据溯源" },
+};
+
+export const SOURCE_STATUS_LABELS: Record<
+  SlideSourceStatus,
+  { label: string; short: string; tone: "verified" | "calc" | "draft" | "warn" }
+> = {
+  "source-material": {
+    label: "来自源材料",
+    short: "源文实据",
+    tone: "verified",
+  },
+  "derived-calc": {
+    label: "数据推算",
+    short: "推算汇总",
+    tone: "calc",
+  },
+  placeholder: {
+    label: "模拟假设",
+    short: "示例占位",
+    tone: "draft",
+  },
+  "needs-verify": {
+    label: "待核验",
+    short: "待核验",
+    tone: "warn",
+  },
+};
+
 export interface SourceDocumentSection {
   heading: string;
   summary: string;
@@ -194,7 +277,11 @@ export interface SourceDocumentSection {
 
 export interface SourceDocumentDigest {
   fileName?: string;
+  charCount?: number;
   detectedScenario?: string;
+  materialKind?: MaterialKind;
+  evidenceDensity?: EvidenceDensity;
+  routeMode?: GenerationRouteMode;
   keyMetrics?: string[];
   keySections?: SourceDocumentSection[];
   excerpt?: string;
@@ -219,6 +306,13 @@ export interface DocumentAnalysisResult {
   suggestedAudience: string;
   suggestedSlideCount: number;
   suggestedTone: "executive" | "storytelling" | "analytical" | "inspiring";
+  /** v8: 6-type material triage & evidence-first metadata (auto-inferred) */
+  materialKind?: MaterialKind;
+  materialStrategy?: string;
+  recommendedEvidenceDensity?: EvidenceDensity;
+  recommendedRouteMode?: GenerationRouteMode;
+  estimatedTalkMinutes?: number;
+  representativeSlideType?: SlideType;
   keyMetrics: string[];
   keySections: SourceDocumentSection[];
   recommendedStyles: RecommendedStyleMatch[];
@@ -310,6 +404,11 @@ export interface DeckSlideItem {
   quoteText?: string;
   quoteAuthor?: string;
   speakerNotes?: string;
+  /** v8: Evidence-first & storyline metadata (all optional, backward-compatible) */
+  audienceQuestion?: string;
+  contentRelation?: string;
+  sourceStatus?: SlideSourceStatus;
+  sourceNote?: string;
 }
 
 export interface OutlineDraftItem {
@@ -318,6 +417,9 @@ export interface OutlineDraftItem {
   sectionTag: string;
   title: string;
   summary: string;
+  audienceQuestion?: string;
+  contentRelation?: string;
+  sourceStatus?: SlideSourceStatus;
 }
 
 export interface SavedDeck {

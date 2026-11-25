@@ -183,25 +183,31 @@ export default function PromptCard({
   };
 
   return (
-    <article className="pg-card" data-prompt-slug={prompt.slug}>
-      {/* Interactive 16:9 Artboard Preview */}
+    <article
+      className="pg-card pg-card--minimal"
+      data-prompt-slug={prompt.slug}
+      title={prompt.summary}
+    >
+      {/* Interactive 16:9 Artboard Preview (~78% visual focus) */}
       <div className="pg-card-stage-wrap">
         <Link
           href={`/studio/${prompt.slug}`}
           className="pg-card-canvas-link"
           aria-label={`进入 ${prompt.title} 提示词工作室`}
         >
-          <SlideCanvas
-            spec={prompt.visualSpec}
-            slideType={slideType}
-            topic={effectiveTopic}
-            subtitle={prompt.sampleSubtitle}
-            englishTitle={prompt.englishTitle}
-            scenario={prompt.scenario}
-          />
+          <div className="pg-canvas-motion-slot" key={slideType}>
+            <SlideCanvas
+              spec={prompt.visualSpec}
+              slideType={slideType}
+              topic={effectiveTopic}
+              subtitle={prompt.sampleSubtitle}
+              englishTitle={prompt.englishTitle}
+              scenario={prompt.scenario}
+            />
+          </div>
         </Link>
 
-        {/* Inline 5-page switcher bar + compact selector for remaining 7 v3/v4 commercial slide types */}
+        {/* Whisper-quiet 5-page micro switcher + 7 more commercial slide types */}
         <div className="pg-card-slide-bar">
           <div
             className="pg-card-slide-tabs"
@@ -217,7 +223,7 @@ export default function PromptCard({
                 className={`pg-slide-tab ${slideType === st ? "is-active" : ""}`}
                 onClick={() => setSlideType(st)}
               >
-                {SLIDE_TYPE_LABELS[st].label}
+                {SLIDE_TYPE_LABELS[st].label.replace(/页$/, "")}
               </button>
             ))}
           </div>
@@ -247,41 +253,12 @@ export default function PromptCard({
         </div>
       </div>
 
-      {/* Card Meta Body */}
+      {/* Minimal 2-Line Gallery Footer (Pitch / Framer Style) */}
       <div className="pg-card-body">
         <div className="pg-card-head">
-          <div className="pg-card-titles">
-            <Link href={`/studio/${prompt.slug}`} className="pg-card-title">
-              {prompt.title}
-            </Link>
-            <div className="pg-card-meta-row">
-              {!prompt.isPublic && (
-                <span className="pg-tag pg-tag-private" title="仅作者本人可见">
-                  <Lock size={10} />
-                  <span>仅自己可见</span>
-                </span>
-              )}
-              <span className="pg-tag pg-tag-scenario">{prompt.scenario}</span>
-              <span className="pg-tag">{prompt.styleCategory}</span>
-              {prompt.remixedFrom && (
-                <span
-                  className="pg-tag pg-tag-remix"
-                  title={`改编自 ${prompt.remixedFrom.title}`}
-                >
-                  <GitFork size={10} />
-                  <span>二创</span>
-                </span>
-              )}
-              <Link
-                href={`/creator/${prompt.author.username}`}
-                className="pg-meta-author pg-meta-author-link"
-              >
-                {prompt.isOfficial
-                  ? `官方 · ${prompt.author.displayName}`
-                  : `by ${prompt.author.displayName}`}
-              </Link>
-            </div>
-          </div>
+          <Link href={`/studio/${prompt.slug}`} className="pg-card-title">
+            {prompt.title}
+          </Link>
 
           <div className="pg-swatches" title="配色系统色板">
             {[
@@ -300,19 +277,46 @@ export default function PromptCard({
           </div>
         </div>
 
-        <p className="pg-card-summary">{prompt.summary}</p>
-
-        {/* Actions */}
         <div className="pg-card-footer">
-          <div className="pg-card-stats">
+          <div className="pg-card-meta-row">
+            {!prompt.isPublic && (
+              <span className="pg-tag pg-tag-private" title="仅作者本人可见">
+                <Lock size={10} />
+                <span>私有</span>
+              </span>
+            )}
+            <span className="pg-tag pg-tag-scenario">{prompt.scenario}</span>
+            {prompt.remixedFrom && (
+              <span
+                className="pg-tag pg-tag-remix"
+                title={`改编自 ${prompt.remixedFrom.title}`}
+              >
+                <GitFork size={10} />
+              </span>
+            )}
+            <Link
+              href={`/creator/${prompt.author.username}`}
+              className="pg-meta-author pg-meta-author-link"
+              title={
+                prompt.isOfficial
+                  ? `官方 · ${prompt.author.displayName}`
+                  : prompt.author.displayName
+              }
+            >
+              {prompt.author.displayName}
+            </Link>
+          </div>
+
+          <div className="pg-card-actions-compact">
             <button
               type="button"
               className={`pg-stat-btn ${prompt.likedByMe ? "is-liked" : ""}`}
               onClick={handleLike}
               title="点赞"
+              aria-label="点赞"
             >
               <Heart
-                size={14}
+                size={13}
                 fill={prompt.likedByMe ? "currentColor" : "none"}
               />
               <span>{prompt.likesCount}</span>
@@ -320,32 +324,56 @@ export default function PromptCard({
 
             <button
               type="button"
-              className={`pg-stat-btn ${isFavorited ? "is-saved" : ""}`}
+              className={`pg-stat-btn pg-stat-btn--icon ${
+                isFavorited ? "is-saved" : ""
+              }`}
               onClick={handleFavorite}
               title={isFavorited ? "取消收藏" : "收藏"}
+              aria-label={isFavorited ? "取消收藏" : "收藏"}
             >
               <Bookmark
-                size={14}
+                size={13}
                 fill={isFavorited ? "currentColor" : "none"}
               />
-              <span>{prompt.savesCount}</span>
             </button>
 
             <button
               type="button"
-              className={`pg-stat-btn ${isCompared ? "is-compared" : ""}`}
+              className={`pg-stat-btn pg-stat-btn--icon ${
+                isCompared ? "is-compared" : ""
+              }`}
               onClick={() => toggleCompare(prompt.id, prompt.title)}
-              title="加入风格并排对比"
+              title={isCompared ? "移出风格对比" : "加入风格并排对比"}
+              aria-label={isCompared ? "已对比" : "对比"}
             >
-              <Columns2 size={14} />
-              <span>{isCompared ? "已对比" : "对比"}</span>
+              <Columns2 size={13} />
             </button>
+
+            <button
+              type="button"
+              className="pg-stat-btn pg-stat-btn--icon"
+              onClick={handleQuickCopy}
+              title="直接复制推荐工具提示词"
+              aria-label="复制提示词"
+            >
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+            </button>
+
+            <Link
+              href={generateHref}
+              className="pg-stat-btn pg-stat-btn--icon"
+              title="用此风格在线生成整套 PPT"
+              aria-label="生成 PPT"
+            >
+              <Sparkles size={13} />
+            </Link>
 
             {showEdit && isOwner && (
               <Link
                 href={`/create?edit=${encodeURIComponent(prompt.slug)}`}
-                className="pg-stat-btn"
+                className="pg-stat-btn pg-stat-btn--icon"
                 title="编辑此模板"
+                aria-label="编辑模板"
               >
                 <Pencil size={13} />
               </Link>
@@ -354,41 +382,22 @@ export default function PromptCard({
             {showDelete && isOwner && (
               <button
                 type="button"
-                className="pg-stat-btn pg-stat-btn-danger"
+                className="pg-stat-btn pg-stat-btn--icon pg-stat-btn-danger"
                 onClick={handleDelete}
                 title="删除此模板"
+                aria-label="删除模板"
               >
-                <Trash2 size={14} />
+                <Trash2 size={13} />
               </button>
             )}
-          </div>
-
-          <div className="pg-card-ctas">
-            <button
-              type="button"
-              className="pg-btn pg-btn-ghost pg-btn-xs"
-              onClick={handleQuickCopy}
-              title="直接复制推荐工具提示词"
-            >
-              {copied ? <Check size={13} /> : <Copy size={13} />}
-              <span>{copied ? "已复制" : "复制"}</span>
-            </button>
-
-            <Link
-              href={generateHref}
-              className="pg-btn pg-btn-secondary pg-btn-xs"
-              title="用此风格站内在线生成整套 PPT"
-            >
-              <Sparkles size={12} />
-              <span>生成 PPT</span>
-            </Link>
 
             <Link
               href={`/studio/${prompt.slug}`}
-              className="pg-btn pg-btn-ink pg-btn-xs"
+              className="pg-btn pg-btn-ink pg-btn-xs pg-card-open-btn"
+              title="进入提示词工作室定制"
             >
               <span>定制</span>
-              <ArrowUpRight size={13} />
+              <ArrowUpRight size={12} />
             </Link>
           </div>
         </div>

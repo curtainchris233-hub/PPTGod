@@ -113,6 +113,7 @@ export async function POST(request: Request) {
         const analysis = analyzeDocumentAndRecommendStyles({
           text: parsed.text,
           fileName,
+          fileType: "pptx",
           suggestedTopic: parsed.suggestedTopic,
           suggestedSubtitle: parsed.suggestedSubtitle,
           styles: catalogStyles,
@@ -186,6 +187,7 @@ export async function POST(request: Request) {
     const analysis = analyzeDocumentAndRecommendStyles({
       text: cleanText.slice(0, 16000),
       fileName,
+      fileType: ext,
       suggestedTopic,
       suggestedSubtitle,
       styles: catalogStyles,

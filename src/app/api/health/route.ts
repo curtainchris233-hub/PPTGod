@@ -14,7 +14,7 @@ export async function GET() {
     return NextResponse.json(
       {
         status: "ok",
-        version: "7.0.0",
+        version: "8.0.0",
         catalogCount: Number(row?.cnt ?? 0),
         dbMode: String(modeRow || "wal").toLowerCase(),
         timestamp: new Date().toISOString(),

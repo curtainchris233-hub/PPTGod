@@ -223,6 +223,15 @@ function AuthFormBody({ initialTab, onClose }: AuthFormBodyProps) {
 export default function AuthModal() {
   const { authModalOpen, authModalTab, closeAuthModal } = useApp();
 
+  React.useEffect(() => {
+    if (!authModalOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeAuthModal();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [authModalOpen, closeAuthModal]);
+
   if (!authModalOpen) return null;
 
   return (

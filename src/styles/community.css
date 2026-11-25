@@ -18,7 +18,13 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  transition: border-color 0.14s ease, background 0.14s ease;
+  transition: border-color var(--dur-fast) var(--ease-apple),
+    background var(--dur-fast) var(--ease-apple),
+    transform var(--dur-micro) var(--ease-out-swift);
+}
+
+.pg-visibility-card:active {
+  transform: scale(0.985);
 }
 
 .pg-visibility-card-head {
@@ -77,6 +83,13 @@
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-xs);
+  transition: transform var(--dur-base) var(--ease-apple),
+    box-shadow var(--dur-base) var(--ease-apple);
+}
+
+.pg-deck-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
 }
 
 .pg-deck-thumb-wrap {

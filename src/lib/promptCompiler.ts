@@ -305,6 +305,20 @@ export function compilePrompt(
     if (digest.fileName) {
       sourceBlocks.push(`- **源文档文件**：${digest.fileName}`);
     }
+    if (digest.routeMode === "beautify-1to1") {
+      sourceBlocks.push(
+        `- **改版模式（1:1 保词换肤）**：严格保留原 PPT 页数、页序与核心业务措辞，仅重构视觉版式、排版层级与母版配色，不得擅自删改事实结论。`
+      );
+    }
+    if (digest.evidenceDensity) {
+      const densHint =
+        digest.evidenceDensity === "high-evidence"
+          ? "高证据答辩模式：每页结论必须附带源材料数据、实验/业务出处或明确标注 [待核验]，绝不编造数字或 DOI。"
+          : digest.evidenceDensity === "light"
+          ? "轻巧讲解模式：大幅精简正文词数，突出视觉焦点与口语提词节奏。"
+          : "均衡模式：核心观点与关键量化论据并重，保持呼吸感留白。";
+      sourceBlocks.push(`- **证据密度与来源责任**：${densHint}`);
+    }
     if (digest.keyMetrics && digest.keyMetrics.length > 0) {
       sourceBlocks.push(
         `- **必须保留的关键事实与量化数据**：\n${digest.keyMetrics
@@ -615,48 +629,48 @@ COLOR_BORDER = RGBColor(${borderRgb[0]}, ${borderRgb[1]}, ${borderRgb[2]})    # 
             { code: "P06", st: "closing", heading: outline[3]?.chapter || "总结与行动路线" },
           ];
 
-    return `【AI 整套连贯 PPT 分页生图词包（${batchCount} 页版）· 适配即梦 / Nano Banana / Midjourney】
+    return `【AI 整套连贯 PPT 分页生图词包（${batchCount} 页版）· 视觉导演 v2 · 适配即梦 / Nano Banana / GPT Image】
 风格锁定：**${prompt.title}（${prompt.englishTitle}）**
 全局统一色卡：底色 ${palette.bg} ｜ 表面 ${palette.surface} ｜ 文字 ${palette.text} ｜ 强调 ${palette.accent} ｜ 图表 ${chartColors.join("、")}
-使用技巧：按顺序逐条发送给生图工具，即可获得画风 100% 统一的 ${batchCount} 页完整视觉幻灯片！
+视觉导演原则：由每页核心内容关系驱动主视觉焦点，跨页统一字体气质、留白节奏与页眉/页脚规则；拒绝等宽粗框卡片堆砌、拒绝油亮假 3D 与无关氛围大图，中文字形自然不挤瘦，严禁捏造数据与引用。
 
 ${batchPages
   .map((bp) => {
     const c = SLIDE_COMPOSITION_GUIDE[bp.st];
     return `---
 ### ${bp.code} · ${SLIDE_TYPE_LABELS[bp.st].label}（${bp.heading}）
-**中文提示词**：16:9 宽屏扁平 2D 专业 PPT 页面设计稿（纯正面平面视口，无电脑边框无斜拍透视），「${prompt.title}」风格。${c.zh}，页面核心标题为「${bp.heading}」${bp.st === "cover" ? `，副标题「${subtitle}」` : ""}。严格使用背景色 ${palette.bg}、模块卡片色 ${palette.surface}、主文字色 ${palette.text}、唯一视觉强调色 ${palette.accent}。圆角 ${layout.cornerRadius}px，${densityInfo.zh}，排版工整清晰无乱码。
-**English Prompt**: Flat 2D 16:9 presentation slide design, ${prompt.englishTitle} style, no laptop mockup, no perspective tilt. ${c.en}, headline "${bp.heading}". Strict palette: bg ${palette.bg}, card ${palette.surface}, text ${palette.text}, accent ${palette.accent}. Radius ${layout.cornerRadius}px, ${densityInfo.en}, ultra-clean vector editorial typography --ar 16:9 --stylize 140`;
+**中文提示词**：16:9 宽屏扁平 2D 专业汇报 PPT 单页设计稿（纯正面平面视口，非海报非样机），「${prompt.title}」套系风格。${c.zh}，主标题「${bp.heading}」${bp.st === "cover" ? `，副标题「${subtitle}」` : ""}。背景 ${palette.bg}、模块面 ${palette.surface}、主字 ${palette.text}、强调色 ${palette.accent}，圆角 ${layout.cornerRadius}px，${densityInfo.zh}；中文字体比例端正清晰、留白有呼吸感、图形真正解释内容而非装饰。
+**English Prompt**: Flat 2D 16:9 executive presentation slide (front orthographic canvas, not a mockup or poster), ${prompt.englishTitle} cohesive system. ${c.en}, headline "${bp.heading}". Strict palette: bg ${palette.bg}, surface ${palette.surface}, text ${palette.text}, accent ${palette.accent}. Radius ${layout.cornerRadius}px, ${densityInfo.en}, crisp editorial typography, zero generic card spam --ar 16:9 --stylize 140`;
   })
   .join("\n\n")}
 
 ---
-### 全局通用负面词（Negative Prompt）
-3D laptop mockup, angled screen, perspective distortion, cluttered icons, neon purple glow, blurry gibberish text, watermark, photo collage${domainMdSection}`;
+### 全局视觉导演硬边界（Negative Prompt）
+3D laptop mockup, angled screen, perspective tilt, multi-slide collage, glossy plastic 3D icons, candy neon glow, compressed distorted Chinese text, uniform repetitive boxes, watermark, fabricated numbers${domainMdSection}`;
   }
 
   const slideLabel = SLIDE_TYPE_LABELS[activeSlide] ?? SLIDE_TYPE_LABELS.cover;
   const comp = SLIDE_COMPOSITION_GUIDE[activeSlide] ?? SLIDE_COMPOSITION_GUIDE.cover;
 
-  return `【AI 整页 PPT 生图提示词 · 适配即梦 / Nano Banana / Midjourney / Ideogram】
+  return `【AI 整页 PPT 生图提示词 · 视觉导演 v2 · 适配即梦 / Nano Banana / Midjourney / Ideogram】
 当前针对页面：**${slideLabel.label}（${slideLabel.en}）**
 
 ---
 ### 中文出图提示词（推荐：即梦 / Nano Banana / 可灵）
-设计一张 16:9 宽屏高颜值专业 PPT 幻灯片整页视觉图。
-- **页面类型与画面**：${comp.zh}。主标题聚焦「${topic}」${activeSlide === "cover" ? `，副标题「${subtitle}」` : ""}。
+设计一张 16:9 宽屏扁平 2D 专业汇报 PPT 单页设计稿（纯正面平面视口，非海报、非 3D 样机）。
+- **页面内容关系与构图**：${comp.zh}。主标题聚焦「${topic}」${activeSlide === "cover" ? `，副标题「${subtitle}」` : ""}。让主视觉图形直接解释本页信息关系，而不是堆砌等宽粗框卡片或无关氛围大图。
 - **核心美学风格**：${prompt.title}。${prompt.promptAnatomy.style}
-- **精准配色控制**：背景底色 ${palette.bg}，卡片/模块色 ${palette.surface}，主体文字色 ${palette.text}，视觉强调色 ${palette.accent}，图表辅助色 ${chartColors.join("、")}。
-- **字体与排版质感**：标题使用 ${typography.headingFontLabel} 风格，正文精致清晰；${prompt.promptAnatomy.layout}；卡片圆角约 ${layout.cornerRadius}px；留白比例遵循「${densityInfo.zh}」。
-- **画质与约束**：平面矢量设计稿质感，纯正面 2D 扁平视口（不要透视斜拍、不要出现笔记本电脑边框或演讲台），文字排版工整对齐，无乱码水印，大师级商业演示审美。
+- **精准配色控制**：背景底色 ${palette.bg}，卡片/模块面 ${palette.surface}，主体文字色 ${palette.text}，视觉强调色 ${palette.accent}，图表辅助色 ${chartColors.join("、")}。
+- **字体与留白节奏**：标题采用 ${typography.headingFontLabel} 气质，正文端正清晰不挤瘦；${prompt.promptAnatomy.layout}；卡片圆角约 ${layout.cornerRadius}px；留白比例遵循「${densityInfo.zh}」。
+- **画质与硬边界**：平面矢量编辑部质感，纯正面 2D 扁平视口（禁止斜拍透视、禁止笔记本边框与演讲台），中文字形自然对齐，无乱码水印，不捏造虚假数字。
 
 ---
 ### English Art-Direction Prompt (Midjourney v6 / Nano Banana / Ideogram)
-Professional 16:9 presentation slide design, flat 2D digital viewport (no mockup frame, no perspective tilt, no laptop screen), ${prompt.englishTitle} aesthetic. ${comp.en} for "${topic}". Color palette strictly locked to background ${palette.bg}, surface ${palette.surface}, primary typography ${palette.text}, accent ${palette.accent}, chart accents ${chartColors.join(", ")}. Layout: ${spec.layout.archetype}, ${densityInfo.en}, border radius ${layout.cornerRadius}px. Typography inspired by ${typography.headingFontLabel} paired with ${typography.bodyFontLabel}. Ultra-clean vector graphic precision, museum-grade editorial composition, crisp alignment, balanced margins, zero clutter --ar 16:9 --stylize 150
+Flat 2D 16:9 executive presentation slide (front orthographic canvas, zero mockup frame, zero perspective tilt, not a poster), ${prompt.englishTitle} cohesive design system. ${comp.en} for "${topic}". Strict color tokens: background ${palette.bg}, surface ${palette.surface}, primary text ${palette.text}, accent ${palette.accent}, chart accents ${chartColors.join(", ")}. Layout: ${spec.layout.archetype}, ${densityInfo.en}, radius ${layout.cornerRadius}px. Typography inspired by ${typography.headingFontLabel} paired with ${typography.bodyFontLabel}. Visual focal element genuinely clarifies content relationships, generous breathing room, crisp vector precision, zero generic card grid spam --ar 16:9 --stylize 140
 
 ---
-### 负面约束词（Negative Prompt）
-3D mockup, angled perspective, laptop bezel, cluttered icons, cheap neon gradient, blurry text, gibberish letters, stock photo collage, watermark, low contrast${domainMdSection}`;
+### 全局视觉导演硬边界（Negative Prompt）
+3D laptop mockup, angled perspective, laptop bezel, glossy plastic 3D icons, candy neon glow, uniform repetitive boxes, compressed distorted Chinese text, stock photo collage, watermark, fabricated numbers${domainMdSection}`;
 }
 
 /**
@@ -679,16 +693,16 @@ export function buildSlideImagePrompt(
     slide.subtitle || slide.bullets?.[0] || "Clean business innovation narrative";
   const chartList = (palette.chartColors || []).slice(0, 3).join(", ");
 
-  return `【单页配图美术提示词 · 适配即梦 / Midjourney / OpenAI Image】
+  return `【单页配图视觉导演 v2 · 适配即梦 / Midjourney / OpenAI Image】
 画面主题：${subject}
 上下文语义：${contextLine}
 美学锁定：${styleTitle}（${englishTitle}），与 PPT 母版色卡严格一致（背景 ${palette.bg}，表面 ${palette.surface}，强调色 ${palette.accent}，辅助色 ${chartList}）。
 
 [中文即梦提示词]
-一幅高质感商业演示配图插画，主题为「${subject}」，严格延续「${styleTitle}」平面设计美学，主背景使用 ${palette.bg} 或 ${palette.surface}，视觉焦点使用 ${palette.accent} 点缀，极简几何构图与编辑部留白秩序，无文字无水印，高清矢量编辑质感，比例 4:3。
+一幅高质感扁平编辑部风格商业演示配图，紧扣「${subject}」的内容逻辑，严格延续「${styleTitle}」平面设计美学，底色使用 ${palette.bg} 或 ${palette.surface}，焦点以 ${palette.accent} 克制点缀，极简几何构图与充裕留白；拒绝油亮塑料 3D、拒绝廉价霓虹发光、拒绝多余杂物，纯画面无文字无水印，比例 4:3。
 
 [English Prompt for Midjourney / OpenAI Image]
-Editorial presentation hero illustration depicting "${subject}", ${englishTitle} graphic design aesthetic (${layout.archetype}), harmonious palette strictly anchored to background ${palette.bg}, surface ${palette.surface}, and focal accent ${palette.accent} (secondary accents ${chartList}). Crisp geometric balance, architectural lighting, museum-grade flat/minimal studio composition, zero text, no letters, no watermark --ar 4:3 --stylize 120`;
+Editorial presentation hero illustration clarifying "${subject}", ${englishTitle} graphic design system (${layout.archetype}), palette strictly anchored to background ${palette.bg}, surface ${palette.surface}, and restrained focal accent ${palette.accent} (secondary ${chartList}). Clean geometric balance, quiet architectural lighting, museum-grade flat editorial craft, no glossy plastic 3D, no neon glow, zero text, no letters, no watermark --ar 4:3 --stylize 120`;
 }
 
 export interface RealDeckCompileOptions {

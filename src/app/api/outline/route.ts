@@ -208,6 +208,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ outline, engine: "llm" });
     }
 
+    const routeMode =
+      body.routeMode === "beautify-1to1" ? "beautify-1to1" : "restructure";
+    const evidenceDensity =
+      body.evidenceDensity === "light" ||
+      body.evidenceDensity === "high-evidence"
+        ? body.evidenceDensity
+        : "balanced";
+
     const outline = generateOutlineDraft({
       topic,
       subtitle,
@@ -215,9 +223,11 @@ export async function POST(request: Request) {
       sourceText,
       slideCount,
       scenario,
+      routeMode,
+      evidenceDensity,
     });
 
-    return NextResponse.json({ outline, engine: "smart" });
+    return NextResponse.json({ outline, engine: "smart", routeMode, evidenceDensity });
   } catch (err) {
     console.error(
       "Outline API error:",
