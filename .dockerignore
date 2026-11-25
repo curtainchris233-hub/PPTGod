@@ -1,0 +1,10 @@
+node_modules
+.next
+data
+.git
+.github
+tests
+.agents
+*.log
+*.bak
+.DS_Store

@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Eye,
   FileCode2,
+  FileJson,
   FileSpreadsheet,
   GitFork,
   Heart,
@@ -23,16 +24,23 @@ import {
   Pencil,
   RotateCcw,
   Send,
+  ShieldCheck,
   Sliders,
   Sparkles,
   Star,
   Trash2,
+  Wrench,
   X,
 } from "lucide-react";
 import SlideCanvas from "@/components/SlideCanvas";
 import { useApp } from "@/context/AppContext";
 import { buildSampleDeckFromPrompt } from "@/lib/deckGenerator";
 import { exportStandaloneHtmlDeck } from "@/lib/htmlExporter";
+import {
+  autoFixPaletteContrast,
+  evaluatePaletteContrast,
+  serializeStylePackJson,
+} from "@/lib/paletteExtractor";
 import { compilePrompt } from "@/lib/promptCompiler";
 import { saveStudioHandoff } from "@/lib/studioHandoff";
 import {
@@ -40,6 +48,7 @@ import {
   ANATOMY_META,
   SLIDE_TYPE_LABELS,
   TOOL_METADATA,
+  getDefaultAudienceForScenario,
   type AnatomyDimension,
   type CustomizerParams,
   type PromptComment,
@@ -107,7 +116,7 @@ export default function StudioClient({
   const [params, setParams] = useState<CustomizerParams>({
     topic: globalTopic || initialPrompt.sampleTopic,
     subtitle: initialPrompt.sampleSubtitle,
-    audience: "核心管理层与业务伙伴",
+    audience: getDefaultAudienceForScenario(initialPrompt.scenario),
     slideCount: 12,
     language: "zh",
     tone: "executive",
@@ -721,16 +730,74 @@ export default function StudioClient({
                   <Sliders size={15} />
                   <h2>实时视觉微调（画面、提示词与导出文件同步联动）</h2>
                 </div>
-                {specIsModified && (
+                <div className="pg-btn-group">
+                  {(() => {
+                    const contrast = evaluatePaletteContrast(liveSpec.palette);
+                    return (
+                      <>
+                        <span
+                          id="pg-studio-wcag-pill"
+                          className={`pg-wcag-pill pg-wcag-pill--${contrast.overallGrade.toLowerCase()}`}
+                          title={`正文/底色 ${contrast.textBgRatio}:1 · 强调色/底色 ${contrast.accentBgRatio}:1`}
+                        >
+                          <ShieldCheck size={11} />
+                          <span>
+                            WCAG {contrast.overallGrade} · {contrast.textBgRatio.toFixed(1)}:1
+                          </span>
+                        </span>
+                        {contrast.overallGrade === "WARN" && (
+                          <button
+                            type="button"
+                            id="pg-studio-wcag-fix-btn"
+                            className="pg-btn pg-btn-secondary pg-btn-xs"
+                            onClick={() => {
+                              setLiveSpec((prev) => ({
+                                ...prev,
+                                palette: autoFixPaletteContrast(prev.palette),
+                              }));
+                              showToast("已按 WCAG AA 投影标准校正配色对比度", "success");
+                            }}
+                          >
+                            <Wrench size={11} />
+                            <span>校正对比度</span>
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                   <button
                     type="button"
-                    className="pg-text-btn"
-                    onClick={() => setLiveSpec(prompt.visualSpec)}
+                    id="pg-studio-export-json-btn"
+                    className="pg-btn pg-btn-secondary pg-btn-xs"
+                    onClick={() => {
+                      const jsonStr = serializeStylePackJson(prompt, liveSpec);
+                      const blob = new Blob([jsonStr], {
+                        type: "application/json;charset=utf-8",
+                      });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `${prompt.slug}.pptgod.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      showToast("已导出可移植风格包 (.pptgod.json)", "success");
+                    }}
+                    title="导出当前视觉设计系统 JSON，可在「发布风格」页面一键导入复用"
                   >
-                    <RotateCcw size={13} />
-                    <span>恢复原版风格</span>
+                    <FileJson size={12} />
+                    <span>导出 .pptgod.json</span>
                   </button>
-                )}
+                  {specIsModified && (
+                    <button
+                      type="button"
+                      className="pg-text-btn"
+                      onClick={() => setLiveSpec(prompt.visualSpec)}
+                    >
+                      <RotateCcw size={13} />
+                      <span>恢复原版风格</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="pg-tweaker-grid">

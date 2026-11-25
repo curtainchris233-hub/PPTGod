@@ -1138,9 +1138,12 @@ def t1_ui_06_compare_8_slides_and_cta(ctx: TestContext) -> None:
         preset_btn = page.locator("#pg-compare-preset-btn").or_(
             page.get_by_role("button", name=re.compile(r"一键载入.*三套|载入经典"))
         )
-        if preset_btn.count() > 0 and preset_btn.first.is_visible():
-            preset_btn.first.click()
-            page.wait_for_timeout(300)
+        for _ in range(3):
+            if preset_btn.count() > 0 and preset_btn.first.is_visible():
+                preset_btn.first.click()
+                page.wait_for_timeout(350)
+            else:
+                break
 
         gen_ctas = page.locator('a[href*="/generate?style="]')
         gen_ctas.nth(2).wait_for(state="visible", timeout=8000)

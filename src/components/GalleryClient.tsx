@@ -283,38 +283,51 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
       <section className="pg-filters-section" aria-label="多维度筛选提示词">
         <div className="pg-container">
           <div className="pg-filter-shell">
-            {/* Full-Domain Audience Tabs */}
-            <div
-              className="pg-domain-tabs"
-              role="tablist"
-              aria-label="按人群领域浏览"
-              id="pg-domain-tabs"
-            >
-              {DOMAIN_TABS.map((tab) => {
-                const active = domainTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    id={`pg-domain-tab-${tab.id}`}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    title={tab.desc}
-                    className={`pg-domain-tab ${active ? "is-active" : ""}`}
-                    onClick={() => handleSelectDomain(tab.id)}
-                  >
-                    <span className="pg-domain-tab-label">{tab.label}</span>
-                    <span className="pg-domain-tab-count">
-                      {domainCounts[tab.id] ?? 0}
-                    </span>
-                  </button>
-                );
-              })}
+            {/* Full-Domain Audience Tabs + Inline Search Box (Compact Above-the-Fold) */}
+            <div className="pg-domain-bar">
+              <div
+                className="pg-domain-tabs"
+                role="tablist"
+                aria-label="按人群领域浏览"
+                id="pg-domain-tabs"
+              >
+                {DOMAIN_TABS.map((tab) => {
+                  const active = domainTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      id={`pg-domain-tab-${tab.id}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      title={tab.desc}
+                      className={`pg-domain-tab ${active ? "is-active" : ""}`}
+                      onClick={() => handleSelectDomain(tab.id)}
+                    >
+                      <span className="pg-domain-tab-label">{tab.label}</span>
+                      <span className="pg-domain-tab-count">
+                        {domainCounts[tab.id] ?? 0}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="pg-search-box">
+                <Search size={15} className="pg-search-icon" />
+                <input
+                  id="pg-gallery-search"
+                  type="search"
+                  placeholder="搜索风格名、关键词、色系..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="pg-filter-row-top">
               <div
-                className="pg-scenario-pills"
+                className="pg-scenario-pills pg-scenario-pills--compact"
                 role="group"
                 aria-label="按使用场景筛选"
               >
@@ -328,17 +341,6 @@ export default function GalleryClient({ initialPrompts }: GalleryClientProps) {
                     {sc}
                   </button>
                 ))}
-              </div>
-
-              <div className="pg-search-box">
-                <Search size={15} className="pg-search-icon" />
-                <input
-                  id="pg-gallery-search"
-                  type="search"
-                  placeholder="搜索风格名、关键词、色系..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
               </div>
             </div>
 
