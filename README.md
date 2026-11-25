@@ -33,22 +33,19 @@
 
 ---
 
-## Glacier UI 2.0 视觉重构进度与验证（`feat/glacier-ui-2.0` 分支）
+## Glacier UI 2.0 视觉重构架构与验收总览
 
-按 [Glacier UI 2.0 开发规范](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) 与 [PROJECT.md](./PROJECT.md)（功能清单 `F1–F41`、诚实能力边界 `B1–B16`）已完成全部阶段开发与验证：**只升级视觉与组件交互层，100% 保留全部现有 API、SQLite 数据结构、生成/导出引擎与 `#pg-*` 稳定契约，严格剔除无后端支撑的假入口**（零假 Pro 付费卡、零假通知铃铛、零假反馈表单、零假协作/回收站/分组、零伪造 `%` 进度、零假语音评分、零未实现的编辑器形状/动画工具）。
+按 [Glacier UI 2.0 开发规范](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) 与 [PROJECT.md](./PROJECT.md)（功能清单 `F1–F41`、诚实能力边界 `B1–B16`）已完成全站视觉重构与验收：**只升级视觉与组件交互层，100% 保留全部现有 API、SQLite 数据结构、生成/导出引擎与 `#pg-*` 稳定契约，严格剔除无后端支撑的假入口**（零假 Pro 付费卡、零假通知铃铛、零假反馈表单、零假协作/回收站/分组、零伪造 `%` 进度、零假语音评分、零未实现的编辑器形状/动画工具）。
 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | Phase 0 | 路由 / 组件 / CSS / API / E2E 全量审计，输出 `F1–F41` 与 `B1–B16` 清单 | 已完成 |
-| Phase 1 · M1a | Design Tokens（`--gl-*`）、冰川品牌 SVG、`AppShell`（64px 顶栏 + 220/64px 可收起侧栏 + 移动抽屉）、通用 UI 组件库、`SlidePreviewFrame` | 已完成（`2c0fcb8`） |
-| Phase 1 · M1b | 首页工作台 `/`（8:4 AI 创作与上传 / 9:3 同内容 3 风格实时对比与 2×3 推荐 / 4:8 最近项目与 4 快速工具）+ 旧筛选参数服务端重定向 `/gallery` | 已完成（`d6ff232`） |
-| Phase 2 · M2a | 风格画廊 `/gallery`（36 套实库模板、动态计数领域胶囊、URL 双向同步筛选、`StyleDetailDrawer`、智能选词、资料直通车） | 已完成（`13d71c4`） |
-| Phase 2 · M2c | 我的项目 `/collections`（4 张真实统计 KPI 卡、诚实标签栏、搜索/可见性/排序、网格/列表切换、重命名/复制副本/公开私有/导出 PPTX/永久删除确认） | 已完成（`ddef671`） |
-| Phase 2 · M2b & Phase 3 · M3a | 创作工坊引导态 + 全屏沉浸式演示编辑器 `/generate`（4 步向导、`示例预览`、`OutlineDraftPanel`、全屏编辑顶栏、左侧页树、诚实工具栏、演讲备注 AI 讲稿、`/api/polish` 预览确认 AI 助手、100 分设计体检 + 深浅底色 WCAG 修复）+ `/studio` 重定向 | 已完成（`0abfeb0`） |
-| Phase 3 · M3b & Phase 4 | 次级页面 Glacier 化（`/compare` 默认 3 风格同屏对比、`/studio/[slug]`、`/deck/[id]?rehearsal=1`、`/tools?tab=`、`/create`、`/creator/[username]`、可搜索帮助弹窗）+ 5 断点响应式 / 无障碍 / Web Vitals 与 68 项 Glacier E2E 验证 | 已完成（`93ffb29`） |
-
-> [!NOTE]
-> Glacier UI 2.0 改动当前位于开发分支 `feat/glacier-ui-2.0`（`main` 分支保留 v8 稳定基线直至合并）。
+| Phase 1 · M1a | Design Tokens（`--gl-*`）、冰川品牌 SVG、`AppShell`（64px 顶栏 + 220/64px 可收起侧栏 + 移动抽屉）、通用 UI 组件库、`SlidePreviewFrame` | 已完成 |
+| Phase 1 · M1b | 首页工作台 `/`（8:4 AI 创作与上传 / 9:3 同内容 3 风格实时对比与 2×3 推荐 / 4:8 最近项目与 4 快速工具）+ 旧筛选参数服务端重定向 `/gallery` | 已完成 |
+| Phase 2 · M2a | 风格画廊 `/gallery`（36 套实库模板、动态计数领域胶囊、URL 双向同步筛选、`StyleDetailDrawer`、智能选词、资料直通车） | 已完成 |
+| Phase 2 · M2c | 我的项目 `/collections`（4 张真实统计 KPI 卡、诚实标签栏、搜索/可见性/排序、网格/列表切换、重命名/复制副本/公开私有/导出 PPTX/永久删除确认） | 已完成 |
+| Phase 2 · M2b & Phase 3 · M3a | 创作工坊引导态 + 全屏沉浸式演示编辑器 `/generate`（4 步向导、`示例预览`、`OutlineDraftPanel`、全屏编辑顶栏、左侧页树、诚实工具栏、演讲备注 AI 讲稿、`/api/polish` 预览确认 AI 助手、100 分设计体检 + 深浅底色 WCAG 修复）+ `/studio` 重定向 | 已完成 |
+| Phase 3 · M3b & Phase 4 | 次级页面 Glacier 化（`/compare` 默认 3 风格同屏对比、`/studio/[slug]`、`/deck/[id]?rehearsal=1`、`/tools?tab=`、`/create`、`/creator/[username]`、可搜索帮助弹窗）+ 5 断点响应式 / 无障碍 / Web Vitals 与 68 项 Glacier E2E 全通 | 已完成 |
 
 ### Glacier UI 2.0 全站路由映射
 
@@ -64,7 +61,7 @@
 | `/tools` | **纯本地 PPT 效率工具箱**：支持 `?tab=pacing\|pptx-inspect\|palette-wcag\|visual-director` 及登录用户的已保存文稿排练直达入口 |
 | `/create` & `/creator/[username]` | **风格创作 / Remix 发布器**（以图抽色 + WCAG 自动校正 + `.pptgod.json` 导入）与 **创作者公开主页** |
 
-### 实测质量与验证结果（`feat/glacier-ui-2.0`）
+### 实测质量与验证结果
 
 - **类型、代码规范与生产构建**：`npx tsc --noEmit --incremental false`、`npm run lint`、`npm run build` 全部通过（**0 errors, 0 warnings**）。
 - **5 断点响应式与 Web Vitals 实测**（Chromium `1920 / 1440 / 1024 / 768 / 390px`）：全站核心与次级路由均实现 **`0px` 水平溢出、0 控制台/运行时错误**；实测 8 个路由首屏性能 **LCP `420–1080 ms`**（目标 `≤ 2500 ms`）、**CLS `0.0000–0.0003`**（目标 `≤ 0.1`），键盘 Tab 切换均具备清晰的 `2px solid` `:focus-visible` 焦点环与语义 `<main>` / `<h1>` 地标。
