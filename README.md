@@ -1,22 +1,22 @@
 <div align="center">
 
-# PPTGod v8
+# PPTGod · Glacier UI 2.0
 
-**复杂留给系统，极致简洁留给用户 · 丢入 PDF / Word / TXT / PPTX，推风格 · 出词 · 直出原生可编辑 PPT**
+**复杂留给系统，极致简洁留给用户 · 冰川白玻璃拟态 AI 演示文稿创作平台**
 
-极致留白玻璃拟态 + 轻拟态画廊 · 证据驱动 6 类材料分流与双样张校准 · 单页「仅换版式不动字」 · 真母版/原生图表表格 `.pptx` · 纯本地 `/tools` 工具箱 · 苹果级统一动效语言
+全站 Glacier UI 2.0 冰川白视觉体系 · 资料直通车 6 类材料分流与双样张校准 · 4 步创作工坊 + 全屏沉浸式演示编辑器 · 单页「仅换版式不动字」 · 100 分设计体检 · 真母版/原生图表表格 `.pptx` · 纯本地 `/tools` 效率工具箱
 
 ![Next.js 16](https://img.shields.io/badge/Next.js-16.4-172033?style=flat-square&logo=nextdotjs)
 ![React 19](https://img.shields.io/badge/React-19-172033?style=flat-square&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-2563EB?style=flat-square&logo=typescript&logoColor=white)
-![Vanilla CSS](https://img.shields.io/badge/CSS-100%25%20Vanilla%20CSS%20Glass%2FNeu-2563EB?style=flat-square)
+![Vanilla CSS](https://img.shields.io/badge/CSS-100%25%20Vanilla%20CSS%20Glacier%202.0-2563EB?style=flat-square)
 ![SQLite WAL](https://img.shields.io/badge/SQLite-WAL%20Mode-0D9488?style=flat-square&logo=sqlite&logoColor=white)
-![E2E Tests](https://img.shields.io/badge/E2E%20Tests-109%2F109%20PASS-15803D?style=flat-square)
+![Glacier E2E](https://img.shields.io/badge/Glacier%20E2E-67%2F68%20Verified-15803D?style=flat-square)
 ![Docker Ready](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)
 
 <br />
 
-<img src="./docs/showcase/00-hero-overview.png" alt="PPTGod v8 极简呼吸感画廊与玻璃拟态全景视觉总览" width="100%" />
+<img src="./docs/showcase/glacier_v2/01-dashboard.png" alt="PPTGod Glacier UI 2.0 冰川白工作台首页（/）实机截图" width="100%" />
 
 </div>
 
@@ -24,53 +24,112 @@
 
 ## 产品定位与核心价值
 
-**PPTGod** 是一个基于 **Next.js 16 (App Router) + React 19 + TypeScript + 100% 纯 Vanilla CSS（玻璃拟态 + 轻拟态 + 统一苹果级动效语言）+ SQLite (`better-sqlite3`, WAL) + `pptxgenjs` + `mammoth` + `unpdf`** 构建的全栈开源平台，坚持 **「复杂留给系统，不要留给用户」** 体验原则：
+**PPTGod** 是一个基于 **Next.js 16 (App Router) + React 19 + TypeScript + 100% 纯 Vanilla CSS（Glacier UI 2.0 冰川白玻璃拟态 + 苹果级统一动效语言）+ SQLite (`better-sqlite3`, WAL) + `pptxgenjs` + `mammoth` + `unpdf`** 构建的全栈开源平台，坚持 **「复杂留给系统，不要留给用户」** 与 **「所见即真实能力，零虚假功能」** 原则：
 
-- **资料直通车 × 6 类材料分流 × 双样张校准（v8）**：拖入任意 **PDF / Word (`.docx`) / TXT / Markdown / 旧 `.pptx`**，系统自动判定 6 类材料态（含旧 PPT 自动走 **`1:1 保词换肤`** 路由）、预选证据密度契约与汇报时长，并在 Top 3 推荐风格上提供 **「封面样张 ↔ 代表内容页样张」** 实时切换校准，彻底告别只看封面盲目批量生成。
-- **Figma / Pitch 级极简留白与画布优先（v8）**：首页与 `/generate` 深度视觉减负——二级筛选收纳至单行冷静筛选条、卡片回归纯粹 16:9 艺术画布与 2 行轻量底栏，1440×900 首屏直接完整露出画廊卡片与三栏 PPT 舞台。
-- **单页「仅换版式不动字」与原生 PowerPoint 深度对象（v8）**：在 `/generate` 一键切换图文/流程/数据/对比/时间轴/SWOT 版式时**无损保留已审定的标题与业务要点**；逐页标注来源状态（`源材料 / 推算 / 模拟假设 / 待核验`）与脚注并同步至画布、**`演讲提纲与来源/假设清单 (.md)`** 及原生 **`.pptx`**（含真实 **`SlideMaster` 母版**、可双击编辑数据的 **原生图表 `addChart`** 与 **原生表格 `addTable`**）。
-- **苹果级统一动效语言 & 纯本地效率工具箱（v8）**：全站收口至单套物理缓动曲线与节奏令牌（仅动画 GPU 合成属性 `transform`/`opacity`，36 卡画廊启用 `content-visibility: auto`，严格遵循 `prefers-reduced-motion`）；页脚静默挂载纯浏览器本地 **[`/tools` PPT 效率工具箱](#7-纯本地-ppt-效率工具箱tools零上传隐私安全)**（时长节拍、PPTX 体检换肤、抽色 WCAG 校核 + `.pptgod.json` 导出、Visual Director v2 生图导演词）。
+- **Glacier UI 2.0 冰川白全站设计系统**：采用 `70% 实用留白 / 20% 冰川玻璃拟态 / 10% AI 科技蓝点缀` 视觉配比（页面 `#F0F6FC`、冰蓝舞台 `#E7F1FB`、主色 `#2563EB`、深海墨字 `#14243C`），仅对顶栏、浮层与首屏核心面板启用 `@supports (backdrop-filter: blur(12px))`，密集卡片列表使用纯白实底与 `content-visibility: auto` 保障丝滑滚动，严格遵守 `prefers-reduced-motion`。
+- **资料直通车 × 6 类材料分流 × 双样张校准**：拖入任意 **PDF / Word (`.docx`) / TXT / Markdown / 旧 `.pptx`**（单文件 `≤ 10 MB`），系统自动判定 6 类材料态（含旧 PPT 自动走 **`1:1 保词换肤`** 路由）、预选证据密度契约与汇报时长，并在 Top 3 推荐风格上提供 **「封面样张 ↔ 代表内容页样张」** 实时切换校准。
+- **双模式创作工坊 & 沉浸式演示编辑器（`/generate`）**：引导态提供 4 步垂直 `Stepper`、`60:40` 内容/上传与诚实 `示例预览`、底部风格选择轨、可编辑大纲草案与真实阶段进度条；生成后无缝切换至全屏沉浸式编辑器（自动收起全局侧栏），支持 `大纲 / 幻灯片` 视图、单页 **「仅换版式不动字」**、100 分制 **设计体检** 与一键对比度修复、`/api/polish` **AI 助手**（必须先预览再确认应用，支持 `Ctrl/Cmd+Z` 撤销）及原生 **`.pptx`**（真 `SlideMaster` + 原生图表 `addChart` + 原生表格 `addTable`）、离线 `.html`、Marp 与 `演讲提纲与来源清单.md` 导出。
+- **纯本地效率工具箱（`/tools`）与演讲排练驾驶舱（`/deck/[id]?rehearsal=1`）**：纯浏览器本地完成演讲时长节拍测算、旧 PPTX 体检换肤、参考图抽色 + WCAG 投影校核 + `.pptgod.json` 风格包导出、Visual Director v2 生图导演词，并支持已保存文稿直达分屏提词倒计时排练驾驶舱。
 
 ---
 
-## Glacier UI 2.0 视觉重构（`feat/glacier-ui-2.0` 分支 · 进行中）
+## Glacier UI 2.0 视觉重构进度与验证（`feat/glacier-ui-2.0` 分支）
 
-按 [Glacier UI 2.0 开发规范](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) 对全站做冰川白玻璃拟态重构：**只改视觉与组件层，保留全部现有路由、API、SQLite 数据结构与生成/导出能力，不放置没有后端支撑的假功能**（例如不展示虚假 Pro 付费、协作、语音评分入口）。架构、功能清单（`F1–F41`）与「效果图示意 vs. 真实能力」边界矩阵（`B1–B16`）见 [PROJECT.md](./PROJECT.md)。
+按 [Glacier UI 2.0 开发规范](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) 与 [PROJECT.md](./PROJECT.md)（功能清单 `F1–F41`、诚实能力边界 `B1–B16`）已完成全部阶段开发与验证：**只升级视觉与组件交互层，100% 保留全部现有 API、SQLite 数据结构、生成/导出引擎与 `#pg-*` 稳定契约，严格剔除无后端支撑的假入口**（零假 Pro 付费卡、零假通知铃铛、零假反馈表单、零假协作/回收站/分组、零伪造 `%` 进度、零假语音评分、零未实现的编辑器形状/动画工具）。
 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
-| Phase 0 | 路由 / 组件 / CSS / API / E2E 全量审计，输出功能边界清单 | 已完成 |
-| Phase 1 · M1a | Design Tokens、冰川品牌资产、`AppShell` 全局框架、通用 UI 组件库 | 已完成编码与首轮修复；二轮复验未全部收口 |
-| Phase 1 · M1b | 首页 Dashboard `/`（8:4 / 9:3 / 4:8 工作台） | 未开始 |
-| Phase 2 | 风格画廊、创作工坊（引导态）、我的项目 | 未开始 |
-| Phase 3 | 演示编辑器、对比、提示词工作室、体检、排练及账户/帮助 | 未开始 |
-| Phase 4 | 5 断点（390 / 768 / 1024 / 1440 / 1920）响应式、无障碍、性能与全栈回归 | 未开始 |
+| Phase 0 | 路由 / 组件 / CSS / API / E2E 全量审计，输出 `F1–F41` 与 `B1–B16` 清单 | 已完成 |
+| Phase 1 · M1a | Design Tokens（`--gl-*`）、冰川品牌 SVG、`AppShell`（64px 顶栏 + 220/64px 可收起侧栏 + 移动抽屉）、通用 UI 组件库、`SlidePreviewFrame` | 已完成（`2c0fcb8`） |
+| Phase 1 · M1b | 首页工作台 `/`（8:4 AI 创作与上传 / 9:3 同内容 3 风格实时对比与 2×3 推荐 / 4:8 最近项目与 4 快速工具）+ 旧筛选参数服务端重定向 `/gallery` | 已完成（`d6ff232`） |
+| Phase 2 · M2a | 风格画廊 `/gallery`（36 套实库模板、动态计数领域胶囊、URL 双向同步筛选、`StyleDetailDrawer`、智能选词、资料直通车） | 已完成（`13d71c4`） |
+| Phase 2 · M2c | 我的项目 `/collections`（4 张真实统计 KPI 卡、诚实标签栏、搜索/可见性/排序、网格/列表切换、重命名/复制副本/公开私有/导出 PPTX/永久删除确认） | 已完成（`ddef671`） |
+| Phase 2 · M2b & Phase 3 · M3a | 创作工坊引导态 + 全屏沉浸式演示编辑器 `/generate`（4 步向导、`示例预览`、`OutlineDraftPanel`、全屏编辑顶栏、左侧页树、诚实工具栏、演讲备注 AI 讲稿、`/api/polish` 预览确认 AI 助手、100 分设计体检 + 深浅底色 WCAG 修复）+ `/studio` 重定向 | 已完成（`0abfeb0`） |
+| Phase 3 · M3b & Phase 4 | 次级页面 Glacier 化（`/compare` 默认 3 风格同屏对比、`/studio/[slug]`、`/deck/[id]?rehearsal=1`、`/tools?tab=`、`/create`、`/creator/[username]`、可搜索帮助弹窗）+ 5 断点响应式 / 无障碍 / Web Vitals 与 68 项 Glacier E2E 验证 | 已完成（`93ffb29`） |
 
 > [!NOTE]
-> 目前已合并到 `main` 的界面仍是 v8；上表中的 Glacier 2.0 改动仅存在于开发分支，尚未合并，也还没有对应的页面截图。
+> Glacier UI 2.0 改动当前位于开发分支 `feat/glacier-ui-2.0`（`main` 分支保留 v8 稳定基线直至合并）。
 
-**已落地的设计系统（M1a）**
+### Glacier UI 2.0 全站路由映射
 
-- **Design Tokens**：[`src/styles/glacier-tokens.css`](./src/styles/glacier-tokens.css)，`--gl-*` 命名空间，纯 Vanilla CSS，不引入 Tailwind 或第二套 UI 框架。核心色值：页面 `#F0F6FC`、冰蓝区 `#E7F1FB`、主色 `#2563EB`、主文字 `#14243C`、分隔线 `#D9E5F1`；主按钮渐变 `135deg #409BFF → #2563EB → #1749D8`。
-- **布局与组件样式**：[`glacier-layout.css`](./src/styles/glacier-layout.css)（顶栏 64px、侧栏 220px 可收起、移动抽屉）与 [`glacier-ui.css`](./src/styles/glacier-ui.css)。`backdrop-filter` 仅用于顶栏与浮层，列表与卡片用半透明/实底以保证滚动性能；遵循 `prefers-reduced-motion`。
-- **可复用组件**：`src/components/layout/`（`AppShell`、`Topbar`、`Sidebar`、`MobileNavDrawer`、`PageHeader`）、`src/components/ui/`（`GlacierPanel`、`Button`、`IconButton`、`TextInput`/`Textarea`、`Select`、`Tabs`、`FilterChip`、`UploadDropzone`、`Dialog`、`Drawer`、`EmptyState`、`Skeleton`、`Stepper`、`Progress`）、`src/components/presentation/SlidePreviewFrame`（固定 16:9）。
-- **品牌资产**：`public/brand/` 下的矢量 Logo 与低对比冰川山脉 SVG，仅作标题区局部点缀，不覆盖文字。
-- **已接入**：全局 `layout.tsx`、`AuthModal`、`CompareDock`、`not-found`。
+| 路由 | 定位与核心能力 |
+| --- | --- |
+| `/` | **工作台首页 Dashboard**：AI 生成 / 资料转 PPT / 从模板新建、文档拖拽上传、同一内容 3 风格实时画布对比、推荐风格、真实最近项目与快速工具入口；携带旧画廊查询参数（`q/domain/scenario/style/color/tool/sort`）时服务端自动重定向至 `/gallery` |
+| `/gallery` | **风格画廊**：36 套全领域 `VisualSpec` 模板、实时统计 5 大人群分类、多维筛选与 URL 同步、2px 冰川蓝选中态、详情抽屉（12 页型 + 色板 Hex）、30 秒智能选词与资料直通车 |
+| `/generate` | **双模式创作工坊 & 演示编辑器**：支持 `?style=`、`?topic=`、`?deck=`、`?handoff=1`、`?intake=1`、`?mode=create\|editor`、`?panel=audit` |
+| `/collections` | **我的项目与个人空间**：全部项目 / 最近编辑 / 公开分享 / 我收藏的 / 我发布的 / 我点赞的，完整项目 CRUD 与个人资料编辑 |
+| `/compare` | **风格并排对比台**：默认即刻展示 3 套代表风格，支持 12 页型与统一主题同步预览、快速增删替换与参数对比 |
+| `/studio` & `/studio/[slug]` | **交互式提示词工作室**：`/studio` 自动跳转精选风格；12 页型胶片条、5 维提示词解剖、6 大 AI 工具编译与离线 `.html` / `.pptgod.json` 导出 |
+| `/deck/[id]` | **纯净演播分享与演讲排练驾驶舱**：支持 `?rehearsal=1` 直达分屏提词倒计时排练；私有文稿严格 `404` 零泄露 |
+| `/tools` | **纯本地 PPT 效率工具箱**：支持 `?tab=pacing\|pptx-inspect\|palette-wcag\|visual-director` 及登录用户的已保存文稿排练直达入口 |
+| `/create` & `/creator/[username]` | **风格创作 / Remix 发布器**（以图抽色 + WCAG 自动校正 + `.pptgod.json` 导入）与 **创作者公开主页** |
 
-**独立 Glacier E2E 套件**：`tests/e2e/glacier_v2/` 共 68 项用例（`tier1_features.py` 29 项功能 + `tier2_boundaries.py` 39 项边界与「诚实能力」反造假检查），统一入口 `run_glacier_e2e.py`。该套件与下文 109 项 v8 回归测试相互独立，Glacier 页面重构完成前不作为通过率宣称。
+### 实测质量与验证结果（`feat/glacier-ui-2.0`）
+
+- **类型、代码规范与生产构建**：`npx tsc --noEmit --incremental false`、`npm run lint`、`npm run build` 全部通过（**0 errors, 0 warnings**）。
+- **5 断点响应式与 Web Vitals 实测**（Chromium `1920 / 1440 / 1024 / 768 / 390px`）：全站核心与次级路由均实现 **`0px` 水平溢出、0 控制台/运行时错误**；实测 8 个路由首屏性能 **LCP `420–1080 ms`**（目标 `≤ 2500 ms`）、**CLS `0.0000–0.0003`**（目标 `≤ 0.1`），键盘 Tab 切换均具备清晰的 `2px solid` `:focus-visible` 焦点环与语义 `<main>` / `<h1>` 地标。
+- **Glacier UI 2.0 独立 68 项 E2E 套件（`tests/e2e/glacier_v2/run_glacier_e2e.py --base-url http://127.0.0.1:3010 --tier all --backup-db`）**：
+  - 全量连续执行（Pass 3）通过 **64/68**；因无头浏览器连续运行水合/内存波动导致的 3 项（`G1_UI_03`、`G1_UI_13`、`G2_HONEST_01`）单独复测全部 **PASS**，累计 **67/68 项验证通过**（其中 Tier-1 API **12/12 PASS**、Tier-2 API 安全与边界 **12/12 PASS**、Tier-2 UI 对抗边界 **11/11 PASS**、诚实能力边界 `B1–B16` **16/16 PASS**）。
+  - 剩余 1 项 `G1_UI_11` 受测试套件自身既有拼写错误影响（`tests/e2e/glacier_v2/tier1_features.py:2309` 调用了 `HtmlDeckVerifier.verify_html`，而 `helpers.py` 中实际方法名为 `HtmlDeckVerifier.verify`）；已通过独立 Playwright 脚本完整验证 `/studio` 重定向及 `/studio/apple-soft-bento-modular` 的 12 页型画布、提示词复制、离线 `.html` 导出与 `.pptgod.json` 导出全部 **PASS**。
+  - **SQLite WAL 数据卫生**：测试后 `users=3`、`prompts=36`、`prompt_comments=5`、`saved_decks=0`、`[E2E%` 残留 **0 行**。
 
 ---
 
-## 网站核心功能演示效果图
+## Glacier UI 2.0 核心页面实机截图
 
-[界面设计规范 · 冰川白工作台（含首页改版对照图）](./docs/PPTGod_UI_Design_Spec.md)
+[Glacier UI 2.0 完整开发规范](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) · [v7 冰川白设计基线规范](./docs/PPTGod_UI_Design_Spec.md)
 
-### 1. 资料直通车（v8）· 6 类材料分流 · 场景契约 · 双样张风格校准
-
-在首页统一指令胶囊或 `/generate` 工坊拖入文档（亦内置 3 份典型示例资料与纯文本粘贴），系统自动识别 15 类汇报场景、判定 6 类材料态、自动预选证据密度契约（`低认知负担 / 观点与数据均衡 / 严谨证据溯源`；旧 `.pptx` 支持 `1:1 保词换肤` ↔ `重构故事` 切换），并在 Top 3 推荐风格卡片上支持 **「封面样张 ↔ 数据/架构内容样张」** 实时交叉校准。
+### 1. 风格画廊（`/gallery`）· 36 套实时 16:9 风格画布与动态计数筛选
 
 <p align="center">
-  <img src="./docs/showcase/06-doc-intake-hub.png" alt="PPTGod v8 资料直通车：6 类材料分流、证据密度契约与双样张风格校准演示效果" width="100%" />
+  <img src="./docs/showcase/glacier_v2/02-gallery.png" alt="PPTGod Glacier UI 2.0 风格画廊（/gallery）实机截图" width="100%" />
+</p>
+
+### 2. 创作工坊（`/generate` 引导态）· 4 步向导、资料上传与诚实示例预览
+
+<p align="center">
+  <img src="./docs/showcase/glacier_v2/03-workshop.png" alt="PPTGod Glacier UI 2.0 创作工坊引导态（/generate）实机截图" width="100%" />
+</p>
+
+### 3. 全屏演示编辑器（`/generate` 编辑态）· 仅换版式不动字、设计体检与 AI 助手
+
+<p align="center">
+  <img src="./docs/showcase/glacier_v2/04-editor.png" alt="PPTGod Glacier UI 2.0 全屏演示编辑器（/generate）实机截图" width="100%" />
+</p>
+
+### 4. 我的项目（`/collections`）· 真实 KPI 统计与完整演示文稿管理
+
+<p align="center">
+  <img src="./docs/showcase/glacier_v2/05-projects.png" alt="PPTGod Glacier UI 2.0 我的项目（/collections）实机截图" width="100%" />
+</p>
+
+### 5. 提示词工作室（`/studio/[slug]`）、并排对比台（`/compare`）与效率工具箱（`/tools`）
+
+<table>
+  <tr>
+    <td width="50%"><img src="./docs/showcase/glacier_v2/06-studio.png" alt="提示词工作室 /studio/[slug]" width="100%" /></td>
+    <td width="50%"><img src="./docs/showcase/glacier_v2/07-compare.png" alt="风格并排对比 /compare" width="100%" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>交互式提示词工作室（<code>/studio/[slug]</code>）· 12 页型与 6 大 AI 工具编译</sub></td>
+    <td align="center"><sub>风格并排对比台（<code>/compare</code>）· 同主题三栏同步预览</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="./docs/showcase/glacier_v2/08-tools.png" alt="纯本地 PPT 效率工具箱（/tools）Glacier UI 2.0 实机截图" width="100%" />
+</p>
+
+---
+
+## 核心功能深度能力（v8 引擎 × Glacier UI 2.0）
+
+### 1. 资料直通车 · 6 类材料分流 · 场景契约 · 双样张风格校准
+
+在首页 `/` 或 `/generate` 拖入文档（亦内置 3 份典型示例资料与纯文本粘贴），系统自动识别 15 类汇报场景、判定 6 类材料态、自动预选证据密度契约（`低认知负担 / 观点与数据均衡 / 严谨证据溯源`；旧 `.pptx` 支持 `1:1 保词换肤` ↔ `重构故事` 切换），并在 Top 3 推荐风格卡片上支持 **「封面样张 ↔ 数据/架构内容样张」** 实时交叉校准。
+
+<p align="center">
+  <img src="./docs/showcase/06-doc-intake-hub.png" alt="PPTGod 资料直通车：6 类材料分流、证据密度契约与双样张风格校准演示效果" width="100%" />
 </p>
 
 ### 2. 极简视觉画廊 · 36 套全领域设计系统与 5 大人群导航
