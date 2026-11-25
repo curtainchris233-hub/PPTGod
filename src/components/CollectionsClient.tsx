@@ -4,36 +4,51 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Bookmark,
-  Check,
-  FileSpreadsheet,
+  Clock,
   FolderKanban,
   Globe,
   Heart,
-  Link2,
-  Lock,
+  Layers,
+  LayoutGrid,
+  List,
   Pencil,
-  Play,
   Plus,
+  RotateCcw,
+  Search,
   Sparkles,
   Trash2,
   User as UserIcon,
   X,
 } from "lucide-react";
-import PromptCard from "@/components/PromptCard";
-import SlideCanvas from "@/components/SlideCanvas";
+import PageHeader from "@/components/layout/PageHeader";
+import ProjectCard from "@/components/presentation/ProjectCard";
+import StyleCard from "@/components/presentation/StyleCard";
+import StyleDetailDrawer from "@/components/presentation/StyleDetailDrawer";
+import { Button, Dialog, EmptyState, TextInput } from "@/components/ui";
 import { useApp } from "@/context/AppContext";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import type { PromptItem, SavedDeck } from "@/types/prompt";
-import "@/styles/community.css";
+import "@/styles/gallery.css";
+import "@/styles/collections.css";
 
 const PROFILE_COLORS = [
-  "#C84B31",
+  "#2563EB",
+  "#0369A1",
   "#0F766E",
-  "#1D4ED8",
-  "#9D174D",
-  "#B45309",
-  "#3F6212",
-  "#1E3A5F",
+  "#4F46E5",
+  "#C84B31",
+  "#14243C",
 ];
+
+type WorkspaceTab =
+  | "decks"
+  | "recent"
+  | "public"
+  | "favorites"
+  | "mine"
+  | "liked";
+
+type ProjectSort = "updated" | "created" | "slides" | "title";
 
 interface CollectionsClientProps {
   initialPrompts: PromptItem[];
@@ -44,17 +59,30 @@ interface CollectionsClientProps {
 export default function CollectionsClient({
   initialPrompts,
   initialDecks,
-  initialTab = "favorites",
+  initialTab = "decks",
 }: CollectionsClientProps) {
-  const { user, syncVersion, openAuthModal, localFavoriteIds, setAuthData, showToast } =
-    useApp();
+  const {
+    user,
+    syncVersion,
+    globalTopic,
+    setGlobalTopic,
+    openAuthModal,
+    localFavoriteIds,
+    setAuthData,
+    showToast,
+  } = useApp();
 
-  const [tab, setTab] = useState<"favorites" | "decks" | "mine" | "liked">(
-    initialTab
-  );
+  const [tab, setTab] = useState<WorkspaceTab>(initialTab);
   const [mineFilter, setMineFilter] = useState<"all" | "public" | "private">(
     "all"
   );
+  const [visibilityFilter, setVisibilityFilter] = useState<
+    "all" | "public" | "private"
+  >("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<ProjectSort>("updated");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [now, setNow] = useState(() => Date.now());
 
   const [publicPrompts, setPublicPrompts] = useState<PromptItem[]>(
     initialPrompts.filter((p) => p.isPublic)
@@ -63,14 +91,35 @@ export default function CollectionsClient({
     user ? initialPrompts.filter((p) => p.authorId === user.id) : []
   );
   const [decks, setDecks] = useState<SavedDeck[]>(initialDecks);
+
   const [copiedDeckId, setCopiedDeckId] = useState<string | null>(null);
   const [exportingDeckId, setExportingDeckId] = useState<string | null>(null);
+  const [duplicatingDeckId, setDuplicatingDeckId] = useState<string | null>(
+    null
+  );
 
-  // Edit Profile Modal state
+  // Style Detail Drawer for style tabs
+  const [previewSlug, setPreviewSlug] = useState<string | null>(null);
+
+  // Rename Deck Dialog state
+  const [renamingDeck, setRenamingDeck] = useState<SavedDeck | null>(null);
+  const [renameTitle, setRenameTitle] = useState("");
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [renameError, setRenameError] = useState("");
+
+  // Delete Deck Dialog state
+  const [deletingDeck, setDeletingDeck] = useState<SavedDeck | null>(null);
+  const [deletingBusy, setDeletingBusy] = useState(false);
+
+  // Delete Style Dialog state
+  const [deletingPrompt, setDeletingPrompt] = useState<PromptItem | null>(null);
+  const [deletingPromptBusy, setDeletingPromptBusy] = useState(false);
+
+  // Edit Profile Dialog state
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profName, setProfName] = useState(user?.displayName || "");
   const [profBio, setProfBio] = useState(user?.bio || "");
-  const [profColor, setProfColor] = useState(user?.avatarColor || "#C84B31");
+  const [profColor, setProfColor] = useState(user?.avatarColor || "#2563EB");
   const [profSaving, setProfSaving] = useState(false);
   const [profError, setProfError] = useState("");
 
@@ -92,6 +141,7 @@ export default function CollectionsClient({
         if (Array.isArray(pubRes.prompts)) setPublicPrompts(pubRes.prompts);
         if (Array.isArray(mineRes.prompts)) setMyPrompts(mineRes.prompts);
         if (Array.isArray(deckRes.decks)) setDecks(deckRes.decks);
+        setNow(Date.now());
       })
       .catch(() => {});
 
@@ -108,22 +158,97 @@ export default function CollectionsClient({
   }, [publicPrompts, myPrompts]);
 
   const favoritePrompts = useMemo(() => {
-    if (user) {
-      return combinedPrompts.filter((p) => p.favoritedByMe);
-    }
+    if (user) return combinedPrompts.filter((p) => p.favoritedByMe);
     return publicPrompts.filter((p) => localFavoriteIds.includes(p.id));
   }, [combinedPrompts, publicPrompts, user, localFavoriteIds]);
-
-  const filteredMyPrompts = useMemo(() => {
-    if (mineFilter === "public") return myPrompts.filter((p) => p.isPublic);
-    if (mineFilter === "private") return myPrompts.filter((p) => !p.isPublic);
-    return myPrompts;
-  }, [myPrompts, mineFilter]);
 
   const likedPrompts = useMemo(() => {
     if (!user) return [];
     return combinedPrompts.filter((p) => p.likedByMe);
   }, [combinedPrompts, user]);
+
+  const recentDecksCount = useMemo(() => {
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    return decks.filter((d) => {
+      const ts = new Date(d.updatedAt).getTime();
+      return Number.isFinite(ts) && now - ts <= sevenDaysMs;
+    }).length;
+  }, [decks, now]);
+
+  const publicDecksCount = useMemo(
+    () => decks.filter((d) => d.isPublic).length,
+    [decks]
+  );
+
+  const isDeckTab = tab === "decks" || tab === "recent" || tab === "public";
+
+  const filteredDecks = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    const list = decks.filter((d) => {
+      if (tab === "public" && !d.isPublic) return false;
+      if (tab === "recent") {
+        const ts = new Date(d.updatedAt).getTime();
+        if (Number.isFinite(ts) && now - ts > sevenDaysMs) return false;
+      }
+      if (visibilityFilter === "public" && !d.isPublic) return false;
+      if (visibilityFilter === "private" && d.isPublic) return false;
+      if (q) {
+        const hay = [d.title, d.subtitle, d.promptTitle, d.audience]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    return [...list].sort((a, b) => {
+      if (sortBy === "created") {
+        return (
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      }
+      if (sortBy === "slides") {
+        return b.slides.length - a.slides.length;
+      }
+      if (sortBy === "title") {
+        return a.title.localeCompare(b.title, "zh-CN");
+      }
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }, [decks, tab, visibilityFilter, searchQuery, sortBy, now]);
+
+  const filteredPrompts = useMemo(() => {
+    const base =
+      tab === "favorites"
+        ? favoritePrompts
+        : tab === "mine"
+        ? myPrompts.filter((p) =>
+            mineFilter === "public"
+              ? p.isPublic
+              : mineFilter === "private"
+              ? !p.isPublic
+              : true
+          )
+        : likedPrompts;
+
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter((p) =>
+      [p.title, p.englishTitle, p.scenario, p.styleCategory, ...p.tags]
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [tab, favoritePrompts, myPrompts, mineFilter, likedPrompts, searchQuery]);
+
+  const previewPrompt = useMemo(
+    () =>
+      previewSlug
+        ? combinedPrompts.find((p) => p.slug === previewSlug) ?? null
+        : null,
+    [combinedPrompts, previewSlug]
+  );
 
   const handleUpdatePrompt = (updated: PromptItem) => {
     setPublicPrompts((prev) =>
@@ -134,9 +259,81 @@ export default function CollectionsClient({
     );
   };
 
-  const handleDeletePrompt = (id: string) => {
-    setPublicPrompts((prev) => prev.filter((item) => item.id !== id));
-    setMyPrompts((prev) => prev.filter((item) => item.id !== id));
+  const handleConfirmDeletePrompt = async () => {
+    if (!deletingPrompt || deletingPromptBusy) return;
+    setDeletingPromptBusy(true);
+    try {
+      const res = await fetch(`/api/prompts/${deletingPrompt.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setPublicPrompts((prev) =>
+          prev.filter((item) => item.id !== deletingPrompt.id)
+        );
+        setMyPrompts((prev) =>
+          prev.filter((item) => item.id !== deletingPrompt.id)
+        );
+        showToast("已删除该风格模板");
+        setDeletingPrompt(null);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || "删除失败", "error");
+      }
+    } finally {
+      setDeletingPromptBusy(false);
+    }
+  };
+
+  const handleOpenRename = (deck: SavedDeck) => {
+    setRenamingDeck(deck);
+    setRenameTitle(deck.title);
+    setRenameError("");
+  };
+
+  const handleConfirmRename = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renamingDeck || renameSaving) return;
+    const clean = renameTitle.trim();
+    if (!clean) {
+      setRenameError("项目名称不能为空");
+      return;
+    }
+    setRenameSaving(true);
+    setRenameError("");
+    try {
+      const res = await fetch(`/api/decks/${renamingDeck.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: clean,
+          subtitle: renamingDeck.subtitle,
+          audience: renamingDeck.audience,
+          promptId: renamingDeck.promptId,
+          promptSlug: renamingDeck.promptSlug,
+          promptTitle: renamingDeck.promptTitle,
+          visualSpec: renamingDeck.visualSpec,
+          slides: renamingDeck.slides,
+          isPublic: renamingDeck.isPublic,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setRenameError(data.error || "重命名失败，请稍后重试");
+        return;
+      }
+      if (data.deck) {
+        setDecks((prev) =>
+          prev.map((d) => (d.id === renamingDeck.id ? data.deck : d))
+        );
+        setNow(Date.now());
+      }
+      showToast("已重命名演示文稿", "success");
+      setRenamingDeck(null);
+    } catch {
+      setRenameError("网络异常，请重试");
+    } finally {
+      setRenameSaving(false);
+    }
   };
 
   const handleToggleDeckVisibility = async (deck: SavedDeck) => {
@@ -152,21 +349,57 @@ export default function CollectionsClient({
         prev.map((d) => (d.id === deck.id ? data.deck : d))
       );
       showToast(
-        nextPublic ? "已开启公开分享链接" : "已切换为仅自己可见（私有）",
+        nextPublic ? "已设为公开分享" : "已切换为仅自己可见",
         "success"
       );
+    } else {
+      showToast("更新可见性失败", "error");
     }
   };
 
-  const handleCopyDeckLink = async (deckId: string) => {
-    const url = `${window.location.origin}/deck/${deckId}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopiedDeckId(deckId);
-      showToast("已复制纯净演播分享链接 (/deck)", "success");
+  const handleCopyDeckLink = async (deck: SavedDeck) => {
+    const url = `${window.location.origin}/deck/${deck.id}`;
+    const ok = await copyTextToClipboard(url);
+    if (ok) {
+      setCopiedDeckId(deck.id);
+      showToast("已复制演播分享链接", "success");
       window.setTimeout(() => setCopiedDeckId(null), 1800);
-    } catch {
+    } else {
       showToast("复制失败", "error");
+    }
+  };
+
+  const handleDuplicateDeck = async (deck: SavedDeck) => {
+    if (duplicatingDeckId) return;
+    setDuplicatingDeckId(deck.id);
+    try {
+      const res = await fetch("/api/decks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `${deck.title}（副本）`,
+          subtitle: deck.subtitle,
+          audience: deck.audience,
+          promptId: deck.promptId,
+          promptSlug: deck.promptSlug,
+          promptTitle: deck.promptTitle,
+          visualSpec: deck.visualSpec,
+          slides: deck.slides,
+          isPublic: false,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.deck) {
+        showToast(data.error || "复制副本失败", "error");
+        return;
+      }
+      setDecks((prev) => [data.deck, ...prev]);
+      setNow(Date.now());
+      showToast("已创建项目副本", "success");
+    } catch {
+      showToast("网络异常，复制副本失败", "error");
+    } finally {
+      setDuplicatingDeckId(null);
     }
   };
 
@@ -203,12 +436,23 @@ export default function CollectionsClient({
     }
   };
 
-  const handleDeleteDeck = async (deck: SavedDeck) => {
-    if (!window.confirm(`确认删除云端文稿「${deck.title}」吗？`)) return;
-    const res = await fetch(`/api/decks/${deck.id}`, { method: "DELETE" });
-    if (res.ok) {
-      setDecks((prev) => prev.filter((d) => d.id !== deck.id));
-      showToast("已删除该文稿");
+  const handleConfirmDeleteDeck = async () => {
+    if (!deletingDeck || deletingBusy) return;
+    setDeletingBusy(true);
+    try {
+      const res = await fetch(`/api/decks/${deletingDeck.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setDecks((prev) => prev.filter((d) => d.id !== deletingDeck.id));
+        showToast("已删除该项目");
+        setDeletingDeck(null);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || "删除失败", "error");
+      }
+    } finally {
+      setDeletingBusy(false);
     }
   };
 
@@ -216,7 +460,7 @@ export default function CollectionsClient({
     if (!user) return;
     setProfName(user.displayName);
     setProfBio(user.bio);
-    setProfColor(user.avatarColor);
+    setProfColor(user.avatarColor || "#2563EB");
     setProfError("");
     setProfileModalOpen(true);
   };
@@ -250,430 +494,725 @@ export default function CollectionsClient({
     }
   };
 
+  const resetSearchAndFilters = () => {
+    setSearchQuery("");
+    setVisibilityFilter("all");
+    setMineFilter("all");
+  };
+
+  const hasSearchOrFilter =
+    searchQuery.trim() !== "" ||
+    visibilityFilter !== "all" ||
+    mineFilter !== "all";
+
   return (
-    <main className="pg-page">
-      <div className="pg-container">
-        <header className="pg-subpage-header">
-          <div>
-            <p className="pg-kicker">PERSONAL WORKSPACE</p>
-            <h1 className="pg-subpage-title">
-              {user ? `${user.displayName} 的创作空间` : "我的收藏与文稿空间"}
-            </h1>
-            <p className="pg-subpage-lead">
-              {user
-                ? user.bio ||
-                  "集中管理云端收藏风格、在线生成的 PPT 文稿、公开发布与私有草稿。"
-                : "当前以访客模式展示本地收藏；登录后会自动将本地收藏合并至云端，并解锁云端文稿与作品管理。"}
-            </p>
-          </div>
-          <div className="pg-subpage-actions">
+    <main className="gl-col" id="gl-collections-page">
+      <PageHeader
+        className="gl-col-hero"
+        icon={<FolderKanban size={22} />}
+        title="我的项目"
+        subtitle={
+          user
+            ? "管理你创建的所有演示文稿、风格收藏与发布作品，随时编辑、分享与导出"
+            : "当前以访客模式展示本地收藏；登录后可云端保存演示文稿并跨设备同步"
+        }
+        actions={
+          <div className="gl-col-hero-actions">
             {user ? (
               <>
-                <button
-                  type="button"
-                  className="pg-btn pg-btn-secondary"
-                  onClick={openProfileModal}
+                <Button
+                  variant="secondary"
+                  size="md"
                   id="pg-edit-profile-btn"
+                  leftIcon={<Pencil size={14} />}
+                  onClick={openProfileModal}
                 >
-                  <Pencil size={14} />
-                  <span>编辑个人资料</span>
-                </button>
+                  编辑个人资料
+                </Button>
                 <Link
                   href={`/creator/${user.username}`}
-                  className="pg-btn pg-btn-secondary"
+                  className="gl-btn gl-btn--secondary gl-btn--md"
                 >
-                  <UserIcon size={14} />
+                  <UserIcon size={14} aria-hidden="true" />
                   <span>公开主页</span>
                 </Link>
               </>
             ) : (
-              <button
-                type="button"
-                className="pg-btn pg-btn-secondary"
+              <Button
+                variant="secondary"
+                size="md"
+                leftIcon={<UserIcon size={15} />}
                 onClick={() => openAuthModal("login")}
               >
-                <UserIcon size={15} />
-                <span>登录同步云端</span>
-              </button>
+                登录同步云端
+              </Button>
             )}
-            <Link href="/create" className="pg-btn pg-btn-primary">
-              <Plus size={15} />
-              <span>发布新风格</span>
+            <Link
+              href="/generate"
+              className="gl-btn gl-btn--primary gl-btn--md"
+              id="gl-col-new-deck-btn"
+            >
+              <Plus size={15} aria-hidden="true" />
+              <span>新建演示文稿</span>
             </Link>
           </div>
-        </header>
+        }
+      />
 
-        {/* 4-Tab Bar */}
-        <div className="pg-collection-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "favorites"}
-            className={`pg-pill ${tab === "favorites" ? "is-active" : ""}`}
-            onClick={() => setTab("favorites")}
-            id="pg-tab-favorites"
+      {/* 4 Real KPI Stat Cards */}
+      <section className="gl-col-stats" aria-label="项目统计概览">
+        <button
+          type="button"
+          className={`gl-col-stat ${tab === "decks" ? "is-active" : ""}`}
+          onClick={() => setTab("decks")}
+        >
+          <span className="gl-col-stat-icon" aria-hidden="true">
+            <Layers size={20} />
+          </span>
+          <span className="gl-col-stat-body">
+            <strong className="gl-col-stat-value">{decks.length}</strong>
+            <span className="gl-col-stat-label">全部项目</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={`gl-col-stat ${tab === "recent" ? "is-active" : ""}`}
+          onClick={() => setTab("recent")}
+        >
+          <span
+            className="gl-col-stat-icon gl-col-stat-icon--recent"
+            aria-hidden="true"
           >
-            <Bookmark size={14} />
-            <span>
-              已收藏风格 ({favoritePrompts.length}
-              {!user ? " · 本地" : ""})
-            </span>
-          </button>
+            <Clock size={20} />
+          </span>
+          <span className="gl-col-stat-body">
+            <strong className="gl-col-stat-value">{recentDecksCount}</strong>
+            <span className="gl-col-stat-label">最近编辑</span>
+          </span>
+        </button>
 
+        <button
+          type="button"
+          className={`gl-col-stat ${tab === "public" ? "is-active" : ""}`}
+          onClick={() => setTab("public")}
+        >
+          <span
+            className="gl-col-stat-icon gl-col-stat-icon--public"
+            aria-hidden="true"
+          >
+            <Globe size={20} />
+          </span>
+          <span className="gl-col-stat-body">
+            <strong className="gl-col-stat-value">{publicDecksCount}</strong>
+            <span className="gl-col-stat-label">公开分享</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={`gl-col-stat ${tab === "favorites" ? "is-active" : ""}`}
+          onClick={() => setTab("favorites")}
+        >
+          <span
+            className="gl-col-stat-icon gl-col-stat-icon--fav"
+            aria-hidden="true"
+          >
+            <Bookmark size={20} />
+          </span>
+          <span className="gl-col-stat-body">
+            <strong className="gl-col-stat-value">
+              {favoritePrompts.length}
+            </strong>
+            <span className="gl-col-stat-label">我收藏的</span>
+          </span>
+        </button>
+      </section>
+
+      {/* Honest Filter Tabs + Search + Sort + Grid/List Bar */}
+      <section className="gl-col-bar" aria-label="筛选与视图切换">
+        <div className="gl-col-tabs" role="tablist" aria-label="项目分类">
           <button
             type="button"
             role="tab"
-            aria-selected={tab === "decks"}
-            className={`pg-pill ${tab === "decks" ? "is-active" : ""}`}
-            onClick={() => setTab("decks")}
             id="pg-tab-decks"
+            aria-selected={tab === "decks"}
+            className={`gl-col-tab ${tab === "decks" ? "is-active" : ""}`}
+            onClick={() => setTab("decks")}
           >
-            <FolderKanban size={14} />
-            <span>我保存的 PPT 文稿 ({decks.length})</span>
+            <span>全部项目</span>
+            <span className="gl-col-tab-count">{decks.length}</span>
           </button>
 
           <button
             type="button"
             role="tab"
-            aria-selected={tab === "mine"}
-            className={`pg-pill ${tab === "mine" ? "is-active" : ""}`}
-            onClick={() => setTab("mine")}
+            aria-selected={tab === "recent"}
+            className={`gl-col-tab ${tab === "recent" ? "is-active" : ""}`}
+            onClick={() => setTab("recent")}
+          >
+            <span>最近编辑</span>
+            <span className="gl-col-tab-count">{recentDecksCount}</span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "public"}
+            className={`gl-col-tab ${tab === "public" ? "is-active" : ""}`}
+            onClick={() => setTab("public")}
+          >
+            <span>公开分享</span>
+            <span className="gl-col-tab-count">{publicDecksCount}</span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            id="pg-tab-favorites"
+            aria-selected={tab === "favorites"}
+            className={`gl-col-tab ${tab === "favorites" ? "is-active" : ""}`}
+            onClick={() => setTab("favorites")}
+          >
+            <span>我收藏的</span>
+            <span className="gl-col-tab-count">{favoritePrompts.length}</span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
             id="pg-tab-mine"
+            aria-selected={tab === "mine"}
+            className={`gl-col-tab ${tab === "mine" ? "is-active" : ""}`}
+            onClick={() => setTab("mine")}
           >
-            <Sparkles size={14} />
-            <span>我发布的风格 ({myPrompts.length})</span>
+            <span>我发布的</span>
+            <span className="gl-col-tab-count">{myPrompts.length}</span>
           </button>
 
           <button
             type="button"
             role="tab"
-            aria-selected={tab === "liked"}
-            className={`pg-pill ${tab === "liked" ? "is-active" : ""}`}
-            onClick={() => setTab("liked")}
             id="pg-tab-liked"
+            aria-selected={tab === "liked"}
+            className={`gl-col-tab ${tab === "liked" ? "is-active" : ""}`}
+            onClick={() => setTab("liked")}
           >
-            <Heart size={14} />
-            <span>我点赞的 ({likedPrompts.length})</span>
+            <span>我点赞的</span>
+            <span className="gl-col-tab-count">{likedPrompts.length}</span>
           </button>
         </div>
 
-        {/* TAB 2: Saved Cloud PPT Decks */}
-        {tab === "decks" ? (
-          decks.length > 0 ? (
-            <div className="pg-decks-grid">
-              {decks.map((deck) => (
-                <article key={deck.id} className="pg-deck-card">
-                  <div className="pg-deck-thumb-wrap">
-                    <Link
-                      href={`/generate?deck=${deck.id}`}
-                      className="pg-deck-thumb"
-                      style={{ display: "block" }}
-                    >
-                      <SlideCanvas
-                        spec={deck.visualSpec}
-                        slideType={deck.slides[0]?.slideType || "cover"}
-                        topic={deck.title}
-                        subtitle={deck.subtitle}
-                        audience={deck.audience}
-                        slideData={deck.slides[0]}
-                        pageIndex={0}
-                        totalPages={deck.slides.length}
-                      />
-                    </Link>
-                  </div>
-                  <div className="pg-deck-body">
-                    <h3 className="pg-deck-title">{deck.title}</h3>
-                    <div className="pg-deck-meta">
-                      <span
-                        className={`pg-tag ${
-                          deck.isPublic ? "pg-tag-scenario" : "pg-tag-private"
-                        }`}
-                      >
-                        {deck.isPublic ? <Globe size={10} /> : <Lock size={10} />}
-                        <span>{deck.isPublic ? "公开分享" : "仅自己可见"}</span>
-                      </span>
-                      <span className="pg-tag">{deck.slides.length} 页</span>
-                      <span>母版：{deck.promptTitle}</span>
-                    </div>
+        <div className="gl-col-controls">
+          <div className="gl-col-search">
+            <Search
+              size={14}
+              className="gl-col-search-icon"
+              aria-hidden="true"
+            />
+            <input
+              type="search"
+              aria-label="搜索项目名称、内容或标签"
+              placeholder="搜索项目名称、内容或标签"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="gl-col-search-clear"
+                aria-label="清空搜索"
+                onClick={() => setSearchQuery("")}
+              >
+                <X size={13} aria-hidden="true" />
+              </button>
+            )}
+          </div>
 
-                    <div className="pg-deck-actions">
-                      <Link
-                        href={`/generate?deck=${deck.id}`}
-                        className="pg-btn pg-btn-ink pg-btn-xs"
-                      >
-                        <Pencil size={12} />
-                        <span>继续编辑</span>
-                      </Link>
-                      <Link
-                        href={`/deck/${deck.id}`}
-                        className="pg-btn pg-btn-secondary pg-btn-xs"
-                      >
-                        <Play size={12} />
-                        <span>演播</span>
-                      </Link>
-                      <button
-                        type="button"
-                        className="pg-btn pg-btn-secondary pg-btn-xs"
-                        onClick={() => handleToggleDeckVisibility(deck)}
-                      >
-                        {deck.isPublic ? <Lock size={12} /> : <Globe size={12} />}
-                        <span>{deck.isPublic ? "设为私有" : "开启分享"}</span>
-                      </button>
-                      {deck.isPublic && (
-                        <button
-                          type="button"
-                          className="pg-btn pg-btn-secondary pg-btn-xs"
-                          onClick={() => handleCopyDeckLink(deck.id)}
-                        >
-                          {copiedDeckId === deck.id ? (
-                            <Check size={12} />
-                          ) : (
-                            <Link2 size={12} />
-                          )}
-                          <span>{copiedDeckId === deck.id ? "已复制" : "链接"}</span>
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="pg-btn pg-btn-secondary pg-btn-xs"
-                        disabled={exportingDeckId === deck.id}
-                        onClick={() => handleExportDeckPptx(deck)}
-                      >
-                        <FileSpreadsheet size={12} />
-                        <span>.pptx</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="pg-stat-btn pg-stat-btn-danger"
-                        onClick={() => handleDeleteDeck(deck)}
-                        title="删除文稿"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                </article>
+          {isDeckTab && (
+            <>
+              <select
+                className="gl-col-select"
+                aria-label="按可见性筛选"
+                value={visibilityFilter}
+                onChange={(e) =>
+                  setVisibilityFilter(
+                    e.target.value as "all" | "public" | "private"
+                  )
+                }
+              >
+                <option value="all">全部可见性</option>
+                <option value="public">公开分享</option>
+                <option value="private">仅自己可见</option>
+              </select>
+
+              <select
+                className="gl-col-select"
+                name="sort"
+                aria-label="排序方式"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as ProjectSort)}
+              >
+                <option value="updated">最近编辑</option>
+                <option value="created">最早创建</option>
+                <option value="slides">页数最多</option>
+                <option value="title">按名称排序</option>
+              </select>
+
+              <div className="gl-col-view-toggle" role="group" aria-label="视图切换">
+                <button
+                  type="button"
+                  className={`gl-col-view-btn ${
+                    viewMode === "grid" ? "is-active" : ""
+                  }`}
+                  aria-label="网格视图"
+                  title="网格视图"
+                  aria-pressed={viewMode === "grid"}
+                  onClick={() => setViewMode("grid")}
+                >
+                  <LayoutGrid size={15} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={`gl-col-view-btn ${
+                    viewMode === "list" ? "is-active" : ""
+                  }`}
+                  aria-label="列表视图"
+                  title="列表视图"
+                  aria-pressed={viewMode === "list"}
+                  onClick={() => setViewMode("list")}
+                >
+                  <List size={15} aria-hidden="true" />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* Content Area */}
+      {isDeckTab ? (
+        filteredDecks.length > 0 ? (
+          <section
+            aria-label="演示文稿列表"
+            className={
+              viewMode === "grid"
+                ? "gl-col-projects-grid"
+                : "gl-col-projects-list"
+            }
+          >
+            {filteredDecks.map((deck) => (
+              <ProjectCard
+                key={deck.id}
+                deck={deck}
+                viewMode={viewMode}
+                now={now}
+                copiedDeckId={copiedDeckId}
+                exportingDeckId={exportingDeckId}
+                duplicatingDeckId={duplicatingDeckId}
+                onRequestRename={handleOpenRename}
+                onToggleVisibility={handleToggleDeckVisibility}
+                onCopyLink={handleCopyDeckLink}
+                onDuplicate={handleDuplicateDeck}
+                onExportPptx={handleExportDeckPptx}
+                onRequestDelete={setDeletingDeck}
+              />
+            ))}
+          </section>
+        ) : hasSearchOrFilter ? (
+          <EmptyState
+            icon={<Search size={24} />}
+            title="未找到匹配的演示文稿"
+            description="尝试更换关键词或清除筛选条件，查看全部已保存的项目。"
+            primaryAction={
+              <Button
+                variant="secondary"
+                size="md"
+                leftIcon={<RotateCcw size={14} />}
+                onClick={resetSearchAndFilters}
+              >
+                清除筛选
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={<FolderKanban size={24} />}
+            title={
+              !user
+                ? "登录后即可云端管理演示文稿"
+                : tab === "public"
+                ? "还没有开启公开分享的文稿"
+                : "还没有保存的演示文稿"
+            }
+            description={
+              !user
+                ? "登录账号后，在创作工坊生成的演示文稿会保存在这里，支持重命名、复制、公开分享与导出 .pptx。"
+                : "前往创作工坊输入主题或上传文档，生成并保存你的第一份演示文稿。"
+            }
+            primaryAction={
+              !user ? (
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => openAuthModal("login")}
+                >
+                  立即登录
+                </Button>
+              ) : (
+                <Link
+                  href="/generate"
+                  className="gl-btn gl-btn--primary gl-btn--md"
+                >
+                  <Plus size={15} aria-hidden="true" />
+                  <span>新建演示文稿</span>
+                </Link>
+              )
+            }
+          />
+        )
+      ) : (
+        <>
+          {tab === "mine" && user && (
+            <div className="gl-col-subbar" role="group" aria-label="按可见性筛选我的风格">
+              {(
+                [
+                  { id: "all", label: `全部 (${myPrompts.length})` },
+                  {
+                    id: "public",
+                    label: `公开 (${myPrompts.filter((p) => p.isPublic).length})`,
+                  },
+                  {
+                    id: "private",
+                    label: `仅自己可见 (${myPrompts.filter((p) => !p.isPublic).length})`,
+                  },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className={`gl-col-tab ${mineFilter === f.id ? "is-active" : ""}`}
+                  onClick={() => setMineFilter(f.id)}
+                >
+                  {f.label}
+                </button>
               ))}
+              <Link
+                href="/create"
+                className="gl-btn gl-btn--secondary gl-btn--sm"
+                style={{ marginLeft: "auto" }}
+              >
+                <Plus size={14} aria-hidden="true" />
+                <span>发布新风格</span>
+              </Link>
             </div>
+          )}
+
+          {filteredPrompts.length > 0 ? (
+            <section className="gl-gallery-grid" aria-label="风格列表">
+              {filteredPrompts.map((prompt) => (
+                <div key={prompt.id}>
+                  <StyleCard
+                    prompt={prompt}
+                    liveTopic={globalTopic}
+                    onPreview={(item) => setPreviewSlug(item.slug)}
+                    onUpdatePrompt={handleUpdatePrompt}
+                  />
+                  {tab === "mine" && user && user.id === prompt.authorId && (
+                    <div className="gl-col-mine-actions">
+                      <Link
+                        href={`/create?edit=${encodeURIComponent(prompt.slug)}`}
+                        className="gl-btn gl-btn--ghost gl-btn--sm"
+                      >
+                        <Pencil size={13} aria-hidden="true" />
+                        <span>编辑</span>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        leftIcon={<Trash2 size={13} />}
+                        onClick={() => setDeletingPrompt(prompt)}
+                      >
+                        删除
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </section>
+          ) : hasSearchOrFilter ? (
+            <EmptyState
+              icon={<Search size={24} />}
+              title="未找到匹配的风格"
+              description="清空搜索词即可恢复展示。"
+              primaryAction={
+                <Button
+                  variant="secondary"
+                  size="md"
+                  leftIcon={<RotateCcw size={14} />}
+                  onClick={resetSearchAndFilters}
+                >
+                  清除筛选
+                </Button>
+              }
+            />
           ) : (
-            <div className="pg-empty-state">
-              <FolderKanban size={28} strokeWidth={1.5} />
-              <h2>
-                {user ? "还没有保存过云端 PPT 文稿" : "登录后可云端保存生成的 PPT"}
-              </h2>
-              <p>
-                前往在线生成工坊，粘贴你的主题或文档一键生成整套幻灯片，随时保存并导出原生
-                .pptx。
-              </p>
-              <div className="pg-empty-actions">
-                {!user && (
-                  <button
-                    type="button"
-                    className="pg-btn pg-btn-secondary"
+            <EmptyState
+              icon={
+                tab === "liked" ? (
+                  <Heart size={24} />
+                ) : tab === "mine" ? (
+                  <Sparkles size={24} />
+                ) : (
+                  <Bookmark size={24} />
+                )
+              }
+              title={
+                tab === "favorites"
+                  ? "还没有收藏任何 PPT 风格"
+                  : tab === "mine"
+                  ? user
+                    ? "还没有发布原创风格"
+                    : "登录后查看并管理你发布的风格"
+                  : user
+                  ? "还没有点赞过风格"
+                  : "登录后查看你的点赞记录"
+              }
+              description={
+                tab === "mine"
+                  ? "使用风格创作器调配一套 16:9 视觉母版，支持公开分享或私密保存。"
+                  : "前往风格画廊浏览 36+ 套视觉设计系统，随时收藏或用于生成 PPT。"
+              }
+              primaryAction={
+                !user && tab !== "favorites" ? (
+                  <Button
+                    variant="primary"
+                    size="md"
                     onClick={() => openAuthModal("login")}
                   >
                     立即登录
-                  </button>
-                )}
-                <Link href="/generate" className="pg-btn pg-btn-primary">
-                  前往在线生成 PPT 工坊
-                </Link>
-              </div>
-            </div>
-          )
-        ) : (
-          <>
-            {/* Visibility filter pills for My Published Styles */}
-            {tab === "mine" && user && (
-              <div className="pg-mine-filter-bar" role="group" aria-label="按可见性筛选我的风格">
-                <span className="pg-filter-label">可见性筛选：</span>
-                {(
-                  [
-                    { id: "all", label: `全部 (${myPrompts.length})` },
-                    {
-                      id: "public",
-                      label: `公开 (${myPrompts.filter((p) => p.isPublic).length})`,
-                    },
-                    {
-                      id: "private",
-                      label: `仅自己可见 (${myPrompts.filter((p) => !p.isPublic).length})`,
-                    },
-                  ] as const
-                ).map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    className={`pg-mini-pill ${
-                      mineFilter === f.id ? "is-active" : ""
-                    }`}
-                    onClick={() => setMineFilter(f.id)}
+                  </Button>
+                ) : tab === "mine" ? (
+                  <Link
+                    href="/create"
+                    className="gl-btn gl-btn--primary gl-btn--md"
                   >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {(() => {
-              const list =
-                tab === "favorites"
-                  ? favoritePrompts
-                  : tab === "mine"
-                  ? filteredMyPrompts
-                  : likedPrompts;
-
-              if (list.length > 0) {
-                return (
-                  <div className="pg-gallery-grid">
-                    {list.map((prompt) => (
-                      <PromptCard
-                        key={prompt.id}
-                        prompt={prompt}
-                        onUpdatePrompt={handleUpdatePrompt}
-                        onDeletePrompt={handleDeletePrompt}
-                        showDelete={tab === "mine"}
-                        showEdit={tab === "mine"}
-                      />
-                    ))}
-                  </div>
-                );
+                    去发布新风格
+                  </Link>
+                ) : (
+                  <Link
+                    href="/gallery"
+                    className="gl-btn gl-btn--primary gl-btn--md"
+                  >
+                    浏览风格画廊
+                  </Link>
+                )
               }
-
-              return (
-                <div className="pg-empty-state">
-                  <Bookmark size={28} strokeWidth={1.5} />
-                  <h2>
-                    {tab === "favorites"
-                      ? "还没有收藏任何 PPT 风格"
-                      : tab === "mine"
-                      ? user
-                        ? "当前筛选下暂无原创风格"
-                        : "登录后查看并管理你发布的风格"
-                      : user
-                      ? "还没有点赞过提示词"
-                      : "登录后查看你的点赞记录"}
-                  </h2>
-                  <p>
-                    {tab === "mine"
-                      ? "使用可视化编辑器创作一套可交互的 16:9 风格模板，支持公开分享或私密保存。"
-                      : "去视觉画廊浏览 18+ 套精选设计系统，点击收藏按钮随时留存备用。"}
-                  </p>
-                  <div className="pg-empty-actions">
-                    {!user && tab !== "favorites" ? (
-                      <button
-                        type="button"
-                        className="pg-btn pg-btn-primary"
-                        onClick={() => openAuthModal("login")}
-                      >
-                        立即登录 / 体验演示账号
-                      </button>
-                    ) : tab === "mine" ? (
-                      <Link href="/create" className="pg-btn pg-btn-primary">
-                        去创作第一套风格
-                      </Link>
-                    ) : (
-                      <Link href="/" className="pg-btn pg-btn-primary">
-                        前往视觉画廊挑选
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-          </>
-        )}
-      </div>
-
-      {/* Edit User Profile Modal */}
-      {profileModalOpen && user && (
-        <div
-          className="pg-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="pg-profile-modal-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setProfileModalOpen(false);
-          }}
-        >
-          <div className="pg-modal">
-            <div className="pg-modal-head">
-              <div>
-                <h2 id="pg-profile-modal-title" className="pg-modal-title">
-                  编辑创作者个人资料
-                </h2>
-                <p className="pg-modal-sub">
-                  资料将公开展示在你的创作者主页与发布作品名片上
-                </p>
-              </div>
-              <button
-                type="button"
-                className="pg-icon-btn"
-                onClick={() => setProfileModalOpen(false)}
-                aria-label="关闭窗口"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveProfile} className="pg-form">
-              <div className="pg-field">
-                <label htmlFor="pg-profile-name">创作者昵称</label>
-                <input
-                  id="pg-profile-name"
-                  type="text"
-                  required
-                  minLength={2}
-                  maxLength={32}
-                  value={profName}
-                  onChange={(e) => setProfName(e.target.value)}
-                />
-              </div>
-
-              <div className="pg-field">
-                <label htmlFor="pg-profile-bio">个人简介</label>
-                <textarea
-                  id="pg-profile-bio"
-                  rows={2}
-                  maxLength={140}
-                  value={profBio}
-                  onChange={(e) => setProfBio(e.target.value)}
-                />
-              </div>
-
-              <div className="pg-field">
-                <label>头像主题色</label>
-                <div className="pg-accent-row">
-                  {PROFILE_COLORS.map((hex) => (
-                    <button
-                      key={hex}
-                      type="button"
-                      className={`pg-accent-dot ${
-                        profColor.toLowerCase() === hex.toLowerCase()
-                          ? "is-active"
-                          : ""
-                      }`}
-                      style={{ background: hex }}
-                      onClick={() => setProfColor(hex)}
-                      aria-label={`选择头像色 ${hex}`}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {profError && <div className="pg-form-error">{profError}</div>}
-
-              <button
-                type="submit"
-                className="pg-btn pg-btn-primary pg-btn-full"
-                disabled={profSaving}
-                id="pg-profile-save-btn"
-              >
-                {profSaving ? "保存中..." : "保存个人资料"}
-              </button>
-            </form>
-          </div>
-        </div>
+            />
+          )}
+        </>
       )}
+
+      <StyleDetailDrawer
+        key={previewPrompt?.id ?? "closed"}
+        prompt={previewPrompt}
+        liveTopic={globalTopic}
+        onLiveTopicChange={setGlobalTopic}
+        onClose={() => setPreviewSlug(null)}
+        onUpdatePrompt={handleUpdatePrompt}
+      />
+
+      {/* Rename Deck Dialog */}
+      <Dialog
+        open={Boolean(renamingDeck)}
+        onClose={() => !renameSaving && setRenamingDeck(null)}
+        title="重命名演示文稿"
+        description="更新后的名称会立即同步到云端项目列表与编辑器顶栏"
+        size="sm"
+        id="gl-rename-deck-dialog"
+      >
+        <form
+          className="gl-col-dialog-form"
+          data-rename-dialog="true"
+          onSubmit={handleConfirmRename}
+        >
+          <TextInput
+            label="项目名称"
+            value={renameTitle}
+            onChange={(e) => {
+              setRenameTitle(e.target.value);
+              if (renameError) setRenameError("");
+            }}
+            maxLength={120}
+            required
+            error={renameError || undefined}
+            autoFocus
+            id="gl-rename-deck-input"
+          />
+          <div className="gl-col-dialog-actions">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setRenamingDeck(null)}
+              disabled={renameSaving}
+            >
+              取消
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              loading={renameSaving}
+              loadingText="保存中…"
+            >
+              确认保存
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* Delete Deck Confirmation Dialog */}
+      <Dialog
+        open={Boolean(deletingDeck)}
+        onClose={() => !deletingBusy && setDeletingDeck(null)}
+        title="确认删除演示文稿？"
+        description="删除后将永久移除且无法恢复，请确认是否继续操作。"
+        size="sm"
+        id="gl-delete-deck-dialog"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setDeletingDeck(null)}
+              disabled={deletingBusy}
+            >
+              取消
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              loading={deletingBusy}
+              loadingText="删除中…"
+              onClick={handleConfirmDeleteDeck}
+            >
+              确认删除
+            </Button>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 13.5, color: "var(--gl-text-secondary)" }}>
+          将永久删除云端项目「<strong>{deletingDeck?.title}</strong>」。
+        </p>
+      </Dialog>
+
+      {/* Delete Published Style Confirmation Dialog */}
+      <Dialog
+        open={Boolean(deletingPrompt)}
+        onClose={() => !deletingPromptBusy && setDeletingPrompt(null)}
+        title="确认删除原创风格？"
+        description="删除后无法恢复，相关分享链接将失效。"
+        size="sm"
+        id="gl-delete-prompt-dialog"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setDeletingPrompt(null)}
+              disabled={deletingPromptBusy}
+            >
+              取消
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              loading={deletingPromptBusy}
+              loadingText="删除中…"
+              onClick={handleConfirmDeletePrompt}
+            >
+              确认删除
+            </Button>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 13.5, color: "var(--gl-text-secondary)" }}>
+          将永久删除你发布的模板「<strong>{deletingPrompt?.title}</strong>」。
+        </p>
+      </Dialog>
+
+      {/* Edit User Profile Dialog */}
+      <Dialog
+        open={profileModalOpen && Boolean(user)}
+        onClose={() => !profSaving && setProfileModalOpen(false)}
+        title="编辑创作者个人资料"
+        description="资料将展示在你的创作者主页与发布作品名片上"
+        size="sm"
+        id="gl-profile-dialog"
+      >
+        <form onSubmit={handleSaveProfile} className="gl-col-dialog-form">
+          <TextInput
+            id="pg-profile-name"
+            label="创作者昵称"
+            required
+            minLength={2}
+            maxLength={32}
+            value={profName}
+            onChange={(e) => setProfName(e.target.value)}
+          />
+          <TextInput
+            id="pg-profile-bio"
+            label="个人简介"
+            maxLength={140}
+            value={profBio}
+            onChange={(e) => setProfBio(e.target.value)}
+            placeholder="一句话介绍你的演示风格与擅长领域"
+          />
+          <div className="gl-field">
+            <span className="gl-field-label">头像主题色</span>
+            <div className="gl-swatch-row">
+              {PROFILE_COLORS.map((hex) => (
+                <button
+                  key={hex}
+                  type="button"
+                  className={`gl-swatch-btn ${
+                    profColor.toLowerCase() === hex.toLowerCase()
+                      ? "is-selected"
+                      : ""
+                  }`}
+                  style={{ background: hex }}
+                  onClick={() => setProfColor(hex)}
+                  aria-label={`选择头像色 ${hex}`}
+                />
+              ))}
+            </div>
+          </div>
+          {profError && (
+            <p className="gl-field-error" role="alert">
+              {profError}
+            </p>
+          )}
+          <div className="gl-col-dialog-actions">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setProfileModalOpen(false)}
+              disabled={profSaving}
+            >
+              取消
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              loading={profSaving}
+              id="pg-profile-save-btn"
+            >
+              保存个人资料
+            </Button>
+          </div>
+        </form>
+      </Dialog>
     </main>
   );
 }
