@@ -285,7 +285,7 @@ export default function CreatePanel({
               ref={topicRef}
               label="演示主题"
               hideLabel
-              placeholder="描述你的演示主题，例如「钙钛矿太阳能电池的结晶调控与稳定性研究」"
+              placeholder="描述你的演示主题，例如「Attention Is All You Need 论文精读」或「高中物理 · 牛顿第二定律公开课」"
               value={topic}
               maxLength={TOPIC_MAX}
               rows={3}
