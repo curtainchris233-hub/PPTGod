@@ -31,11 +31,12 @@ export function renderImageSplit(ctx: SlideRenderContext) {
     slot?.kind === "data-url" &&
     typeof slot.dataUrl === "string" &&
     slot.dataUrl.startsWith("data:image/");
-  const imageSrc = hasCustomDataUrl
-    ? slot.dataUrl!
-    : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-        renderArtworkSvgString(presetId, palette)
-      )}`;
+  const artworkSvgMarkup = hasCustomDataUrl
+    ? ""
+    : renderArtworkSvgString(presetId, palette).replace(
+        "<svg ",
+        '<svg style="width:100%;height:100%;display:block" '
+      );
   const caption = slot?.caption || `${topic.slice(0, 18)} · 核心视觉构成`;
   const bullets =
     slideData?.bullets && slideData.bullets.length > 0
@@ -71,17 +72,31 @@ export function renderImageSplit(ctx: SlideRenderContext) {
           justifyContent: "center",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageSrc}
-          alt={caption}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: hasCustomDataUrl ? "cover" : "contain",
-            display: "block",
-          }}
-        />
+        {hasCustomDataUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={slot!.dataUrl!}
+            alt={caption}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+            }}
+          />
+        ) : (
+          <div
+            aria-label={caption}
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            dangerouslySetInnerHTML={{ __html: artworkSvgMarkup }}
+          />
+        )}
       </div>
       <div
         style={{

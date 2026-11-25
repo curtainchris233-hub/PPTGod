@@ -26,6 +26,7 @@ interface DeckSpecTweakerProps {
   handoffApplied: boolean;
   onChangeSpec: (next: VisualSpec) => void;
   onResetSpec: () => void;
+  defaultOpen?: boolean;
 }
 
 export default function DeckSpecTweaker({
@@ -34,8 +35,9 @@ export default function DeckSpecTweaker({
   handoffApplied,
   onChangeSpec,
   onResetSpec,
+  defaultOpen = false,
 }: DeckSpecTweakerProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
 
   const isCustomized =
     JSON.stringify(deckSpec) !== JSON.stringify(baseSpec);

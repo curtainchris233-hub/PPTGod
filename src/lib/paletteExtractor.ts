@@ -260,14 +260,19 @@ export function evaluatePaletteContrast(
 export function autoFixPaletteContrast(palette: VisualPalette): VisualPalette {
   const bgRgb = parseColorToRgb(palette.bg, { r: 255, g: 255, b: 255 });
   const isDark = relativeLuminance(bgRgb) < 0.35;
+  const surfaceRgb = parseColorToRgb(palette.surface, bgRgb);
+  const surfaceMatchesPolarity = isDark
+    ? relativeLuminance(surfaceRgb) < 0.45
+    : relativeLuminance(surfaceRgb) >= 0.45;
 
   const fixedSurface =
+    surfaceMatchesPolarity &&
     computeContrastRatio(palette.surface, palette.bg) > 1.03
       ? palette.surface
       : rgbToHex(
           mixRgb(
             bgRgb,
-            isDark ? { r: 255, g: 255, b: 255 } : { r: 255, g: 255, b: 255 },
+            { r: 255, g: 255, b: 255 },
             isDark ? 0.08 : 0.6
           )
         );

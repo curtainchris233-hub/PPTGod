@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -22,6 +22,9 @@ interface DeckAuditDrawerProps {
   onAutoFillNotes: () => void;
   /** Opens the report on mount (e.g. deep link `/generate?panel=audit`). */
   defaultOpen?: boolean;
+  /** Optional controlled open state synced with Editor topbar. */
+  open?: boolean;
+  onOpenChange?: (next: boolean) => void;
 }
 
 export default function DeckAuditDrawer({
@@ -33,16 +36,18 @@ export default function DeckAuditDrawer({
   onAutoFixContrast,
   onAutoFillNotes,
   defaultOpen = false,
+  open: controlledOpen,
+  onOpenChange,
 }: DeckAuditDrawerProps) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (controlledOpen === undefined) {
+      setInternalOpen(next);
+    }
+    onOpenChange?.(next);
+  };
   const barRef = useRef<HTMLDivElement | null>(null);
-
-  // Deep link: bring the opened report into view once, without stealing focus.
-  useEffect(() => {
-    if (!defaultOpen) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    barRef.current?.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
-  }, [defaultOpen]);
 
   const report = useMemo(
     () => auditDeckQuality(slides, spec, { topic, audience }),
@@ -77,12 +82,12 @@ export default function DeckAuditDrawer({
           type="button"
           id="pg-deck-audit-toggle"
           className={`pg-btn pg-btn-ghost pg-btn-xs ${open ? "is-open" : ""}`}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(!open)}
           aria-expanded={open}
-          title="展开整套 PPT 智能体检与一键修复"
+          title="展开整套 PPT 设计体检与一键修复"
         >
           <ShieldCheck size={13} />
-          <span>智能体检</span>
+          <span>设计体检</span>
         </button>
 
         <div className="pg-audit-bar-metrics">
