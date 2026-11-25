@@ -27,10 +27,10 @@
   align-items: center;
   gap: 4px;
   padding: 4px;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.88);
-  box-shadow: var(--neu-inset-soft);
+  border-radius: var(--gl-radius-pill, 999px);
+  background: var(--gl-surface, #ffffff);
+  border: 1px solid var(--gl-border, #e2e8f0);
+  box-shadow: var(--gl-shadow-xs);
   flex-wrap: wrap;
 }
 
@@ -39,10 +39,10 @@
   align-items: center;
   gap: 6px;
   padding: 7px 14px;
-  border-radius: var(--radius-full);
+  border-radius: var(--gl-radius-pill, 999px);
   border: none;
   background: transparent;
-  color: var(--ink-secondary);
+  color: var(--gl-text-secondary, #475569);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -57,27 +57,23 @@
 }
 
 .pg-tools-tab:hover {
-  color: var(--ink-primary);
+  color: var(--gl-text, #0f172a);
 }
 
 .pg-tools-tab.is-active {
-  background: linear-gradient(135deg, #172033 0%, #27354f 100%);
+  background: var(--gl-primary, #2563eb);
   color: #ffffff;
-  box-shadow: var(--shadow-xs);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 .pg-tools-stage {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(
-    165deg,
-    rgba(255, 255, 255, 0.88) 0%,
-    rgba(248, 251, 255, 0.76) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  border-radius: var(--radius-lg);
+  background: var(--gl-surface, #ffffff);
+  border: 1px solid var(--gl-border, #e2e8f0);
+  border-radius: var(--gl-radius-xl, 16px);
   padding: 24px 26px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--gl-shadow-sm);
   animation: pgCanvasSwitch var(--dur-base) var(--ease-apple) both;
 }
 
@@ -292,5 +288,22 @@
   }
   .pg-tools-swatches {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .pg-tools-page .gl-page-header-actions {
+    width: 100%;
+    max-width: 100%;
+  }
+  .pg-tools-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    border-radius: var(--gl-radius-md, 12px);
+  }
+  .pg-tools-tab {
+    justify-content: center;
+    padding: 8px 10px;
   }
 }

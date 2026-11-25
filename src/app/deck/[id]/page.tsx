@@ -33,10 +33,13 @@ export async function generateMetadata({
 
 export default async function DeckSharePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ rehearsal?: string }>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
   const viewer = await getCurrentUser();
   const deck = getSavedDeckById(id);
 
@@ -48,5 +51,5 @@ export default async function DeckSharePage({
     notFound();
   }
 
-  return <DeckShareClient deck={deck} />;
+  return <DeckShareClient deck={deck} initialRehearsal={sp.rehearsal === "1"} />;
 }

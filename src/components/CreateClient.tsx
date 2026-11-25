@@ -15,6 +15,7 @@ import {
   Wand2,
   Wrench,
 } from "lucide-react";
+import PageHeader from "@/components/layout/PageHeader";
 import SlideCanvas from "@/components/SlideCanvas";
 import { useApp } from "@/context/AppContext";
 import {
@@ -455,37 +456,29 @@ export default function CreateClient({
   return (
     <main className="pg-page">
       <div className="pg-container">
-        <header className="pg-subpage-header">
-          <div>
-            <p className="pg-kicker">
-              {mode === "edit"
-                ? "EDIT PROMPT STYLE"
-                : mode === "fork"
-                ? "REMIX PROMPT STUDIO"
-                : "COMMUNITY PROMPT BUILDER"}
-            </p>
-            <h1 className="pg-subpage-title">
-              {mode === "edit"
-                ? `编辑模板 · ${sourcePrompt?.title}`
-                : mode === "fork"
-                ? `基于「${sourcePrompt?.title}」Remix 二创`
-                : "创作并发布你的 PPT 视觉提示词"}
-            </h1>
-            <p className="pg-subpage-lead">
-              调配配色体系、字体气质、版式网格与 5 维提示词拆解，左侧 16:9 画布实时预览全部 12 种商业页型，并可自由设置公开分享或仅自己可见。
-            </p>
-          </div>
-          {!user && (
-            <button
-              type="button"
-              className="pg-btn pg-btn-primary"
-              onClick={() => openAuthModal("login")}
-            >
-              <Lock size={15} />
-              <span>登录后即可发布</span>
-            </button>
-          )}
-        </header>
+        <PageHeader
+          icon={<Sparkles size={22} />}
+          title={
+            mode === "edit"
+              ? `编辑模板 · ${sourcePrompt?.title}`
+              : mode === "fork"
+              ? `基于「${sourcePrompt?.title}」Remix 二创`
+              : "创作并发布你的 PPT 视觉提示词"
+          }
+          subtitle="调配配色体系、字体气质、版式网格与 5 维提示词拆解，左侧 16:9 画布实时预览全部 12 种商业页型，并可自由设置公开分享或仅自己可见。"
+          actions={
+            !user ? (
+              <button
+                type="button"
+                className="pg-btn pg-btn-primary"
+                onClick={() => openAuthModal("login")}
+              >
+                <Lock size={15} />
+                <span>登录后即可发布</span>
+              </button>
+            ) : undefined
+          }
+        />
 
         {editForbidden && (
           <div className="pg-form-error" style={{ marginBottom: "18px" }}>

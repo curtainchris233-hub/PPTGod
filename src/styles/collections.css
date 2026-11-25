@@ -90,13 +90,12 @@
 }
 
 .gl-col-stat-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: block;
   min-width: 0;
 }
 
 .gl-col-stat-value {
+  display: block;
   color: var(--gl-text);
   font-size: 24px;
   font-weight: 700;
@@ -105,6 +104,8 @@
 }
 
 .gl-col-stat-label {
+  display: block;
+  margin-top: 2px;
   color: var(--gl-muted);
   font-size: 12.5px;
   font-weight: 500;

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import ToolsClient from "@/components/ToolsClient";
 import { getCurrentUser } from "@/lib/auth";
-import { listPrompts } from "@/lib/db";
+import { listPrompts, listSavedDecksByUser } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -19,5 +19,12 @@ export default async function ToolsPage({
   const sp = await searchParams;
   const viewer = await getCurrentUser();
   const styles = listPrompts({ sort: "popular", viewerId: viewer?.id });
-  return <ToolsClient styles={styles} initialTab={sp.tab} />;
+  const initialDecks = viewer ? listSavedDecksByUser(viewer.id) : [];
+  return (
+    <ToolsClient
+      styles={styles}
+      initialTab={sp.tab}
+      initialDecks={initialDecks}
+    />
+  );
 }

@@ -9,6 +9,7 @@ import {
   Keyboard,
   Layers,
   LogOut,
+  Search,
   ShieldCheck,
   User as UserIcon,
 } from "lucide-react";
@@ -32,6 +33,25 @@ const AVATAR_SWATCHES = [
 
 function GlacierHelpDialog() {
   const { helpModalOpen, closeHelpModal } = useLayout();
+  const [faqQuery, setFaqQuery] = useState("");
+  const q = faqQuery.trim().toLowerCase();
+
+  const matches = (keywords: string) =>
+    !q || keywords.toLowerCase().includes(q);
+
+  const showUpload = matches(
+    "文档导入解析规格 pdf docx pptx md txt 10mb 10 mb 扫描 ocr 上传"
+  );
+  const showEngine = matches(
+    "免 key 智能引擎 byok 隐私 api key 多语言 大模型 sqlite"
+  );
+  const showExport = matches(
+    "多格式导出能力 pptx html marp markdown 提示词 16:9 演讲备注"
+  );
+  const showShortcuts = matches(
+    "常用键盘快捷键 esc ctrl z shift 翻页 演播 备注 排练 驾驶舱"
+  );
+  const hasAny = showUpload || showEngine || showExport || showShortcuts;
 
   return (
     <Dialog
@@ -57,73 +77,99 @@ function GlacierHelpDialog() {
       }
     >
       <div className="gl-modal-sections">
-        <section className="gl-modal-section">
-          <div className="gl-modal-section-head">
-            <FileText size={16} strokeWidth={2} aria-hidden="true" />
-            <h3>文档导入与解析规格</h3>
-          </div>
-          <p className="gl-modal-section-text">
-            支持 <strong>.pdf</strong>、<strong>.docx</strong>、
-            <strong>.pptx</strong>、<strong>.md</strong>、<strong>.txt</strong>{" "}
-            共 5 种文档格式，单文件体积上限 <strong>10 MB</strong>。暂不支持旧版
-            .doc 二进制文件与图片 OCR 识别（纯扫描 PDF 建议先提取文字后粘贴）。
-          </p>
-        </section>
+        <TextInput
+          id="gl-help-search-input"
+          type="search"
+          size="sm"
+          label="搜索帮助主题"
+          hideLabel
+          leftIcon={<Search size={15} />}
+          placeholder="搜索常见问题、格式限制（如 10 MB）、BYOK 或快捷键…"
+          value={faqQuery}
+          onChange={(e) => setFaqQuery(e.target.value)}
+        />
 
-        <section className="gl-modal-section">
-          <div className="gl-modal-section-head">
-            <ShieldCheck size={16} strokeWidth={2} aria-hidden="true" />
-            <h3>免 Key 智能引擎与 BYOK 隐私</h3>
-          </div>
-          <p className="gl-modal-section-text">
-            开箱即用内置结构化智能排版引擎；如需更强语言润色与多语言生成，可在创作工坊开启
-            BYOK 自定义模型。你的 API Key 仅保留在当前浏览器会话中，绝不写入服务端
-            SQLite 数据库或日志。
-          </p>
-        </section>
+        {showUpload && (
+          <section className="gl-modal-section">
+            <div className="gl-modal-section-head">
+              <FileText size={16} strokeWidth={2} aria-hidden="true" />
+              <h3>文档导入与解析规格</h3>
+            </div>
+            <p className="gl-modal-section-text">
+              支持 <strong>.pdf</strong>、<strong>.docx</strong>、
+              <strong>.pptx</strong>、<strong>.md</strong>、<strong>.txt</strong>{" "}
+              共 5 种文档格式，单文件体积上限 <strong>10 MB</strong>。暂不支持旧版
+              .doc 二进制文件与图片 OCR 识别（纯扫描 PDF 建议先提取文字后粘贴）。
+            </p>
+          </section>
+        )}
 
-        <section className="gl-modal-section">
-          <div className="gl-modal-section-head">
-            <Layers size={16} strokeWidth={2} aria-hidden="true" />
-            <h3>多格式真实导出能力</h3>
-          </div>
-          <p className="gl-modal-section-text">
-            支持原生 16:9 <strong>.pptx</strong>（含 SlideMaster、原生图表/表格与演讲备注）、离线独立{" "}
-            <strong>.html</strong> 演示页、Marp Markdown、来源核验清单，以及适配 6
-            大 AI 演示工具的结构化提示词编译。
-          </p>
-        </section>
+        {showEngine && (
+          <section className="gl-modal-section">
+            <div className="gl-modal-section-head">
+              <ShieldCheck size={16} strokeWidth={2} aria-hidden="true" />
+              <h3>免 Key 智能引擎与 BYOK 隐私</h3>
+            </div>
+            <p className="gl-modal-section-text">
+              开箱即用内置结构化智能排版引擎；如需更强语言润色与多语言生成，可在创作工坊开启
+              BYOK 自定义模型。你的 API Key 仅保留在当前浏览器会话中，绝不写入服务端
+              SQLite 数据库或日志。
+            </p>
+          </section>
+        )}
 
-        <section className="gl-modal-section">
-          <div className="gl-modal-section-head">
-            <Keyboard size={16} strokeWidth={2} aria-hidden="true" />
-            <h3>常用键盘快捷键</h3>
-          </div>
-          <ul className="gl-shortcut-list">
-            <li>
-              <span>关闭弹窗 / 抽屉</span>
-              <kbd>Esc</kbd>
-            </li>
-            <li>
-              <span>编辑器撤销 / 重做</span>
-              <span>
-                <kbd>Ctrl / ⌘ + Z</kbd> / <kbd>Shift + Z</kbd>
-              </span>
-            </li>
-            <li>
-              <span>演播模式翻页</span>
-              <span>
-                <kbd>←</kbd> <kbd>→</kbd> <kbd>Space</kbd>
-              </span>
-            </li>
-            <li>
-              <span>演播备注 / 演讲排练驾驶舱</span>
-              <span>
-                <kbd>N</kbd> / <kbd>P</kbd>
-              </span>
-            </li>
-          </ul>
-        </section>
+        {showExport && (
+          <section className="gl-modal-section">
+            <div className="gl-modal-section-head">
+              <Layers size={16} strokeWidth={2} aria-hidden="true" />
+              <h3>多格式真实导出能力</h3>
+            </div>
+            <p className="gl-modal-section-text">
+              支持原生 16:9 <strong>.pptx</strong>（含 SlideMaster、原生图表/表格与演讲备注）、离线独立{" "}
+              <strong>.html</strong> 演示页、Marp Markdown、来源核验清单，以及适配 6
+              大 AI 演示工具的结构化提示词编译。
+            </p>
+          </section>
+        )}
+
+        {showShortcuts && (
+          <section className="gl-modal-section">
+            <div className="gl-modal-section-head">
+              <Keyboard size={16} strokeWidth={2} aria-hidden="true" />
+              <h3>常用键盘快捷键</h3>
+            </div>
+            <ul className="gl-shortcut-list">
+              <li>
+                <span>关闭弹窗 / 抽屉</span>
+                <kbd>Esc</kbd>
+              </li>
+              <li>
+                <span>编辑器撤销 / 重做</span>
+                <span>
+                  <kbd>Ctrl / ⌘ + Z</kbd> / <kbd>Shift + Z</kbd>
+                </span>
+              </li>
+              <li>
+                <span>演播模式翻页</span>
+                <span>
+                  <kbd>←</kbd> <kbd>→</kbd> <kbd>Space</kbd>
+                </span>
+              </li>
+              <li>
+                <span>演播备注 / 演讲排练驾驶舱</span>
+                <span>
+                  <kbd>N</kbd> / <kbd>P</kbd>
+                </span>
+              </li>
+            </ul>
+          </section>
+        )}
+
+        {!hasAny && (
+          <p className="gl-modal-section-text" style={{ textAlign: "center", padding: "12px 0" }}>
+            未找到与「{faqQuery}」匹配的帮助条目，请尝试搜索「10 MB」「BYOK」「导出」或「快捷键」。
+          </p>
+        )}
       </div>
     </Dialog>
   );

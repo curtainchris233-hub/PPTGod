@@ -704,16 +704,21 @@ export default function GenerateClient({
   const handleDocumentFile = async (file: File) => {
     if (parsingDoc) return;
     setUploadError(null);
+    if (file.size === 0) {
+      const msg = `「${file.name}」文件内容为空（0 字节），请重新选择有效文档`;
+      setUploadError(msg);
+      showToast(msg, "error");
+      return;
+    }
     if (file.size > 10 * 1024 * 1024) {
-      const msg = "单文件大小不能超过 10 MB";
+      const msg = `「${file.name}」文件大小超过 10 MB 上限，请压缩或拆分后上传`;
       setUploadError(msg);
       showToast(msg, "error");
       return;
     }
     const ext = file.name.toLowerCase().split(".").pop() || "";
     if (!["pdf", "docx", "pptx", "md", "txt"].includes(ext)) {
-      const msg =
-        "暂不支持该文件格式，请上传 .pdf、.docx、.pptx、.md 或 .txt 文件";
+      const msg = `暂不支持「${file.name}」格式（.${ext || "未知"}），请上传 .pdf、.docx、.pptx、.md 或 .txt 文件`;
       setUploadError(msg);
       showToast(msg, "error");
       return;
