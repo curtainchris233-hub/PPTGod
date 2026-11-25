@@ -1,20 +1,38 @@
 import Link from "next/link";
+import { Compass } from "lucide-react";
+import { GlacierPanel } from "@/components/ui";
 
 export default function NotFound() {
   return (
-    <main className="pg-page">
-      <div className="pg-container" style={{ paddingTop: "64px" }}>
-        <div className="pg-empty-state">
-          <p className="pg-kicker">404 · NOT FOUND</p>
-          <h2>没有找到对应的 PPT 视觉风格</h2>
-          <p>该模板可能已被创作者删除，或链接地址有误。</p>
-          <div className="pg-empty-actions">
-            <Link href="/" className="pg-btn pg-btn-primary">
-              返回视觉画廊
-            </Link>
-          </div>
+    <main className="gl-page gl-notfound-page">
+      <GlacierPanel
+        variant="solid"
+        radius="xl"
+        padding="none"
+        className="gl-notfound-card"
+      >
+        <div className="gl-notfound-badge" aria-hidden="true">
+          <Compass size={26} strokeWidth={1.75} />
         </div>
-      </div>
+        <p className="gl-notfound-kicker">404 · 页面未找到</p>
+        <h1 className="gl-notfound-title">没有找到对应的页面或风格</h1>
+        <p className="gl-notfound-desc">
+          该页面、演示文稿或视觉风格可能已被删除、设为私有，或链接地址有误。
+        </p>
+        <div className="gl-notfound-actions">
+          <Link href="/" className="gl-btn gl-btn--primary gl-btn--md">
+            返回首页工作台
+          </Link>
+          {/* Enabled once M2 introduces /gallery/page.tsx */}
+          <Link
+            href="/gallery"
+            prefetch={false}
+            className="gl-btn gl-btn--secondary gl-btn--md"
+          >
+            浏览风格画廊
+          </Link>
+        </div>
+      </GlacierPanel>
     </main>
   );
 }

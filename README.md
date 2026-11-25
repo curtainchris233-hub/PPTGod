@@ -33,6 +33,34 @@
 
 ---
 
+## Glacier UI 2.0 视觉重构（`feat/glacier-ui-2.0` 分支 · 进行中）
+
+按 [Glacier UI 2.0 开发规范](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) 对全站做冰川白玻璃拟态重构：**只改视觉与组件层，保留全部现有路由、API、SQLite 数据结构与生成/导出能力，不放置没有后端支撑的假功能**（例如不展示虚假 Pro 付费、协作、语音评分入口）。架构、功能清单（`F1–F41`）与「效果图示意 vs. 真实能力」边界矩阵（`B1–B16`）见 [PROJECT.md](./PROJECT.md)。
+
+| 阶段 | 内容 | 状态 |
+| --- | --- | --- |
+| Phase 0 | 路由 / 组件 / CSS / API / E2E 全量审计，输出功能边界清单 | 已完成 |
+| Phase 1 · M1a | Design Tokens、冰川品牌资产、`AppShell` 全局框架、通用 UI 组件库 | 已完成编码与首轮修复；二轮复验未全部收口 |
+| Phase 1 · M1b | 首页 Dashboard `/`（8:4 / 9:3 / 4:8 工作台） | 未开始 |
+| Phase 2 | 风格画廊、创作工坊（引导态）、我的项目 | 未开始 |
+| Phase 3 | 演示编辑器、对比、提示词工作室、体检、排练及账户/帮助 | 未开始 |
+| Phase 4 | 5 断点（390 / 768 / 1024 / 1440 / 1920）响应式、无障碍、性能与全栈回归 | 未开始 |
+
+> [!NOTE]
+> 目前已合并到 `main` 的界面仍是 v8；上表中的 Glacier 2.0 改动仅存在于开发分支，尚未合并，也还没有对应的页面截图。
+
+**已落地的设计系统（M1a）**
+
+- **Design Tokens**：[`src/styles/glacier-tokens.css`](./src/styles/glacier-tokens.css)，`--gl-*` 命名空间，纯 Vanilla CSS，不引入 Tailwind 或第二套 UI 框架。核心色值：页面 `#F0F6FC`、冰蓝区 `#E7F1FB`、主色 `#2563EB`、主文字 `#14243C`、分隔线 `#D9E5F1`；主按钮渐变 `135deg #409BFF → #2563EB → #1749D8`。
+- **布局与组件样式**：[`glacier-layout.css`](./src/styles/glacier-layout.css)（顶栏 64px、侧栏 220px 可收起、移动抽屉）与 [`glacier-ui.css`](./src/styles/glacier-ui.css)。`backdrop-filter` 仅用于顶栏与浮层，列表与卡片用半透明/实底以保证滚动性能；遵循 `prefers-reduced-motion`。
+- **可复用组件**：`src/components/layout/`（`AppShell`、`Topbar`、`Sidebar`、`MobileNavDrawer`、`PageHeader`）、`src/components/ui/`（`GlacierPanel`、`Button`、`IconButton`、`TextInput`/`Textarea`、`Select`、`Tabs`、`FilterChip`、`UploadDropzone`、`Dialog`、`Drawer`、`EmptyState`、`Skeleton`、`Stepper`、`Progress`）、`src/components/presentation/SlidePreviewFrame`（固定 16:9）。
+- **品牌资产**：`public/brand/` 下的矢量 Logo 与低对比冰川山脉 SVG，仅作标题区局部点缀，不覆盖文字。
+- **已接入**：全局 `layout.tsx`、`AuthModal`、`CompareDock`、`not-found`。
+
+**独立 Glacier E2E 套件**：`tests/e2e/glacier_v2/` 共 68 项用例（`tier1_features.py` 29 项功能 + `tier2_boundaries.py` 39 项边界与「诚实能力」反造假检查），统一入口 `run_glacier_e2e.py`。该套件与下文 109 项 v8 回归测试相互独立，Glacier 页面重构完成前不作为通过率宣称。
+
+---
+
 ## 网站核心功能演示效果图
 
 [界面设计规范 · 冰川白工作台（含首页改版对照图）](./docs/PPTGod_UI_Design_Spec.md)
@@ -158,3 +186,26 @@ npx next start --port 3000
 PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/run_e2e.py \
   --base-url http://localhost:3000 --tier all --backup-db
 ```
+
+### 4. Glacier UI 2.0 独立 E2E 套件（开发分支）
+
+```bash
+# 列出全部 68 项用例
+python3 tests/e2e/glacier_v2/run_glacier_e2e.py --list
+
+# 在独立端口运行，避免占用线上预览端口（3000 端口被套件拒绝）
+npx next start --port 3010 --hostname 127.0.0.1
+PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_glacier_e2e.py \
+  --base-url http://127.0.0.1:3010 --tier all --backup-db
+```
+
+---
+
+## 文档索引
+
+| 文档 | 说明 |
+| --- | --- |
+| [docs/PPTGod_Glacier_UI_2.0_Development_Spec.md](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) | Glacier UI 2.0 视觉与开发执行规范（Tokens、组件、页面、响应式、验收清单） |
+| [docs/PPTGod_UI_Design_Spec.md](./docs/PPTGod_UI_Design_Spec.md) | v7 冰川白工作台界面设计规范与对照图 |
+| [PROJECT.md](./PROJECT.md) | Glacier 2.0 架构、功能清单 `F1–F41`、能力边界 `B1–B16`、阶段与文件归属 |
+| [TEST_INFRA.md](./TEST_INFRA.md) | E2E 测试基础设施说明 |

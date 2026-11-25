@@ -3,38 +3,39 @@
    ========================================================================== */
 
 :root {
-  /* Luminous Frosted Pearl Canvas & Translucent Glass Surfaces */
-  --bg-canvas: #f2f3ef;
-  --bg-surface: rgba(255, 255, 255, 0.68);
-  --bg-surface-strong: rgba(255, 255, 255, 0.86);
-  --bg-subtle: rgba(235, 241, 250, 0.62);
-  --bg-inset: rgba(242, 246, 253, 0.62);
+  /* Glacier UI 2.0 Legacy Color & Border Bridge (radii & shadows preserved below) */
+  --bg-canvas: var(--gl-bg);
+  --bg-surface: var(--gl-glass);
+  --bg-surface-strong: var(--gl-surface);
+  --bg-subtle: var(--gl-bg-subtle);
+  --bg-inset: var(--gl-surface-hover);
 
-  /* Crisp Slate Ink Hierarchy (WCAG AAA on frosted glass) */
-  --ink-primary: #172033;
-  --ink-secondary: #475569;
-  --ink-muted: #64748b;
+  /* Crisp Deep-Sea Ink Hierarchy */
+  --ink-primary: var(--gl-text);
+  --ink-secondary: var(--gl-text-secondary);
+  --ink-muted: var(--gl-muted);
 
-  /* Refined AI Cobalt-Indigo Luminous Accent */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-soft: rgba(37, 99, 235, 0.1);
-  --accent-ring: rgba(37, 99, 235, 0.22);
+  /* Glacier Cobalt Primary Accent */
+  --accent: var(--gl-primary);
+  --accent-hover: var(--gl-primary-hover);
+  --accent-soft: var(--gl-primary-light);
+  --accent-ring: var(--gl-primary-ring);
 
   /* Semantic Accents */
   --teal: #0d9488;
   --teal-soft: rgba(13, 148, 136, 0.11);
   --cobalt: #3b82f6;
   --cobalt-soft: rgba(59, 130, 246, 0.12);
-  --danger: #dc2626;
-  --danger-soft: rgba(220, 38, 38, 0.09);
+  --danger: var(--gl-danger);
+  --danger-soft: var(--gl-danger-bg);
 
-  /* Frosted Glass Blur & Specular Edge Borders (single-pass GPU-safe) */
-  --glass-blur: blur(14px);
-  --glass-blur-heavy: blur(18px);
-  --border-hairline: rgba(255, 255, 255, 0.78);
-  --border-glass-edge: rgba(148, 163, 184, 0.22);
-  --border-strong: rgba(148, 163, 184, 0.34);
+  /* Frosted Glass Blur & Specular Edge Borders (fixes undefined --border-subtle) */
+  --glass-blur: blur(12px);
+  --glass-blur-heavy: blur(16px);
+  --border-subtle: var(--gl-border);
+  --border-hairline: var(--gl-border);
+  --border-glass-edge: var(--gl-border);
+  --border-strong: var(--gl-border-strong);
 
   /* Soft Neumorphism Dual-Light Elevation Shadows & Recessed Inset Wells */
   --shadow-xs: -2px -2px 6px rgba(255, 255, 255, 0.9),
@@ -62,7 +63,7 @@
   --radius-full: 999px;
 
   --container-max: 1360px;
-  --nav-height: 66px;
+  --nav-height: var(--gl-topbar-h);
 
   /* Unified Apple-Grade Motion Language (Single Curve Family & Rhythm) */
   --ease-apple: cubic-bezier(0.22, 1, 0.36, 1);
@@ -86,42 +87,18 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  background-color: var(--bg-canvas);
-  color: var(--ink-primary);
-  font-family: var(--font-sans), var(--font-cjk-sans), "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background-color: var(--gl-bg);
+  color: var(--gl-text);
+  font-family: var(--gl-font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.55;
 }
 
-/* Soft diffused luminous frost washes behind glassmorphic panels (zero grid clutter) */
+/* Glacier UI 2.0 Ice-White Page Canvas (Spec v2 §3) */
 body {
-  background-image: radial-gradient(
-      ellipse 55% 44% at 10% 4%,
-      rgba(191, 219, 254, 0.42) 0%,
-      transparent 68%
-    ),
-    radial-gradient(
-      ellipse 48% 42% at 88% 8%,
-      rgba(199, 210, 254, 0.38) 0%,
-      transparent 66%
-    ),
-    radial-gradient(
-      ellipse 44% 38% at 62% 38%,
-      rgba(153, 246, 228, 0.24) 0%,
-      transparent 65%
-    ),
-    radial-gradient(
-      ellipse 40% 34% at 18% 72%,
-      rgba(224, 231, 255, 0.3) 0%,
-      transparent 66%
-    ),
-    radial-gradient(
-      ellipse 36% 30% at 86% 84%,
-      rgba(254, 215, 170, 0.16) 0%,
-      transparent 64%
-    );
+  background-color: var(--gl-bg);
+  background-image: var(--gl-page-gradient);
   background-repeat: no-repeat;
 }
 
@@ -379,20 +356,16 @@ code {
 }
 
 .pg-btn-primary {
-  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  background: var(--gl-primary-gradient);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.28);
-  box-shadow: -2px -2px 6px rgba(255, 255, 255, 0.7),
-    0 6px 14px rgba(37, 99, 235, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.36);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: var(--gl-shadow-primary);
 }
 
 .pg-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  background: var(--gl-primary-gradient-hover);
   transform: translateY(-1px);
-  box-shadow: -3px -3px 8px rgba(255, 255, 255, 0.78),
-    0 8px 18px rgba(37, 99, 235, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.44);
+  box-shadow: var(--gl-shadow-primary-hover);
 }
 
 .pg-btn-ink {
@@ -1136,8 +1109,8 @@ code {
 }
 
 .pg-slide-more-select.is-active {
-  background: var(--ink-primary);
-  border-color: var(--ink-primary);
+  background: var(--gl-primary);
+  border-color: var(--gl-primary);
   color: #ffffff;
 }
 
@@ -2622,25 +2595,25 @@ code {
 
 .pg-toast {
   position: fixed;
-  top: 78px;
+  top: calc(var(--gl-topbar-h) + 14px);
   right: 24px;
-  z-index: 100;
+  z-index: var(--gl-z-toast);
   padding: 10px 16px;
-  border-radius: var(--radius-sm);
-  background: var(--ink-primary);
+  border-radius: var(--gl-radius-md);
+  background: var(--gl-text);
   color: #ffffff;
   font-size: 13px;
   font-weight: 600;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--gl-shadow-md);
   animation: pgSlideIn 0.2s var(--ease-out);
 }
 
 .pg-toast--success {
-  background: #14532d;
+  background: var(--gl-success);
 }
 
 .pg-toast--error {
-  background: #991b1b;
+  background: var(--gl-danger);
 }
 
 @keyframes pgSlideIn {
@@ -2869,16 +2842,21 @@ code {
   transform: translateY(-1px);
 }
 
+.pg-domain-tab.is-active {
+  background: var(--gl-primary-gradient);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: var(--gl-shadow-primary);
+}
+
 .pg-preset-chip.is-active,
 .pg-pill.is-active,
-.pg-mini-pill.is-active,
-.pg-domain-tab.is-active {
-  background: linear-gradient(135deg, #172033 0%, #27354f 100%);
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow: -2px -2px 5px rgba(255, 255, 255, 0.72),
-    3px 5px 12px rgba(15, 23, 42, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+.pg-mini-pill.is-active {
+  background: var(--gl-primary-light);
+  color: var(--gl-primary-ink);
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: none;
+  font-weight: 600;
 }
 
 .pg-hero-doc-dropzone {
@@ -2944,8 +2922,8 @@ code {
 }
 
 .pg-toast {
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--gl-radius-md);
 }
 
 /* ==========================================================================
@@ -3458,9 +3436,9 @@ code {
 }
 
 .pg-filter-toggle-btn.is-active {
-  background: linear-gradient(135deg, #172033 0%, #27354f 100%);
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.22);
+  background: var(--gl-primary-light);
+  color: var(--gl-primary-ink);
+  border-color: rgba(37, 99, 235, 0.35);
 }
 
 .pg-filter-badge {
@@ -3694,6 +3672,19 @@ code {
     width: calc(100vw - 24px);
     bottom: 12px;
   }
+}
+
+/* Restore keyboard focus rings over legacy outline: none inputs */
+.pg-live-topic-input:focus-visible,
+.pg-search-box input:focus-visible,
+.pg-select:focus-visible,
+.pg-slide-more-select:focus-visible,
+.pg-compiled-output:focus-visible,
+.pg-input-inline:focus-visible,
+.pg-field input:focus-visible,
+.pg-field textarea:focus-visible {
+  outline: 2px solid var(--gl-focus);
+  outline-offset: 2px;
 }
 
 /* --- 8. Accessibility: Respect OS "Reduce Motion" Strictly --- */

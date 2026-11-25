@@ -1,0 +1,186 @@
+/* ==========================================================================
+   PPTGod · Glacier UI 2.0 — Canonical Design Tokens & Scoped Glass Utilities
+   100% Pure Vanilla CSS | Zero Tailwind | Namespace: --gl-* / .gl-*
+   ========================================================================== */
+
+:root {
+  /* --- 1. Surface & Background Palette (Spec v2 §3) --- */
+  --gl-bg: #F0F6FC;
+  --gl-bg-subtle: #E7F1FB;
+  --gl-surface: #FFFFFF;
+  --gl-surface-hover: #F5F9FE;
+  --gl-glass: rgba(255, 255, 255, 0.78);
+  --gl-glass-strong: rgba(255, 255, 255, 0.90);
+  --gl-glass-rail: rgba(246, 250, 255, 0.84);
+  --gl-backdrop: rgba(20, 36, 60, 0.28);
+
+  /* --- 2. Brand & Accent Palette --- */
+  --gl-primary: #2563EB;
+  --gl-primary-hover: #1D4ED8;
+  --gl-primary-ink: #1D4ED8; /* >= 5.78:1 WCAG AA on --gl-primary-light (#E2EDFF) */
+  --gl-primary-light: #E2EDFF;
+  --gl-primary-ring: rgba(37, 99, 235, 0.22);
+  --gl-cyan: #38BDF8;
+
+  /* --- 3. Gradients --- */
+  --gl-primary-gradient: linear-gradient(135deg, #409BFF 0%, #2563EB 65%, #1749D8 100%);
+  --gl-primary-gradient-hover: linear-gradient(135deg, #2D8EFF 0%, #1D4ED8 65%, #1540BF 100%);
+  --gl-page-gradient: linear-gradient(145deg, #F8FBFF, #EAF3FC);
+
+  /* --- 4. Ink / Text Hierarchy --- */
+  --gl-text: #14243C;
+  --gl-text-secondary: #52657B;
+  --gl-text-nav: #3D4F66; /* >= 6.6:1 even over dark slides under frosted topbar */
+  --gl-muted: #64748B; /* >= 4.76:1 on #FFFFFF; use --gl-text-secondary on tinted #F0F6FC/#E7F1FB */
+
+  /* --- 5. Borders & Hairlines --- */
+  --gl-border: #D9E5F1;
+  --gl-border-strong: #C2D4E6;
+  --gl-border-interactive: #71828D; /* >= 3:1 non-text WCAG boundary */
+  --gl-border-glass: rgba(255, 255, 255, 0.92);
+  --gl-border-dashed: #BDD3EC;
+
+  /* --- 6. Semantic Status Tokens --- */
+  --gl-success: #15803D;
+  --gl-success-bg: #ECFDF3;
+  --gl-success-border: rgba(21, 128, 61, 0.24);
+  --gl-warning: #B45309;
+  --gl-warning-bg: #FFFBEB;
+  --gl-warning-border: rgba(180, 83, 9, 0.24);
+  --gl-danger: #B91C1C;
+  --gl-danger-bg: #FEF2F2;
+  --gl-danger-border: rgba(185, 28, 28, 0.24);
+  --gl-info-bg: #EFF6FF;
+  --gl-info-border: rgba(37, 99, 235, 0.22);
+  --gl-focus: #2563EB;
+
+  /* --- 7. Elevation Shadows (Single-Layer Cool Glacier) --- */
+  --gl-shadow-xs: 0 1px 3px rgba(36, 72, 120, 0.05);
+  --gl-shadow-sm: 0 2px 8px rgba(36, 72, 120, 0.06);
+  --gl-shadow-md: 0 8px 24px rgba(36, 72, 120, 0.09);
+  --gl-shadow-lg: 0 16px 40px rgba(20, 36, 60, 0.14);
+  --gl-shadow-primary: 0 5px 16px rgba(37, 99, 235, 0.20);
+  --gl-shadow-primary-hover: 0 8px 22px rgba(37, 99, 235, 0.28);
+  --gl-shadow-inset-input: inset 0 1px 2px rgba(20, 36, 60, 0.04);
+
+  /* --- 8. Border Radii (Glacier Scale — Isolated from Legacy --radius-*) --- */
+  --gl-radius-xs: 6px;
+  --gl-radius-sm: 8px;
+  --gl-radius-btn: 10px;
+  --gl-radius-md: 12px;
+  --gl-radius-lg: 16px;
+  --gl-radius-xl: 20px;
+  --gl-radius-full: 9999px;
+
+  /* --- 9. 4px Spacing Scale --- */
+  --gl-space-1: 4px;
+  --gl-space-2: 8px;
+  --gl-space-3: 12px;
+  --gl-space-4: 16px;
+  --gl-space-5: 20px;
+  --gl-space-6: 24px;
+  --gl-space-8: 32px;
+  --gl-space-10: 40px;
+  --gl-space-12: 48px;
+
+  /* --- 10. Global Layout Dimensions --- */
+  --gl-topbar-h: 64px;
+  --gl-sidebar-w: 220px;
+  --gl-sidebar-collapsed-w: 64px;
+  --gl-content-max: 1600px;
+  --gl-page-pad: 24px;
+  --gl-page-pad-mobile: 16px;
+  --gl-gap: 16px;
+
+  /* --- 11. Typography (Sans + Mono on UI; Serif Reserved for SlideCanvas) --- */
+  --gl-font-sans: var(--font-sans), var(--font-cjk-sans), "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --gl-font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* --- 12. Motion Tokens (Apple Curve Family) --- */
+  --ease-apple: cubic-bezier(0.22, 1, 0.36, 1);
+  --gl-ease: var(--ease-apple);
+  --gl-dur-hover: 150ms;
+  --gl-dur-switch: 200ms;
+  --gl-dur-overlay: 220ms;
+
+  /* --- 13. Canonical Z-Index Ladder (PROJECT.md Contract) --- */
+  --gl-z-peaks: 0;
+  --gl-z-share-topbar: 20;
+  --gl-z-sidebar: 30;
+  --gl-z-topbar: 40;
+  --gl-z-sidebar-tooltip: 45;
+  --gl-z-compare-dock: 50;
+  --gl-z-drawer-backdrop: 55;
+  --gl-z-mobile-drawer: 60;
+  --gl-z-overlay: 80;
+  --gl-z-presenter: 90;
+  --gl-z-toast: 100;
+  --gl-z-skip-link: 120;
+}
+
+/* --- Global Keyboard Focus Ring (Spec v2 §3 & §11) --- */
+:focus-visible {
+  outline: 2px solid var(--gl-focus);
+  outline-offset: 3px;
+}
+
+/* --- Visually Hidden Screen-Reader Utilities --- */
+.sr-only,
+.gl-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Scoped Glacier Glass Utilities (Blur STRICTLY Restricted to Floating/Topbar/Hero) --- */
+.glacier-panel,
+.gl-glass-panel {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--gl-border-glass);
+  border-radius: var(--gl-radius-lg);
+  box-shadow: var(--gl-shadow-sm), inset 0 0 0 1px rgba(217, 229, 241, 0.58);
+}
+
+.gl-glass-solid {
+  background: var(--gl-surface);
+  border: 1px solid var(--gl-border);
+  border-radius: var(--gl-radius-lg);
+  box-shadow: var(--gl-shadow-sm);
+}
+
+.gl-glass-topbar {
+  background: #FFFFFF;
+  border-bottom: 1px solid var(--gl-border);
+}
+
+@supports (backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px)) {
+  .glacier-panel--floating,
+  .gl-glass-floating {
+    background: var(--gl-glass);
+    backdrop-filter: blur(12px);
+  }
+
+  .gl-glass-topbar {
+    background: var(--gl-glass-strong);
+    backdrop-filter: blur(12px) saturate(140%);
+  }
+}
+
+/* --- Global Reduced Motion Guarantee (Spec v2 §8) --- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
