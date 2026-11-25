@@ -46,12 +46,13 @@ from tests.e2e.tier5_v3 import get_tier5_tests  # noqa: E402
 from tests.e2e.tier6_v4 import get_tier6_tests  # noqa: E402
 from tests.e2e.tier7_v5 import get_tier7_tests  # noqa: E402
 from tests.e2e.tier8_v6 import get_tier8_tests  # noqa: E402
+from tests.e2e.tier9_v7_doc_intake import get_tier9_tests  # noqa: E402
 
-VALID_TIERS: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8)
+VALID_TIERS: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9)
 
 
 def collect_all_tests() -> list[TestCaseSpec]:
-    """Return all registered Tier 1-8 test cases in deterministic execution order."""
+    """Return all registered Tier 1-9 test cases in deterministic execution order."""
     return [
         *get_tier1_tests(),
         *get_tier2_tests(),
@@ -61,23 +62,24 @@ def collect_all_tests() -> list[TestCaseSpec]:
         *get_tier6_tests(),
         *get_tier7_tests(),
         *get_tier8_tests(),
+        *get_tier9_tests(),
     ]
 
 
 def parse_tiers(raw: str) -> tuple[int, ...]:
-    """Parse --tier argument ('all' or comma-separated subset of 1..8)."""
+    """Parse --tier argument ('all' or comma-separated subset of 1..9)."""
     cleaned = raw.strip().lower()
     if not cleaned:
-        raise ValueError("Empty --tier value; expected 'all' or comma-separated subset of 1..8")
+        raise ValueError("Empty --tier value; expected 'all' or comma-separated subset of 1..9")
     if cleaned == "all":
         return VALID_TIERS
 
     seen: list[int] = []
     for part in cleaned.split(","):
         tok = part.strip()
-        if tok not in {"1", "2", "3", "4", "5", "6", "7", "8"}:
+        if tok not in {"1", "2", "3", "4", "5", "6", "7", "8", "9"}:
             raise ValueError(
-                f"Invalid tier {tok!r} in --tier={raw!r}; allowed values: 1..8, or all"
+                f"Invalid tier {tok!r} in --tier={raw!r}; allowed values: 1..9, or all"
             )
         num = int(tok)
         if num not in seen:

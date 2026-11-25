@@ -32,6 +32,7 @@ interface AppContextValue {
 
   compareIds: string[];
   toggleCompare: (id: string, title?: string) => void;
+  replaceCompareIds: (ids: string[]) => void;
   removeCompare: (id: string) => void;
   clearCompare: () => void;
 
@@ -228,6 +229,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [showToast]
   );
 
+  const replaceCompareIds = useCallback((ids: string[]) => {
+    const unique = Array.from(new Set(ids.filter(Boolean))).slice(0, 3);
+    setCompareIds(unique);
+    try {
+      localStorage.setItem(COMPARE_KEY, JSON.stringify(unique));
+    } catch {}
+  }, []);
+
   const removeCompare = useCallback((id: string) => {
     setCompareIds((prev) => {
       const next = prev.filter((item) => item !== id);
@@ -275,6 +284,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         closeAuthModal,
         compareIds,
         toggleCompare,
+        replaceCompareIds,
         removeCompare,
         clearCompare,
         localFavoriteIds,

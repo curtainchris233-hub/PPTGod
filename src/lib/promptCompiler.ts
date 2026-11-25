@@ -296,12 +296,49 @@ export function compilePrompt(
   const langLabel = LANG_LABELS[params.language] ?? LANG_LABELS.zh;
   const densityInfo = DENSITY_MAP[spec.layout.density] ?? DENSITY_MAP.balanced;
   const outline = buildAdaptiveOutline(slideCount, topic);
-  const domainGuide = buildDomainGuidelines(prompt.scenario);
-  const domainMdSection = domainGuide
-    ? `\n\n## 领域专属专业铁律：${domainGuide.heading}\n${domainGuide.rules
-        .map((r) => `- ${r}`)
-        .join("\n")}`
-    : "";
+  const domainGuide = buildDomainGuidelines(
+    params.sourceDigest?.detectedScenario || prompt.scenario
+  );
+  const digest = params.sourceDigest;
+  const sourceBlocks: string[] = [];
+  if (digest) {
+    if (digest.fileName) {
+      sourceBlocks.push(`- **源文档文件**：${digest.fileName}`);
+    }
+    if (digest.keyMetrics && digest.keyMetrics.length > 0) {
+      sourceBlocks.push(
+        `- **必须保留的关键事实与量化数据**：\n${digest.keyMetrics
+          .map((m) => `  - ${m}`)
+          .join("\n")}`
+      );
+    }
+    if (digest.keySections && digest.keySections.length > 0) {
+      sourceBlocks.push(
+        `- **源文档提炼章节大纲**：\n${digest.keySections
+          .map((s, idx) => `  ${idx + 1}. **${s.heading}**：${s.summary}`)
+          .join("\n")}`
+      );
+    }
+    if (digest.excerpt && digest.excerpt.trim()) {
+      sourceBlocks.push(
+        `- **原始参考正文节选（供事实核对，请勿编造数字）**：\n> ${digest.excerpt
+          .trim()
+          .slice(0, 1200)
+          .replace(/\n+/g, "\n> ")}`
+      );
+    }
+  }
+  const sourceMdSection =
+    sourceBlocks.length > 0
+      ? `\n\n## 源文档提炼素材（请严格基于以下真实内容整理成 PPT）\n${sourceBlocks.join("\n")}`
+      : "";
+
+  const domainMdSection =
+    (domainGuide
+      ? `\n\n## 领域专属专业铁律：${domainGuide.heading}\n${domainGuide.rules
+          .map((r) => `- ${r}`)
+          .join("\n")}`
+      : "") + sourceMdSection;
   const { palette, typography, layout } = spec;
   const rawChartColors = Array.isArray(palette.chartColors)
     ? palette.chartColors

@@ -1,0 +1,591 @@
+/* ==========================================================================
+   PPTGod v7 — Drop-a-Doc Intelligent Intake Workbench Modal (Vanilla CSS)
+   ========================================================================== */
+
+.pg-intake-modal {
+  position: relative;
+  width: 100%;
+  max-width: 1020px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  padding: 24px 26px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pg-intake-head-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pg-intake-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pg-intake-mode-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-full);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-hairline);
+  box-shadow: var(--neu-inset-soft);
+}
+
+.pg-intake-mode-tab {
+  border: none;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 13px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.pg-intake-mode-tab.is-active {
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink-primary);
+  box-shadow: var(--shadow-xs);
+}
+
+.pg-intake-samples {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pg-intake-sample-label {
+  font-size: 11.5px;
+  color: var(--ink-muted);
+}
+
+.pg-intake-dropzone {
+  position: relative;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-inset);
+  box-shadow: var(--neu-inset-soft);
+  padding: 22px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pg-intake-dropzone.is-compact {
+  padding: 12px 16px;
+}
+
+.pg-intake-dropzone.is-drag-over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.pg-intake-drop-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.pg-intake-drop-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: var(--shadow-xs);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pg-intake-dropzone.is-compact .pg-intake-drop-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.pg-intake-drop-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink-primary);
+  line-height: 1.35;
+}
+
+.pg-intake-drop-sub {
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.pg-intake-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pg-intake-paste-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  box-shadow: var(--neu-inset-soft);
+  padding: 14px;
+}
+
+.pg-intake-paste-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-glass-edge);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--neu-inset);
+  color: var(--ink-primary);
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+}
+
+.pg-intake-paste-textarea:focus {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.pg-intake-paste-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pg-intake-error {
+  padding: 10px 13px;
+  border-radius: var(--radius-sm);
+  background: rgba(254, 242, 242, 0.85);
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.pg-intake-warning {
+  padding: 10px 13px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 251, 235, 0.86);
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ====== Insight Summary Strip ====== */
+
+.pg-intake-insight {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pg-intake-insight-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pg-intake-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.pg-intake-file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-primary);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--border-hairline);
+  box-shadow: var(--shadow-xs);
+  border-radius: var(--radius-full);
+  padding: 3px 10px;
+}
+
+.pg-intake-scene-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: var(--radius-full);
+  padding: 3px 10px;
+}
+
+.pg-intake-domain-pill {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-full);
+  padding: 3px 9px;
+}
+
+.pg-intake-edit-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1.5fr 1.1fr 0.65fr;
+  gap: 10px;
+}
+
+.pg-intake-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pg-intake-field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.pg-intake-field input {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--ink-primary);
+  font-size: 12.5px;
+  outline: none;
+}
+
+.pg-intake-field input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.pg-intake-metrics-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pg-intake-metric-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.pg-intake-metric-chip {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: 5px;
+  padding: 2px 7px;
+}
+
+.pg-intake-sections-details {
+  border-top: 1px dashed var(--border-hairline);
+  padding-top: 8px;
+}
+
+.pg-intake-sections-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  user-select: none;
+}
+
+.pg-intake-sections-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pg-intake-sections-list li {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-xs);
+  padding: 7px 10px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-secondary);
+}
+
+.pg-intake-sections-list li strong {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-primary);
+  margin-bottom: 2px;
+}
+
+/* ====== Section 1: Top 3 Recommended Styles ====== */
+
+.pg-intake-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pg-intake-section-head h3 {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pg-intake-step-badge {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--ink-primary);
+  color: #ffffff;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pg-intake-rec-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.pg-intake-rec-card {
+  background: var(--bg-inset);
+  border: 1.5px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.pg-intake-rec-card:hover {
+  border-color: var(--border-strong);
+}
+
+.pg-intake-rec-card.is-selected {
+  border-color: var(--accent);
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.pg-intake-rec-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.pg-intake-rank-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+}
+
+.pg-intake-rec-card.is-selected .pg-intake-rank-pill {
+  background: var(--ink-primary);
+  color: #ffffff;
+  border-color: var(--ink-primary);
+}
+
+.pg-intake-score-pill {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pg-intake-rec-canvas {
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(23, 22, 21, 0.1);
+}
+
+.pg-intake-rec-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink-primary);
+}
+
+.pg-intake-rec-reason {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.48;
+  color: var(--ink-secondary);
+  flex: 1;
+}
+
+.pg-intake-rec-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ====== Section 2: Document-Enriched Prompt Compiler ====== */
+
+.pg-intake-prompt-box {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.pg-intake-tool-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pg-intake-tool-tabs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pg-intake-prompt-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pg-intake-compiled-textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--ink-primary);
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+}
+
+.pg-intake-compiled-textarea:focus {
+  border-color: var(--accent);
+}
+
+.pg-intake-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.pg-intake-footer-meta {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+/* ====== Responsive ====== */
+
+@media (max-width: 900px) {
+  .pg-intake-rec-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pg-intake-edit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pg-intake-sections-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .pg-intake-modal {
+    padding: 16px 14px;
+  }
+
+  .pg-intake-edit-grid {
+    grid-template-columns: 1fr;
+  }
+}

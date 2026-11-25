@@ -187,6 +187,43 @@ export interface PromptComment {
   createdAt: string;
 }
 
+export interface SourceDocumentSection {
+  heading: string;
+  summary: string;
+}
+
+export interface SourceDocumentDigest {
+  fileName?: string;
+  detectedScenario?: string;
+  keyMetrics?: string[];
+  keySections?: SourceDocumentSection[];
+  excerpt?: string;
+}
+
+export interface RecommendedStyleMatch {
+  id: string;
+  slug: string;
+  title: string;
+  englishTitle: string;
+  scenario: string;
+  styleCategory: string;
+  score: number;
+  reasons: string[];
+}
+
+export interface DocumentAnalysisResult {
+  detectedScenario: string;
+  detectedDomainId: DomainTabId;
+  detectedDomainLabel: string;
+  confidence: number;
+  suggestedAudience: string;
+  suggestedSlideCount: number;
+  suggestedTone: "executive" | "storytelling" | "analytical" | "inspiring";
+  keyMetrics: string[];
+  keySections: SourceDocumentSection[];
+  recommendedStyles: RecommendedStyleMatch[];
+}
+
 export interface CustomizerParams {
   topic: string;
   subtitle: string;
@@ -197,6 +234,8 @@ export interface CustomizerParams {
   targetTool: TargetTool;
   aiImageBatchMode?: boolean;
   aiImageBatchCount?: 6 | 12;
+  /** Optional parsed document digest injected into compiled prompts across all 6 AI tools */
+  sourceDigest?: SourceDocumentDigest;
 }
 
 /* ====== Structured Slide Deck Types (v3: 12 Commercial Slide Types + Visual Slots) ====== */

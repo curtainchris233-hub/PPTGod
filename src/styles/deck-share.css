@@ -65,8 +65,8 @@
 }
 
 .pg-share-badge.is-private {
-  background: rgba(200, 75, 49, 0.25);
-  color: #ffb8a8;
+  background: rgba(59, 130, 246, 0.25);
+  color: #bfdbfe;
 }
 
 .pg-share-sub {
@@ -88,9 +88,9 @@
   gap: 6px;
   height: 34px;
   padding: 0 12px;
-  border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.1);
   color: #f5f2eb;
   font-size: 12.5px;
   font-weight: 600;
@@ -100,8 +100,8 @@
 }
 
 .pg-share-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.34);
 }
 
 .pg-share-btn:disabled {
@@ -110,20 +110,20 @@
 }
 
 .pg-share-btn.is-active {
-  background: rgba(200, 75, 49, 0.24);
-  border-color: #c84b31;
+  background: rgba(59, 130, 246, 0.24);
+  border-color: #3b82f6;
   color: #ffffff;
 }
 
 .pg-share-btn-primary {
-  background: #c84b31;
-  border-color: #c84b31;
+  background: #2563eb;
+  border-color: #3b82f6;
   color: #ffffff;
 }
 
 .pg-share-btn-primary:hover {
-  background: #b13f27;
-  border-color: #b13f27;
+  background: #1d4ed8;
+  border-color: #2563eb;
 }
 
 .pg-share-theater {
@@ -183,7 +183,7 @@
   max-width: 1020px;
   background: rgba(34, 32, 30, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-left: 3px solid #c84b31;
+  border-left: 3px solid #3b82f6;
   border-radius: 8px;
   padding: 14px 18px;
 }
@@ -393,13 +393,13 @@
 }
 
 .pg-rehearsal-preset-btn.is-active {
-  background: #c84b31;
-  border-color: #c84b31;
+  background: #2563eb;
+  border-color: #3b82f6;
   color: #ffffff;
 }
 
 .pg-rehearsal-teleprompter {
-  border-left: 3px solid #c84b31;
+  border-left: 3px solid #3b82f6;
 }
 
 .pg-rehearsal-notes-body {
@@ -416,7 +416,7 @@
   width: 100%;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 7px;
+  border-radius: 10px;
   overflow: hidden;
   background: transparent;
   cursor: pointer;
@@ -424,7 +424,7 @@
 }
 
 .pg-rehearsal-next-canvas-btn:hover {
-  border-color: #c84b31;
+  border-color: #3b82f6;
   transform: translateY(-1px);
 }
 
