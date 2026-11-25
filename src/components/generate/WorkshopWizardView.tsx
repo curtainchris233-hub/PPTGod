@@ -39,10 +39,10 @@ import {
 } from "@/types/prompt";
 
 const QUICK_SAMPLE_TOPICS = [
-  "钙钛矿太阳能电池研究进展",
-  "半导体工艺与缺陷分析",
-  "2026 年度工作总结与规划",
-  "产品方案与增长汇报",
+  "Attention Is All You Need · Transformer 论文精读",
+  "DeepSeek-R1 强化学习推理范式与技术拆解",
+  "高中物理必修一 · 牛顿第二定律公开课",
+  "初中语文 · 《岳阳楼记》意境赏析课件",
 ];
 
 const PREVIEW_THUMB_TYPES: SlideType[] = [
@@ -335,7 +335,7 @@ export default function WorkshopWizardView({
                   maxLength={1000}
                   value={topic}
                   onChange={(e) => onTopicChange(e.target.value)}
-                  placeholder="描述你想创建的演示文稿，例如「钙钛矿太阳能电池研究进展与关键机理」"
+                  placeholder="描述你想创建的演示文稿，例如「Attention Is All You Need 论文精读」或「高中物理 · 电磁感应公开课」"
                   aria-label="演示文稿主题与核心内容"
                 />
                 <span className="gl-ws-char-count" aria-live="polite">

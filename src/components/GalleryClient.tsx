@@ -42,10 +42,10 @@ import {
 import "@/styles/gallery.css";
 
 const TOPIC_PRESETS = [
-  "2026 AI Agent 落地路线",
-  "Q4 增长与毛利复盘",
-  "高中物理 · 电磁感应公开课",
-  "国家自然科学基金答辩",
+  "Attention Is All You Need · Transformer 精读",
+  "DeepSeek-R1 强化学习推理范式",
+  "高中物理 · 电磁感应与法拉第定律",
+  "初中语文 · 《岳阳楼记》情境教学",
 ];
 
 const DOMAIN_ICONS: Record<DomainTabId, React.ReactNode> = {

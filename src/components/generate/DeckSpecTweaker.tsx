@@ -282,7 +282,7 @@ export default function DeckSpecTweaker({
               type="text"
               className="pg-input"
               maxLength={60}
-              placeholder="例如：清华大学材料学院 · NSFC 2026 或 XX 中学物理公开课"
+              placeholder="例如：AI 实验室组会 · NeurIPS 论文精读 或 XX 中学物理公开课"
               value={deckSpec.layout.brandFooter || ""}
               onChange={(e) =>
                 onChangeSpec({
