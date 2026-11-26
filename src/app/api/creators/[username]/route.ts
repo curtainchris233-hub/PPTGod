@@ -13,7 +13,7 @@ export async function GET(
   }
 
   const viewer = await getCurrentUser();
-  const data = getCreatorByUsername(trimmed, viewer?.id);
+  const data = await getCreatorByUsername(trimmed, viewer?.id);
   if (!data) {
     return NextResponse.json({ error: "未找到该创作者" }, { status: 404 });
   }

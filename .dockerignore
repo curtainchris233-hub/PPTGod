@@ -9,3 +9,4 @@ tests
 *.log
 *.bak
 .DS_Store
+.env*

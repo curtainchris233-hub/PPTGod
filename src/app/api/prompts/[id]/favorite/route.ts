@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { and, eq, or, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb, getPromptBySlugOrId } from "@/lib/db";
+import { promptFavorites, prompts } from "@/lib/db/schema";
 
 export async function POST(
   _request: Request,
@@ -15,45 +17,39 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  const prompt = getPromptBySlugOrId(id, user.id);
+  const prompt = await getPromptBySlugOrId(id, user.id);
   if (!prompt) {
     return NextResponse.json({ error: "模板不存在" }, { status: 404 });
   }
 
-  const db = getDb();
-  const tx = db.transaction(() => {
-    const existing = db
-      .prepare(
-        `SELECT 1 FROM prompt_favorites WHERE user_id = ? AND prompt_id = ?`
-      )
-      .get(user.id, prompt.id);
+  const result = await getDb().transaction(async (tx) => {
+    const [lockedPrompt] = await tx.select({ id: prompts.id })
+      .from(prompts)
+      .where(and(eq(prompts.id, prompt.id), or(eq(prompts.isPublic, true), eq(prompts.authorId, user.id))))
+      .for("update");
+    if (!lockedPrompt) return null;
 
-    if (existing) {
-      db.prepare(
-        `DELETE FROM prompt_favorites WHERE user_id = ? AND prompt_id = ?`
-      ).run(user.id, prompt.id);
-      db.prepare(
-        `UPDATE prompts SET saves_count = MAX(0, saves_count - 1) WHERE id = ?`
-      ).run(prompt.id);
-      return { favorited: false };
-    } else {
-      db.prepare(
-        `INSERT INTO prompt_favorites (user_id, prompt_id, created_at) VALUES (?, ?, ?)`
-      ).run(user.id, prompt.id, new Date().toISOString());
-      db.prepare(
-        `UPDATE prompts SET saves_count = saves_count + 1 WHERE id = ?`
-      ).run(prompt.id);
-      return { favorited: true };
+    const [removed] = await tx.delete(promptFavorites)
+      .where(and(eq(promptFavorites.userId, user.id), eq(promptFavorites.promptId, prompt.id)))
+      .returning({ promptId: promptFavorites.promptId });
+    if (!removed) {
+      await tx.insert(promptFavorites).values({
+        userId: user.id,
+        promptId: prompt.id,
+        createdAt: new Date().toISOString(),
+      });
     }
-  });
 
-  const { favorited } = tx();
-  const updated = db
-    .prepare(`SELECT saves_count FROM prompts WHERE id = ?`)
-    .get(prompt.id) as { saves_count: number };
-
-  return NextResponse.json({
-    favorited,
-    savesCount: updated.saves_count,
+    const adjustment = removed ? -1 : 1;
+    const [updated] = await tx.update(prompts)
+      .set({ savesCount: sql`greatest(0, ${prompts.savesCount} + ${adjustment})` })
+      .where(eq(prompts.id, prompt.id))
+      .returning({ savesCount: prompts.savesCount });
+    return { favorited: !removed, savesCount: updated.savesCount };
   });
+  if (!result) {
+    return NextResponse.json({ error: "模板不存在" }, { status: 404 });
+  }
+
+  return NextResponse.json(result);
 }

@@ -410,14 +410,7 @@ export default function CollectionsClient({
       const res = await fetch("/api/export/pptx", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: deck.title,
-          subtitle: deck.subtitle,
-          audience: deck.audience,
-          styleName: deck.promptTitle,
-          visualSpec: deck.visualSpec,
-          slides: deck.slides,
-        }),
+        body: JSON.stringify({ deckId: deck.id }),
       });
       if (!res.ok) {
         showToast("导出 .pptx 失败", "error");

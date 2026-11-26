@@ -43,7 +43,7 @@ from typing import Any, Callable, Iterable, Iterator, Literal, Sequence
 from tests.e2e.config import (
     DESKTOP_VIEWPORT,
     PLAYWRIGHT_BROWSERS_DEFAULT,
-    SESSION_COOKIE_NAME,
+    SESSION_COOKIE_NAMES,
     SQLITE3_FALLBACK_BIN,
     make_valid_slides,
 )
@@ -241,17 +241,21 @@ class ApiClient:
         return self.request("DELETE", path, **kwargs)
 
     def login(self, email: str, password: str) -> ApiResponse:
-        return self.post("/api/auth/login", json_body={"email": email, "password": password})
+        return self.post(
+            "/api/auth/login",
+            json_body={"email": email, "password": password},
+            headers={"Origin": self.base_url},
+        )
 
     def logout(self) -> ApiResponse:
-        return self.post("/api/auth/logout")
+        return self.post("/api/auth/logout", headers={"Origin": self.base_url})
 
     def me(self) -> ApiResponse:
         return self.get("/api/auth/me")
 
-    def get_cookie(self, name: str = SESSION_COOKIE_NAME) -> str | None:
+    def get_cookie(self, name: str | None = None) -> str | None:
         for cookie in self.cookie_jar:
-            if cookie.name == name:
+            if cookie.name in (SESSION_COOKIE_NAMES if name is None else (name,)):
                 return cookie.value
         return None
 

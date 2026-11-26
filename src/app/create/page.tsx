@@ -25,7 +25,7 @@ export default async function CreatePage({
   let editForbidden = false;
 
   if (sp.edit) {
-    const found = getPromptBySlugOrId(sp.edit, viewer?.id);
+    const found = await getPromptBySlugOrId(sp.edit, viewer?.id);
     if (found && viewer && found.authorId === viewer.id) {
       mode = "edit";
       sourcePrompt = found;
@@ -33,7 +33,7 @@ export default async function CreatePage({
       editForbidden = true;
     }
   } else if (sp.fork) {
-    const found = getPromptBySlugOrId(sp.fork, viewer?.id);
+    const found = await getPromptBySlugOrId(sp.fork, viewer?.id);
     if (found) {
       mode = "fork";
       sourcePrompt = found;

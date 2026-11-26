@@ -1,12 +1,19 @@
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { getAuthBaseUrl } from "@/lib/auth-config";
 import { getDb, getUserStats, mapPublicUser } from "@/lib/db";
+import { users } from "@/lib/db/schema";
 import { parseJsonObject, safeString } from "../../prompts/_validation";
 
 const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 export async function PATCH(request: Request) {
   try {
+    const origin = request.headers.get("origin");
+    if (origin && origin !== getAuthBaseUrl()) {
+      return NextResponse.json({ error: "无法验证请求来源" }, { status: 403 });
+    }
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "请先登录" }, { status: 401 });
@@ -48,30 +55,17 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const db = getDb();
-    db.prepare(
-      `UPDATE users SET display_name = ?, bio = ?, avatar_color = ? WHERE id = ?`
-    ).run(displayName, bio, avatarColor, user.id);
-
-    const updated = db
-      .prepare(
-        `SELECT id, username, display_name, bio, avatar_color, created_at FROM users WHERE id = ?`
-      )
-      .get(user.id) as {
-      id: string;
-      username: string;
-      display_name: string;
-      bio: string;
-      avatar_color: string;
-      created_at: string;
-    };
+    const [updated] = await getDb().update(users)
+      .set({ name: displayName, bio, avatarColor, updatedAt: new Date() })
+      .where(eq(users.id, user.id)).returning();
+    if (!updated) return NextResponse.json({ error: "请先登录" }, { status: 401 });
 
     return NextResponse.json({
       user: mapPublicUser(updated),
-      stats: getUserStats(user.id),
+      stats: await getUserStats(user.id),
     });
-  } catch (err) {
-    console.error("Update profile error:", err);
+  } catch {
+    console.error("PPTGod profile update failed");
     return NextResponse.json({ error: "保存资料失败" }, { status: 500 });
   }
 }

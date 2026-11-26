@@ -28,7 +28,7 @@ export default async function OpenGraphImage({
 }) {
   const { slug } = await params;
   // Pass viewerId=undefined so private prompts NEVER leak in OpenGraph social cards
-  const prompt = getPromptBySlugOrId(slug, undefined);
+  const prompt = await getPromptBySlugOrId(slug, undefined);
 
   if (!prompt || !prompt.isPublic) {
     notFound();

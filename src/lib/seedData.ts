@@ -5,7 +5,6 @@ export interface SeedUser {
   username: string;
   displayName: string;
   email: string;
-  passwordPlain: string;
   bio: string;
   avatarColor: string;
 }
@@ -39,7 +38,6 @@ export const SEED_USERS: SeedUser[] = [
     username: "pptgod_lab",
     displayName: "PPTGod 视觉实验室",
     email: "studio@pptgod.studio",
-    passwordPlain: "PPTGodOfficial#2026",
     bio: "专注演示文稿设计系统与跨工具提示词工程研究",
     avatarColor: "#C84B31",
   },
@@ -48,7 +46,6 @@ export const SEED_USERS: SeedUser[] = [
     username: "demo_designer",
     displayName: "林屿 · 演示设计师",
     email: "demo@pptgod.studio",
-    passwordPlain: "demo1234",
     bio: "探索结构化叙事与高信息密度幻灯片美学（体验演示账号）",
     avatarColor: "#0F766E",
   },
@@ -57,7 +54,6 @@ export const SEED_USERS: SeedUser[] = [
     username: "chen_strategy",
     displayName: "陈默 · 战略咨询",
     email: "chen@pptgod.studio",
-    passwordPlain: "ChenStrategy#2026",
     bio: "10 年管理咨询与商业计划书视觉架构师",
     avatarColor: "#1D4ED8",
   },

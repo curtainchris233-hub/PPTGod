@@ -320,7 +320,7 @@ def t8_ops_06_health_sitemap_privacy_and_robots(ctx: TestContext) -> None:
     health = anon.get("/api/health").assert_status(200, "GET /api/health").require_json()
     assert health.get("status") == "ok"
     assert int(health.get("catalogCount", 0)) >= 36
-    assert health.get("dbMode") == "wal"
+    assert health.get("dbMode") == "postgresql"
 
     # 2. /robots.txt
     robots = anon.get("/robots.txt").assert_status(200, "GET /robots.txt")

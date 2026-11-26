@@ -18,12 +18,12 @@ export default async function CollectionsPage({
 }) {
   const sp = await searchParams;
   const viewer = await getCurrentUser();
-  const initialPrompts = listPrompts({
+  const initialPrompts = await listPrompts({
     sort: "newest",
     viewerId: viewer?.id,
     includePrivateForAuthorId: viewer?.id,
   });
-  const initialDecks = viewer ? listSavedDecksByUser(viewer.id) : [];
+  const initialDecks = viewer ? await listSavedDecksByUser(viewer.id) : [];
 
   const initialTab =
     sp.tab === "favorites" ||

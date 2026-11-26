@@ -21,7 +21,7 @@ DEFAULT_TIMEOUT_MS = 15000
 PLAYWRIGHT_BROWSERS_DEFAULT = "/opt/ms-playwright"
 SQLITE3_FALLBACK_BIN = "/opt/android-sdk/platform-tools/sqlite3"
 
-SESSION_COOKIE_NAME = "pptgod_session"
+SESSION_COOKIE_NAMES = ("pptgod.session_token", "__Secure-pptgod.session_token")
 COMPARE_STORAGE_KEY = "pptgod_compare_ids_v1"
 GUEST_FAVS_STORAGE_KEY = "pptgod_guest_favs_v1"
 

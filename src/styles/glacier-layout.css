@@ -1103,20 +1103,55 @@
   gap: 14px;
 }
 
+.gl-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.gl-account-page {
+  width: min(100%, 460px);
+  margin: clamp(28px, 8vw, 92px) auto;
+}
+
+.gl-account-page h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.25;
+}
+
+.gl-account-page > p {
+  margin: 0;
+  color: var(--gl-text-secondary);
+  line-height: 1.6;
+}
+
+.gl-auth-notice,
 .gl-auth-error {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   padding: 10px 12px;
   border-radius: var(--gl-radius-md);
-  background: var(--gl-danger-bg);
   border: 1px solid #fecaca;
-  color: var(--gl-danger);
   font-size: 13px;
   font-weight: 500;
   line-height: 1.45;
 }
 
+.gl-auth-error {
+  background: var(--gl-danger-bg);
+  color: var(--gl-danger);
+}
+
+.gl-auth-notice {
+  background: var(--gl-info-bg);
+  border-color: var(--gl-info-border);
+  color: var(--gl-primary-ink);
+}
+
+.gl-auth-notice svg,
 .gl-auth-error svg {
   flex-shrink: 0;
   margin-top: 2px;

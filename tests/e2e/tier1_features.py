@@ -276,7 +276,7 @@ def t1_api_03_auth_lifecycle(ctx: TestContext) -> None:
         200, "POST /api/auth/login"
     )
     set_cookie = login_resp.header("Set-Cookie")
-    assert "pptgod_session=" in set_cookie, f"Missing pptgod_session in Set-Cookie: {set_cookie!r}"
+    assert client.get_cookie(), "Expected Better Auth to establish a session cookie"
     assert "httponly" in set_cookie.lower(), f"Session cookie missing HttpOnly flag: {set_cookie!r}"
 
     login_json = login_resp.require_json("login")

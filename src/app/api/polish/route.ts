@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { generatePresentationJson } from "@/lib/presentationAgent";
+import { resolveProvider } from "@/lib/providerRequest";
+import { limitSiteProvider, limitToolRequest } from "@/lib/toolRateLimit";
 import { polishSlideContent, type PolishAction } from "@/lib/deckGenerator";
 import {
   isPlainObject,
   sanitizeLlmSlide,
-  scrubUpstreamError,
-  validateByokApiBase,
 } from "@/lib/deckValidation";
 import type { DeckSlideItem } from "@/types/prompt";
 import { safeString } from "../prompts/_validation";
@@ -21,6 +22,9 @@ const ACTION_INSTRUCTIONS: Record<PolishAction, string> = {
 };
 
 export async function POST(request: Request) {
+  const limited = await limitToolRequest(request, "polish", 40);
+  if (limited) return limited;
+
   let body: Record<string, unknown>;
   try {
     const parsed: unknown = await request.json();
@@ -84,27 +88,21 @@ export async function POST(request: Request) {
         );
       }
 
-      const apiKey =
-        safeString(body.apiKey).trim() || process.env.OPENAI_API_KEY || "";
-      const rawApiBase =
-        safeString(body.apiBase).trim() ||
-        process.env.OPENAI_BASE_URL ||
-        "https://api.openai.com/v1";
-      const model =
-        safeString(body.model).trim() ||
-        process.env.OPENAI_MODEL ||
-        "gpt-4o-mini";
-
-      if (!apiKey) {
-        return NextResponse.json(
-          { error: "未检测到 API Key，请填入 Key 或使用免 Key 智能润色模式" },
-          { status: 400 }
-        );
+      const provider = resolveProvider(
+        {
+          apiKey: safeString(body.apiKey).trim(),
+          apiBase: safeString(body.apiBase).trim(),
+          model: safeString(body.model).trim(),
+        },
+        "text",
+        "未检测到 API Key，请填入 Key 或使用免 Key 智能润色模式"
+      );
+      if (!provider.ok) {
+        return NextResponse.json({ error: provider.error }, { status: 400 });
       }
-
-      const baseCheck = validateByokApiBase(rawApiBase);
-      if (!baseCheck.ok) {
-        return NextResponse.json({ error: baseCheck.error }, { status: 400 });
+      if (provider.config.usesSiteKey) {
+        const limit = await limitSiteProvider(request, "text");
+        if (limit) return limit;
       }
 
       // Strip potentially large image dataUrl before sending to text LLM
@@ -116,89 +114,17 @@ export async function POST(request: Request) {
         };
       }
 
-      let llmRes: Response;
-      try {
-        llmRes = await fetch(`${baseCheck.endpointRoot}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model,
-            temperature: 0.45,
-            response_format: { type: "json_object" },
-            messages: [
-              {
-                role: "system",
-                content: `你是一位资深商业 PPT 润色专家。任务：${ACTION_INSTRUCTIONS[action]}。严格返回 JSON 对象 {"slide": { ...与输入字段结构兼容的单页对象... }}，不要更改 id 与 slideType。`,
-              },
-              {
-                role: "user",
-                content: JSON.stringify({ slide: promptSlideCopy }),
-              },
-            ],
-          }),
-          signal: AbortSignal.timeout(35000),
-        });
-      } catch (fetchErr) {
-        const isTimeout =
-          fetchErr instanceof Error &&
-          (fetchErr.name === "TimeoutError" || fetchErr.name === "AbortError");
-        return NextResponse.json(
-          {
-            error: isTimeout
-              ? "大模型润色请求超时，请稍后重试或切换免 Key 模式"
-              : "无法连接大模型接口，请检查 API Base URL",
-          },
-          { status: 502 }
-        );
+      const result = await generatePresentationJson({
+        task: "polish",
+        config: provider.config,
+        instructions: `你是一位资深商业 PPT 润色专家。任务：${ACTION_INSTRUCTIONS[action]}。严格返回 JSON 对象 {"slide": { ...与输入字段结构兼容的单页对象... }}，不要更改 id 与 slideType。`,
+        input: JSON.stringify({ slide: promptSlideCopy }),
+        requestSignal: request.signal,
+      });
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 502 });
       }
-
-      if (!llmRes.ok) {
-        const errText = await llmRes.text().catch(() => "");
-        return NextResponse.json(
-          {
-            error: `大模型润色失败 (HTTP ${llmRes.status})：${scrubUpstreamError(
-              errText,
-              apiKey
-            )}`,
-          },
-          { status: 502 }
-        );
-      }
-
-      let llmJson: unknown;
-      try {
-        llmJson = await llmRes.json();
-      } catch {
-        return NextResponse.json(
-          { error: "大模型返回非 JSON 响应" },
-          { status: 502 }
-        );
-      }
-
-      const choices = isPlainObject(llmJson) ? llmJson.choices : undefined;
-      const firstChoice = Array.isArray(choices) ? choices[0] : undefined;
-      const message = isPlainObject(firstChoice)
-        ? firstChoice.message
-        : undefined;
-      const rawContent =
-        isPlainObject(message) && typeof message.content === "string"
-          ? message.content.trim()
-          : "";
-      const fenceMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/i);
-      const candidate = (fenceMatch ? fenceMatch[1] : rawContent).trim();
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(candidate);
-      } catch {
-        return NextResponse.json(
-          { error: "大模型返回的润色结果不是合法 JSON" },
-          { status: 502 }
-        );
-      }
+      const parsed = result.data;
 
       const rawPolished =
         isPlainObject(parsed) && isPlainObject(parsed.slide)

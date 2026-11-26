@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
 import {
   isPlainObject,
-  isValidImageDataUrl,
-  scrubUpstreamError,
-  validateByokApiBase,
+  VALID_IMAGE_DATA_URL_RE,
 } from "@/lib/deckValidation";
+import { createProviderTransport, getProviderError, resolveProvider } from "@/lib/providerRequest";
+import { limitSiteProvider, limitToolRequest } from "@/lib/toolRateLimit";
 import { safeString } from "../prompts/_validation";
 
 const ALLOWED_SIZES = new Set(["1024x1024", "1792x1024", "1024x1792", "512x512"]);
+const MAX_PROVIDER_IMAGE_CHARS = 4_000_000;
+
+function isProviderImage(value: unknown): value is string {
+  return typeof value === "string" && value.length <= MAX_PROVIDER_IMAGE_CHARS && VALID_IMAGE_DATA_URL_RE.test(value);
+}
 
 export async function POST(request: Request) {
+  const limited = await limitToolRequest(request, "image", 8);
+  if (limited) return limited;
+
   let body: Record<string, unknown>;
   try {
     const parsed: unknown = await request.json();
@@ -58,42 +66,31 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey =
-      safeString(body.apiKey).trim() ||
-      process.env.OPENAI_IMAGE_API_KEY ||
-      process.env.OPENAI_API_KEY ||
-      "";
-    const rawApiBase =
-      safeString(body.apiBase).trim() ||
-      process.env.OPENAI_BASE_URL ||
-      "https://api.openai.com/v1";
-    const model =
-      safeString(body.model).trim() ||
-      process.env.OPENAI_IMAGE_MODEL ||
-      "dall-e-3";
+    const provider = resolveProvider(
+      {
+        apiKey: safeString(body.apiKey).trim(),
+        apiBase: safeString(body.apiBase).trim(),
+        model: safeString(body.model).trim(),
+      },
+      "image",
+      "未检测到 AI 生图 API Key：请填入 OpenAI Image 兼容 API Key，或使用「12 套免 Key 矢量艺术图」/「本地图片上传」/「一键复制即梦提示词」"
+    );
+    if (!provider.ok) {
+      return NextResponse.json({ error: provider.error }, { status: 400 });
+    }
+    if (provider.config.usesSiteKey) {
+      const limit = await limitSiteProvider(request, "image");
+      if (limit) return limit;
+    }
+
+    const { apiKey, endpointRoot, model } = provider.config;
     const rawSize = safeString(body.size, "1024x1024").trim();
     const size = ALLOWED_SIZES.has(rawSize) ? rawSize : "1024x1024";
-
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error:
-            "未检测到 AI 生图 API Key：请填入 OpenAI Image 兼容 API Key，或使用「12 套免 Key 矢量艺术图」/「本地图片上传」/「一键复制即梦提示词」",
-        },
-        { status: 400 }
-      );
-    }
-
-    const baseCheck = validateByokApiBase(rawApiBase);
-    if (!baseCheck.ok) {
-      return NextResponse.json({ error: baseCheck.error }, { status: 400 });
-    }
-
-    const endpoint = `${baseCheck.endpointRoot}/images/generations`;
-
-    let imgRes: Response;
+    const timeout = AbortSignal.timeout(60_000);
+    const transport = createProviderTransport(endpointRoot);
+    let imgJson: unknown;
     try {
-      imgRes = await fetch(endpoint, {
+      const response = await transport.fetch(`${endpointRoot}/images/generations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -104,45 +101,34 @@ export async function POST(request: Request) {
           prompt: prompt.slice(0, 2000),
           n: 1,
           size,
-          response_format: "b64_json",
+          ...(!model.startsWith("gpt-image-") ? { response_format: "b64_json" } : {}),
         }),
-        signal: AbortSignal.timeout(60000),
+        signal: AbortSignal.any([timeout, request.signal]),
       });
-    } catch (fetchErr) {
-      const isTimeout =
-        fetchErr instanceof Error &&
-        (fetchErr.name === "TimeoutError" || fetchErr.name === "AbortError");
+      if (!response.ok) {
+        const error = await getProviderError(response, apiKey);
+        return NextResponse.json({ error }, { status: 502 });
+      }
+
+      try {
+        imgJson = await response.json();
+      } catch {
+        return NextResponse.json(
+          { error: "AI 生图接口未返回可读取的图像数据" },
+          { status: 502 }
+        );
+      }
+    } catch {
       return NextResponse.json(
         {
-          error: isTimeout
+          error: timeout.aborted
             ? "AI 生图接口请求超时（60s），请稍后重试"
             : "无法连接 AI 生图接口，请检查 API Base URL 与网络连通性",
         },
         { status: 502 }
       );
-    }
-
-    if (!imgRes.ok) {
-      const errText = await imgRes.text().catch(() => "");
-      return NextResponse.json(
-        {
-          error: `AI 生图接口返回错误 (HTTP ${imgRes.status})：${scrubUpstreamError(
-            errText,
-            apiKey
-          )}`,
-        },
-        { status: 502 }
-      );
-    }
-
-    let imgJson: unknown;
-    try {
-      imgJson = await imgRes.json();
-    } catch {
-      return NextResponse.json(
-        { error: "AI 生图接口返回了非 JSON 响应" },
-        { status: 502 }
-      );
+    } finally {
+      await transport.close();
     }
 
     const dataArr =
@@ -163,12 +149,12 @@ export async function POST(request: Request) {
     } else if (
       firstItem &&
       typeof firstItem.url === "string" &&
-      isValidImageDataUrl(firstItem.url)
+      isProviderImage(firstItem.url.trim())
     ) {
       dataUrl = firstItem.url.trim();
     }
 
-    if (!dataUrl || !isValidImageDataUrl(dataUrl)) {
+    if (!isProviderImage(dataUrl)) {
       return NextResponse.json(
         {
           error:

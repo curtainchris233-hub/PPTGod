@@ -13,7 +13,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const viewer = await getCurrentUser();
-  const prompt = getPromptBySlugOrId(slug, viewer?.id);
+  const prompt = await getPromptBySlugOrId(slug, viewer?.id);
   if (!prompt) {
     return { title: "未找到模板" };
   }
@@ -30,13 +30,13 @@ export default async function StudioPage({
 }) {
   const { slug } = await params;
   const viewer = await getCurrentUser();
-  const prompt = getPromptBySlugOrId(slug, viewer?.id);
+  const prompt = await getPromptBySlugOrId(slug, viewer?.id);
 
   if (!prompt) {
     notFound();
   }
 
-  const initialComments = listPromptComments(prompt.id);
+  const initialComments = await listPromptComments(prompt.id);
 
   return (
     <StudioClient initialPrompt={prompt} initialComments={initialComments} />

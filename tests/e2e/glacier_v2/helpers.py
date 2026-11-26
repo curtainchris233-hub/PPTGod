@@ -49,7 +49,7 @@ from .config import (
     DESKTOP_VIEWPORT,
     PLAYWRIGHT_BROWSERS_DEFAULT,
     PPTX_CONTENT_TYPE,
-    SESSION_COOKIE_NAME,
+    SESSION_COOKIE_NAMES,
     SQLITE3_FALLBACK_BIN,
     SeedAccount,
     TINY_PNG_B64,
@@ -166,9 +166,9 @@ class ApiClient:
                 url = f"{url}{sep}{urllib.parse.urlencode(pairs)}"
         return url
 
-    def get_cookie(self, name: str) -> str | None:
+    def get_cookie(self, name: str | None = None) -> str | None:
         for cookie in self.cookie_jar:
-            if cookie.name == name:
+            if cookie.name in (SESSION_COOKIE_NAMES if name is None else (name,)):
                 return cookie.value
         return None
 
@@ -360,25 +360,26 @@ class ApiClient:
         resp = self.post(
             "/api/auth/login",
             json_body={"email": email, "password": password},
+            headers={"Origin": self.base_url},
         )
         resp.assert_status(200, f"Login failed for {email}")
-        if not self.get_cookie(SESSION_COOKIE_NAME):
+        if not self.get_cookie():
             raise AssertionError(
-                f"Login for {email} returned 200 but did not set cookie '{SESSION_COOKIE_NAME}'"
+                f"Login for {email} returned 200 but did not set a Better Auth session cookie"
             )
         return resp
 
     def logout(self) -> ApiResponse:
-        resp = self.post("/api/auth/logout")
+        resp = self.post("/api/auth/logout", headers={"Origin": self.base_url})
         self.clear_cookies()
         return resp
 
     def logout_if_authenticated(self) -> None:
-        """Delete active server session row if this client holds ``pptgod_session``."""
-        if not self.get_cookie(SESSION_COOKIE_NAME):
+        """Revoke the active Better Auth session when the client holds its cookie."""
+        if not self.get_cookie():
             return
         try:
-            resp = self.post("/api/auth/logout", timeout_ms=5000)
+            resp = self.post("/api/auth/logout", headers={"Origin": self.base_url}, timeout_ms=5000)
             if resp.status not in (200, 204):
                 sys.stderr.write(
                     f"[glacier_e2e] Warning: session logout returned HTTP {resp.status}\n"
@@ -2723,6 +2724,7 @@ def login_via_api(
     resp = page.request.post(
         f"{base_url.rstrip('/')}/api/auth/login",
         data={"email": account.email, "password": account.password},
+        headers={"Origin": base_url.rstrip("/")},
     )
     if resp.status != 200:
         raise AssertionError(
@@ -2730,10 +2732,8 @@ def login_via_api(
         )
     # Verify cookie is attached to context
     cookies = page.context.cookies()
-    if not any(c.get("name") == SESSION_COOKIE_NAME for c in cookies):
-        raise AssertionError(
-            f"Browser API login succeeded but cookie '{SESSION_COOKIE_NAME}' not stored in context"
-        )
+    if not any(c.get("name") in SESSION_COOKIE_NAMES for c in cookies):
+        raise AssertionError("Browser API login succeeded but no Better Auth session cookie was stored")
 
 
 def login_via_demo_ui(page: Any, base_url: str, *, timeout_ms: int = 8000) -> None:
@@ -2762,11 +2762,11 @@ def login_via_demo_ui(page: Any, base_url: str, *, timeout_ms: int = 8000) -> No
     deadline = time.monotonic() + (timeout_ms / 1000.0)
     while time.monotonic() < deadline:
         cookies = page.context.cookies()
-        if any(c.get("name") == SESSION_COOKIE_NAME for c in cookies):
+        if any(c.get("name") in SESSION_COOKIE_NAMES for c in cookies):
             page.wait_for_timeout(200)
             return
         time.sleep(0.1)
-    raise AssertionError("Demo UI login did not establish pptgod_session cookie in time")
+    raise AssertionError("Demo UI login did not establish a Better Auth session in time")
 
 
 def ensure_editor_ready(
@@ -3170,14 +3170,14 @@ class PlaywrightSession:
 
     @staticmethod
     def _logout_browser_context_session(context: Any, base_url: str | None) -> None:
-        """If the browser context holds a ``pptgod_session`` cookie, revoke it via API."""
+        """Revoke a Better Auth session held by the browser context through the API."""
         try:
             cookies = context.cookies()
         except Exception as err:  # noqa: BLE001 — context already crashed
             sys.stderr.write(f"[glacier_e2e] Warning reading browser cookies during teardown: {err}\n")
             return
         session_cookie = next(
-            (c for c in cookies if c.get("name") == SESSION_COOKIE_NAME and c.get("value")),
+            (c for c in cookies if c.get("name") in SESSION_COOKIE_NAMES and c.get("value")),
             None,
         )
         if not session_cookie:
@@ -3195,7 +3195,10 @@ class PlaywrightSession:
         try:
             client.post(
                 "/api/auth/logout",
-                headers={"Cookie": f"{SESSION_COOKIE_NAME}={session_cookie['value']}"},
+                headers={
+                    "Cookie": f"{session_cookie['name']}={session_cookie['value']}",
+                    "Origin": origin,
+                },
             )
         except ApiConnectionError as err:
             sys.stderr.write(

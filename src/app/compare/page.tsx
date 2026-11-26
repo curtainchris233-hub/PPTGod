@@ -13,6 +13,6 @@ export const metadata: Metadata = {
 
 export default async function ComparePage() {
   const viewer = await getCurrentUser();
-  const allPrompts = listPrompts({ sort: "popular", viewerId: viewer?.id });
+  const allPrompts = await listPrompts({ sort: "popular", viewerId: viewer?.id });
   return <CompareClient allPrompts={allPrompts} />;
 }
