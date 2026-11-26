@@ -69,6 +69,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const publicPreview = process.env.PPTGOD_PUBLIC_PREVIEW === "true";
+
   return (
     <html
       lang="zh-CN"
@@ -77,9 +79,12 @@ export default function RootLayout({
       <body>
         <AppProvider>
           <LayoutProvider>
-            <AppShell>{children}</AppShell>
+            <AppShell publicPreview={publicPreview}>{children}</AppShell>
             <CompareDock />
-            <AuthModal showDemoAccount={process.env.NODE_ENV !== "production" && demoAccountEnabled()} />
+            <AuthModal
+              publicPreview={publicPreview}
+              showDemoAccount={!publicPreview && process.env.NODE_ENV !== "production" && demoAccountEnabled()}
+            />
           </LayoutProvider>
         </AppProvider>
       </body>

@@ -17,6 +17,7 @@ import { useLayout } from "@/context/LayoutContext";
 
 interface TopbarProps {
   showMenuOnDesktop?: boolean;
+  publicPreview: boolean;
 }
 
 function TopbarSearchInput({ initialQuery }: { initialQuery: string }) {
@@ -76,7 +77,7 @@ function TopbarSearchWithParams() {
   return <TopbarSearchInput key={qParam} initialQuery={qParam} />;
 }
 
-export default function Topbar({ showMenuOnDesktop = false }: TopbarProps) {
+export default function Topbar({ showMenuOnDesktop = false, publicPreview }: TopbarProps) {
   const pathname = usePathname() || "/";
   const { user, compareIds, openAuthModal, logout } = useApp();
   const { mobileDrawerOpen, setMobileDrawerOpen } = useLayout();
@@ -220,7 +221,7 @@ export default function Topbar({ showMenuOnDesktop = false }: TopbarProps) {
               onClick={() => openAuthModal("login")}
             >
               <UserIcon size={15} strokeWidth={2} aria-hidden="true" />
-              <span>登录</span>
+              <span>{publicPreview ? "访客预览" : "登录"}</span>
             </button>
           )}
         </div>

@@ -7,7 +7,9 @@ for (const path of [".env.production.local", ".env.local", ".env.production", ".
 }
 
 const required = ["DATABASE_URL", "BETTER_AUTH_URL", "BETTER_AUTH_SECRET"];
-if (process.env.PPTGOD_REQUIRE_SERVICES === "true") {
+const fullHosted = process.env.PPTGOD_REQUIRE_SERVICES === "true";
+const publicPreview = process.env.PPTGOD_PUBLIC_PREVIEW === "true";
+if (fullHosted) {
   required.push(
     "RESEND_API_KEY",
     "RESEND_FROM_EMAIL",
@@ -21,14 +23,17 @@ if (process.env.PPTGOD_REQUIRE_SERVICES === "true") {
 }
 
 const missing = required.filter((key) => !process.env[key]?.trim());
-if (missing.length) {
+if (fullHosted && publicPreview) {
+  console.error("Disable PPTGOD_PUBLIC_PREVIEW when enabling hosted account services.");
+  process.exitCode = 1;
+} else if (missing.length) {
   console.error(`PPTGod is missing required environment variables: ${missing.join(", ")}`);
   process.exitCode = 1;
 } else if (process.env.BETTER_AUTH_SECRET.length < 32) {
   console.error("BETTER_AUTH_SECRET must contain at least 32 characters.");
   process.exitCode = 1;
 } else if (
-  process.env.PPTGOD_REQUIRE_SERVICES === "true" &&
+  (fullHosted || publicPreview) &&
   !process.env.BETTER_AUTH_URL.startsWith("https://")
 ) {
   console.error("Hosted PPTGod requires an HTTPS BETTER_AUTH_URL.");
