@@ -35,7 +35,7 @@ export default async function GalleryPage({
   };
 
   const viewer = await getCurrentUser();
-  const initialPrompts = listPrompts({
+  const initialPrompts = await listPrompts({
     sort: "popular",
     viewerId: viewer?.id,
   });

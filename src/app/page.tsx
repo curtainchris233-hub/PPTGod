@@ -45,7 +45,7 @@ export default async function HomePage({
   }
 
   const viewer = await getCurrentUser();
-  const prompts = listPrompts({
+  const prompts = await listPrompts({
     sort: "popular",
     viewerId: viewer?.id,
   });

@@ -12,7 +12,7 @@ export async function generateMetadata({
   params: Promise<{ username: string }>;
 }): Promise<Metadata> {
   const { username } = await params;
-  const data = getCreatorByUsername(username, null);
+  const data = await getCreatorByUsername(username, null);
   if (!data) return { title: "未找到创作者" };
   return {
     title: `${data.creator.displayName} — PPT 视觉提示词创作者主页`,
@@ -29,7 +29,7 @@ export default async function CreatorPage({
 }) {
   const { username } = await params;
   const viewer = await getCurrentUser();
-  const data = getCreatorByUsername(username, viewer?.id);
+  const data = await getCreatorByUsername(username, viewer?.id);
 
   if (!data) {
     notFound();

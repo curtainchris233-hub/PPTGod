@@ -26,7 +26,7 @@ export default async function GeneratePage({
 }) {
   const sp = await searchParams;
   const viewer = await getCurrentUser();
-  const styles = listPrompts({
+  const styles = await listPrompts({
     sort: "popular",
     viewerId: viewer?.id,
     includePrivateForAuthorId: viewer?.id,
@@ -36,7 +36,7 @@ export default async function GeneratePage({
   let deckForbidden = false;
 
   if (sp.deck) {
-    const found = getSavedDeckById(sp.deck);
+    const found = await getSavedDeckById(sp.deck);
     if (found) {
       if (found.isPublic || (viewer && found.authorId === viewer.id)) {
         initialDeck = found;

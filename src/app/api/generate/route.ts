@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { generatePresentationJson } from "@/lib/presentationAgent";
+import { resolveProvider } from "@/lib/providerRequest";
+import { limitSiteProvider, limitToolRequest } from "@/lib/toolRateLimit";
 import { generateStructuredDeck } from "@/lib/deckGenerator";
 import {
   isPlainObject,
   sanitizeLlmSlide,
   sanitizeOutlineItems,
-  scrubUpstreamError,
-  validateByokApiBase,
 } from "@/lib/deckValidation";
 import {
   ALL_SLIDE_TYPES,
@@ -14,6 +15,9 @@ import {
 import { safeNumber, safeString } from "../prompts/_validation";
 
 export async function POST(request: Request) {
+  const limited = await limitToolRequest(request, "generate", 24);
+  if (limited) return limited;
+
   let body: Record<string, unknown>;
   try {
     const parsed: unknown = await request.json();
@@ -83,33 +87,23 @@ export async function POST(request: Request) {
         );
       }
 
-      const apiKey =
-        safeString(body.apiKey).trim() || process.env.OPENAI_API_KEY || "";
-      const rawApiBase =
-        safeString(body.apiBase).trim() ||
-        process.env.OPENAI_BASE_URL ||
-        "https://api.openai.com/v1";
-      const model =
-        safeString(body.model).trim() ||
-        process.env.OPENAI_MODEL ||
-        "gpt-4o-mini";
-
-      if (!apiKey) {
-        return NextResponse.json(
-          {
-            error:
-              "未检测到 API Key：请在下方填入 OpenAI / DeepSeek 兼容 API Key，或切换为「内置语义结构引擎（免 Key）」",
-          },
-          { status: 400 }
-        );
+      const provider = resolveProvider(
+        {
+          apiKey: safeString(body.apiKey).trim(),
+          apiBase: safeString(body.apiBase).trim(),
+          model: safeString(body.model).trim(),
+        },
+        "text",
+        "未检测到 API Key：请在下方填入 OpenAI / DeepSeek 兼容 API Key，或切换为「内置语义结构引擎（免 Key）」"
+      );
+      if (!provider.ok) {
+        return NextResponse.json({ error: provider.error }, { status: 400 });
+      }
+      if (provider.config.usesSiteKey) {
+        const limit = await limitSiteProvider(request, "text");
+        if (limit) return limit;
       }
 
-      const baseCheck = validateByokApiBase(rawApiBase);
-      if (!baseCheck.ok) {
-        return NextResponse.json({ error: baseCheck.error }, { status: 400 });
-      }
-
-      const chatEndpoint = `${baseCheck.endpointRoot}/chat/completions`;
       const effectiveCount =
         outline && outline.length > 0 ? outline.length : slideCount;
 
@@ -156,98 +150,17 @@ export async function POST(request: Request) {
         sourceText.slice(0, 12000) || "（请结合行业最佳实践自动充实高质量数据与论据）"
       }${outlineHint}`;
 
-      let llmRes: Response;
-      try {
-        llmRes = await fetch(chatEndpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model,
-            temperature: 0.5,
-            response_format: { type: "json_object" },
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userContent },
-            ],
-          }),
-          signal: AbortSignal.timeout(45000),
-        });
-      } catch (fetchErr) {
-        const isTimeout =
-          fetchErr instanceof Error &&
-          (fetchErr.name === "TimeoutError" || fetchErr.name === "AbortError");
-        return NextResponse.json(
-          {
-            error: isTimeout
-              ? "大模型接口请求超时（45s），请稍后重试或切换「内置语义结构引擎」"
-              : "无法连接到大模型接口，请检查 API Base URL 与网络连通性",
-          },
-          { status: 502 }
-        );
+      const result = await generatePresentationJson({
+        task: "generate",
+        config: provider.config,
+        instructions: systemPrompt,
+        input: userContent,
+        requestSignal: request.signal,
+      });
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 502 });
       }
-
-      if (!llmRes.ok) {
-        const errText = await llmRes.text().catch(() => "");
-        const safeSnippet = scrubUpstreamError(errText, apiKey);
-        return NextResponse.json(
-          {
-            error: `大模型接口返回错误 (HTTP ${llmRes.status})：${safeSnippet}`,
-          },
-          { status: 502 }
-        );
-      }
-
-      let llmJson: unknown;
-      try {
-        llmJson = await llmRes.json();
-      } catch {
-        return NextResponse.json(
-          {
-            error:
-              "大模型接口返回了非 JSON 响应，请检查 API Base URL 或切换「内置语义结构引擎」",
-          },
-          { status: 502 }
-        );
-      }
-
-      const choices = isPlainObject(llmJson) ? llmJson.choices : undefined;
-      const firstChoice = Array.isArray(choices) ? choices[0] : undefined;
-      const message = isPlainObject(firstChoice)
-        ? firstChoice.message
-        : undefined;
-      const rawContent =
-        isPlainObject(message) && typeof message.content === "string"
-          ? message.content.trim()
-          : "";
-
-      if (!rawContent) {
-        return NextResponse.json(
-          {
-            error:
-              "大模型返回内容为空，请重试或切换「内置语义结构引擎」",
-          },
-          { status: 502 }
-        );
-      }
-
-      const fenceMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/i);
-      const candidate = (fenceMatch ? fenceMatch[1] : rawContent).trim();
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(candidate);
-      } catch {
-        return NextResponse.json(
-          {
-            error:
-              "大模型返回的内容不是合法 JSON 格式，请重试或切换「内置语义结构引擎」",
-          },
-          { status: 502 }
-        );
-      }
+      const parsed = result.data;
 
       const rawSlides =
         isPlainObject(parsed) && Array.isArray(parsed.slides)

@@ -1,22 +1,29 @@
 import { NextResponse } from "next/server";
+import { count, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import { prompts } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const db = getDb();
-    const row = db
-      .prepare("SELECT COUNT(*) AS cnt FROM prompts WHERE is_public = 1")
-      .get() as { cnt: number };
-    const modeRow = db.pragma("journal_mode", { simple: true }) as string;
+    const [{ catalogCount }] = await getDb()
+      .select({ catalogCount: count() })
+      .from(prompts)
+      .where(eq(prompts.isPublic, true));
+    if (catalogCount === 0) {
+      return NextResponse.json({ status: "error", error: "Style catalog unavailable" }, {
+        status: 503,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
 
     return NextResponse.json(
       {
         status: "ok",
         version: "8.0.0",
-        catalogCount: Number(row?.cnt ?? 0),
-        dbMode: String(modeRow || "wal").toLowerCase(),
+        catalogCount,
+        dbMode: "postgresql",
         timestamp: new Date().toISOString(),
       },
       {
@@ -30,7 +37,7 @@ export async function GET() {
         status: "error",
         error: "Database unavailable",
       },
-      { status: 503 }
+      { status: 503, headers: { "Cache-Control": "no-store" } }
     );
   }
 }

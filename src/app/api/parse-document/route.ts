@@ -4,8 +4,11 @@ import { extractText } from "unpdf";
 import { listPrompts } from "@/lib/db";
 import { analyzeDocumentAndRecommendStyles } from "@/lib/documentAnalyzer";
 import { parsePptxBuffer } from "@/lib/pptxParser";
+import { limitToolRequest } from "@/lib/toolRateLimit";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+// Leave room to receive moderate oversize uploads and return the file-size message.
+const MAX_MULTIPART_BYTES = MAX_UPLOAD_BYTES + 1024 * 1024;
 const ALLOWED_EXTS = new Set(["pdf", "docx", "pptx", "md", "txt"]);
 
 function getExtension(fileName: string): string {
@@ -48,10 +51,36 @@ function extractTitleHints(
 }
 
 export async function POST(request: Request) {
+  const limited = await limitToolRequest(request, "parse-document", 40);
+  if (limited) return limited;
+
+  const tooLarge = () => NextResponse.json(
+    { error: "文档体积超过 10MB 上限，请精简后再上传" },
+    { status: 400 },
+  );
+  if (Number(request.headers.get("content-length")) > MAX_MULTIPART_BYTES) {
+    return tooLarge();
+  }
+
+  let totalBytes = 0;
+  let sizeExceeded = false;
+  const boundedBody = request.body?.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      totalBytes += chunk.byteLength;
+      if (totalBytes > MAX_MULTIPART_BYTES) {
+        sizeExceeded = true;
+        controller.error(new Error("Upload exceeds request limit"));
+        return;
+      }
+      controller.enqueue(chunk);
+    },
+  }));
+
   let formData: FormData;
   try {
-    formData = await request.formData();
+    formData = await new Response(boundedBody, { headers: request.headers }).formData();
   } catch {
+    if (sizeExceeded) return tooLarge();
     return NextResponse.json(
       { error: "请使用 multipart/form-data 上传文档文件（字段名 file）" },
       { status: 400 }
@@ -96,16 +125,13 @@ export async function POST(request: Request) {
   }
 
   if (fileEntry.size > MAX_UPLOAD_BYTES) {
-    return NextResponse.json(
-      { error: "文档体积超过 10MB 上限，请精简后再上传" },
-      { status: 400 }
-    );
+    return tooLarge();
   }
 
   try {
     const arrayBuffer = await fileEntry.arrayBuffer();
     const uint8 = new Uint8Array(arrayBuffer);
-    const catalogStyles = listPrompts({});
+    const catalogStyles = await listPrompts({});
 
     if (ext === "pptx") {
       try {

@@ -67,7 +67,7 @@ def g1_api_01_health(ctx: TestContext) -> None:
     data = resp.require_json("GET /api/health")
     assert data.get("status") == "ok", f"Expected status='ok', got {data!r}"
     assert data.get("catalogCount") == 36, f"Expected catalogCount=36, got {data!r}"
-    assert str(data.get("dbMode", "")).lower() == "wal", f"Expected dbMode='wal', got {data!r}"
+    assert str(data.get("dbMode", "")).lower() == "postgresql", f"Expected dbMode='postgresql', got {data!r}"
 
 
 def g1_api_02_prompts_catalog_filters(ctx: TestContext) -> None:
@@ -1987,12 +1987,12 @@ def g1_ui_09_collections_projects_crud(ctx: TestContext) -> None:
             assert vis_info.value.json()["deck"]["isPublic"] is True, "Visibility PATCH did not set isPublic=true"
             page.wait_for_timeout(150)
 
-            # UI Export PPTX (POST /api/export/pptx -> 200 + ZIP PK magic)
+            # UI Export PPTX: verify the PowerPoint file the browser saves.
             _open_card_menu(renamed_title)
             with page.expect_response(
                 lambda r: "/api/export/pptx" in r.url and r.request.method == "POST",
                 timeout=ctx.timeout_ms,
-            ) as exp_info:
+            ) as exp_info, page.expect_download(timeout=ctx.timeout_ms) as pptx_download:
                 click_resilient(
                     page,
                     [
@@ -2002,7 +2002,9 @@ def g1_ui_09_collections_projects_crud(ctx: TestContext) -> None:
                     description="Project Export PPTX action",
                 )
             assert exp_info.value.status == 200, f"Collections Export PPTX returned {exp_info.value.status}"
-            assert exp_info.value.body().startswith(b"PK\x03\x04"), "Collections Export PPTX missing ZIP magic"
+            download = pptx_download.value
+            assert download.suggested_filename.endswith(".pptx")
+            assert Path(download.path()).read_bytes().startswith(b"PK\x03\x04"), "Collections Export PPTX missing ZIP magic"
             page.wait_for_timeout(150)
 
             # Duplicate (POST /api/decks)
@@ -2657,7 +2659,7 @@ def g1_ui_15_modals_and_not_found(ctx: TestContext) -> None:
         guard.goto_ok(f"{ctx.base_url}/")
         page = guard.page
 
-        # AuthModal: verify BOTH Login & Register tabs switch cleanly before Demo Login
+        # AuthModal: switch between signup and login, then submit the login form.
         click_resilient(
             page,
             [
@@ -2694,12 +2696,14 @@ def g1_ui_15_modals_and_not_found(ctx: TestContext) -> None:
             description="AuthModal Login tab",
         )
         page.wait_for_timeout(120)
+        auth_dlg.locator("#pg-auth-email").fill(ACCOUNT_DEMO.email)
+        auth_dlg.locator("#pg-auth-password").fill(ACCOUNT_DEMO.password)
         with page.expect_response(
             lambda r: "/api/auth/login" in r.url and r.request.method == "POST",
             timeout=ctx.timeout_ms,
         ) as login_resp:
-            click_resilient(auth_dlg, ["#pg-demo-login-btn"], description="AuthModal demo login button")
-        assert login_resp.value.status == 200, f"Demo login returned HTTP {login_resp.value.status}"
+            click_resilient(auth_dlg, ["#pg-auth-submit-btn"], description="AuthModal login submit button")
+        assert login_resp.value.status == 200, f"Login returned HTTP {login_resp.value.status}"
         locate_first(page, ["#pg-nav-logout-btn"], timeout_ms=ctx.timeout_ms, description="Logged-in logout button")
 
         # SettingsModal from Sidebar — verify editable profile inputs AND local-only BYOK section
@@ -2792,7 +2796,7 @@ def g1_ui_15b_creator_profile(ctx: TestContext) -> None:
 def get_specs() -> list[TestSpec]:
     return [
         # Tier 1A: 12 Core API Happy Paths
-        TestSpec("G1_API_01", 1, "GET /api/health returns ok, 36 catalogCount, WAL mode", g1_api_01_health, ("api", "health")),
+        TestSpec("G1_API_01", 1, "GET /api/health returns ok, 36 catalogCount, PostgreSQL", g1_api_01_health, ("api", "health")),
         TestSpec("G1_API_02", 1, "GET /api/prompts catalog (36 slugs), facet filters & sorts", g1_api_02_prompts_catalog_filters, ("api", "prompts")),
         TestSpec("G1_API_03", 1, "Auth login/me/logout lifecycle & HttpOnly session cookie", g1_api_03_auth_lifecycle, ("api", "auth")),
         TestSpec("G1_API_04", 1, "Prompts POST/GET/PUT/PATCH/DELETE lifecycle", g1_api_04_prompts_crud, ("api", "prompts", "crud")),

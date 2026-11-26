@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb, getPromptBySlugOrId, listPrompts } from "@/lib/db";
+import { promptLikes, prompts } from "@/lib/db/schema";
 import { generateToken } from "@/lib/password";
 import { parseJsonObject, validatePromptPayload } from "./_validation";
 
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
     includePrivateForAuthorId = viewer.id;
   }
 
-  const prompts = listPrompts({
+  const prompts = await listPrompts({
     q,
     scenario,
     style,
@@ -122,7 +123,7 @@ export async function POST(request: Request) {
     const rawRemixId =
       typeof body.remixedFromId === "string" ? body.remixedFromId.trim() : "";
     const remixOrigin = rawRemixId
-      ? getPromptBySlugOrId(rawRemixId, user.id)
+      ? await getPromptBySlugOrId(rawRemixId, user.id)
       : null;
     const remixedFromId = remixOrigin ? remixOrigin.id : null;
 
@@ -130,46 +131,41 @@ export async function POST(request: Request) {
     const slug = makeSlug(englishTitle, title);
     const now = new Date().toISOString();
 
-    const db = getDb();
-    db.prepare(
-      `INSERT INTO prompts (
-        id, slug, title, english_title, summary, scenario, style_category,
-        color_family, recommended_tools, tags, visual_spec, prompt_anatomy,
-        custom_notes, sample_topic, sample_subtitle, author_id, is_official,
-        is_public, remixed_from_id, likes_count, saves_count, copies_count,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 1, 0, 0, ?, ?)`
-    ).run(
-      id,
-      slug,
-      title,
-      englishTitle,
-      summary,
-      scenario,
-      styleCategory,
-      colorFamily,
-      JSON.stringify(
-        recommendedTools.length ? recommendedTools : ["claude-html"]
-      ),
-      JSON.stringify(tags),
-      JSON.stringify(visualSpec),
-      JSON.stringify(promptAnatomy),
-      customNotes,
-      sampleTopic,
-      sampleSubtitle,
-      user.id,
-      isPublic ? 1 : 0,
-      remixedFromId,
-      now,
-      now
-    );
+    await getDb().transaction(async (tx) => {
+      await tx.insert(prompts).values({
+        id,
+        slug,
+        title,
+        englishTitle,
+        summary,
+        scenario,
+        styleCategory,
+        colorFamily,
+        recommendedTools: recommendedTools.length ? recommendedTools : ["claude-html"],
+        tags,
+        visualSpec,
+        promptAnatomy,
+        customNotes,
+        sampleTopic,
+        sampleSubtitle,
+        authorId: user.id,
+        isOfficial: false,
+        isPublic,
+        remixedFromId,
+        likesCount: 1,
+        savesCount: 0,
+        copiesCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await tx.insert(promptLikes).values({
+        userId: user.id,
+        promptId: id,
+        createdAt: now,
+      });
+    });
 
-    // Auto-like own newly published prompt
-    db.prepare(
-      `INSERT OR IGNORE INTO prompt_likes (user_id, prompt_id, created_at) VALUES (?, ?, ?)`
-    ).run(user.id, id, now);
-
-    const created = getPromptBySlugOrId(id, user.id);
+    const created = await getPromptBySlugOrId(id, user.id);
     return NextResponse.json({ prompt: created }, { status: 201 });
   } catch (err) {
     console.error("Create prompt error:", err);

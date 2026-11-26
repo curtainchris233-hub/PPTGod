@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { promptFavorites, prompts } from "@/lib/db/schema";
 import { parseJsonObject } from "../_validation";
 
 export async function POST(request: Request) {
@@ -31,32 +33,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ synced: 0 });
     }
 
-    const db = getDb();
-    const now = new Date().toISOString();
-    let synced = 0;
+    const synced = await getDb().transaction(async (tx) => {
+      const accessible = await tx.select({ promptId: prompts.id })
+        .from(prompts)
+        .where(and(
+          inArray(prompts.id, ids),
+          or(eq(prompts.isPublic, true), eq(prompts.authorId, user.id)),
+        ))
+        .orderBy(asc(prompts.id))
+        .for("update");
+      if (!accessible.length) return 0;
 
-    const tx = db.transaction(() => {
-      const checkStmt = db.prepare(
-        `SELECT 1 FROM prompts WHERE id = ? AND (is_public = 1 OR author_id = ?)`
-      );
-      const insertFavStmt = db.prepare(
-        `INSERT OR IGNORE INTO prompt_favorites (user_id, prompt_id, created_at) VALUES (?, ?, ?)`
-      );
-      const bumpCountStmt = db.prepare(
-        `UPDATE prompts SET saves_count = saves_count + 1 WHERE id = ?`
-      );
+      const now = new Date().toISOString();
+      const added = await tx.insert(promptFavorites)
+        .values(accessible.map(({ promptId }) => ({ userId: user.id, promptId, createdAt: now })))
+        .onConflictDoNothing()
+        .returning({ promptId: promptFavorites.promptId });
+      if (!added.length) return 0;
 
-      for (const pid of ids) {
-        const promptExists = checkStmt.get(pid, user.id);
-        if (!promptExists) continue;
-        const info = insertFavStmt.run(user.id, pid, now);
-        if (info.changes > 0) {
-          bumpCountStmt.run(pid);
-          synced += 1;
-        }
-      }
+      await tx.update(prompts)
+        .set({ savesCount: sql`${prompts.savesCount} + 1` })
+        .where(inArray(prompts.id, added.map(({ promptId }) => promptId)));
+      return added.length;
     });
-    tx();
 
     return NextResponse.json({ synced });
   } catch (err) {

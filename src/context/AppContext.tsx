@@ -16,6 +16,8 @@ interface ToastState {
   tone: "default" | "success" | "error";
 }
 
+export type AuthView = "login" | "register" | "forgot" | "verify";
+
 interface AppContextValue {
   user: UserPublic | null;
   stats: UserStats | null;
@@ -26,8 +28,8 @@ interface AppContextValue {
   logout: () => Promise<void>;
 
   authModalOpen: boolean;
-  authModalTab: "login" | "register";
-  openAuthModal: (tab?: "login" | "register") => void;
+  authModalTab: AuthView;
+  openAuthModal: (tab?: AuthView) => void;
   closeAuthModal: () => void;
 
   compareIds: string[];
@@ -58,9 +60,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [syncVersion, setSyncVersion] = useState(0);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authModalTab, setAuthModalTab] = useState<"login" | "register">(
-    "login"
-  );
+  const [authModalTab, setAuthModalTab] = useState<AuthView>("login");
 
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [localFavoriteIds, setLocalFavoriteIds] = useState<string[]>([]);
@@ -182,14 +182,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error("Sign-out failed");
+    } catch {
+      showToast("暂时无法退出登录，请重试。", "error");
+      return;
+    }
     setUser(null);
     setStats(null);
     setSyncVersion((v) => v + 1);
     showToast("已退出登录");
   }, [showToast]);
 
-  const openAuthModal = useCallback((tab: "login" | "register" = "login") => {
+  const openAuthModal = useCallback((tab: AuthView = "login") => {
     setAuthModalTab(tab);
     setAuthModalOpen(true);
   }, []);

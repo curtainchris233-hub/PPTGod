@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getDb,
@@ -6,6 +7,7 @@ import {
   updatePrompt,
   updatePromptVisibility,
 } from "@/lib/db";
+import { prompts } from "@/lib/db/schema";
 import { parseJsonObject, validatePromptPayload } from "../_validation";
 
 export async function GET(
@@ -14,7 +16,7 @@ export async function GET(
 ) {
   const { id } = await context.params;
   const viewer = await getCurrentUser();
-  const prompt = getPromptBySlugOrId(id, viewer?.id);
+  const prompt = await getPromptBySlugOrId(id, viewer?.id);
   if (!prompt) {
     return NextResponse.json({ error: "未找到该提示词模板" }, { status: 404 });
   }
@@ -32,7 +34,7 @@ export async function PUT(
     }
 
     const { id } = await context.params;
-    const existing = getPromptBySlugOrId(id, user.id);
+    const existing = await getPromptBySlugOrId(id, user.id);
     if (!existing) {
       return NextResponse.json({ error: "模板不存在" }, { status: 404 });
     }
@@ -61,11 +63,9 @@ export async function PUT(
       return NextResponse.json({ error: validated.error }, { status: 400 });
     }
 
-    const isPublic =
-      typeof body.isPublic === "boolean" ? body.isPublic : existing.isPublic;
-    const updated = updatePrompt(
+    const updated = await updatePrompt(
       existing.id,
-      { ...validated.data, isPublic },
+      { ...validated.data, isPublic: body.isPublic },
       user.id
     );
     if (!updated) {
@@ -93,7 +93,7 @@ export async function PATCH(
     }
 
     const { id } = await context.params;
-    const existing = getPromptBySlugOrId(id, user.id);
+    const existing = await getPromptBySlugOrId(id, user.id);
     if (!existing) {
       return NextResponse.json({ error: "模板不存在" }, { status: 404 });
     }
@@ -117,7 +117,7 @@ export async function PATCH(
       );
     }
 
-    const updated = updatePromptVisibility(existing.id, body.isPublic, user.id);
+    const updated = await updatePromptVisibility(existing.id, body.isPublic, user.id);
     if (!updated) {
       return NextResponse.json({ error: "模板不存在" }, { status: 404 });
     }
@@ -142,7 +142,7 @@ export async function DELETE(
     return NextResponse.json({ error: "请先登录" }, { status: 401 });
   }
 
-  const prompt = getPromptBySlugOrId(id, user.id);
+  const prompt = await getPromptBySlugOrId(id, user.id);
   if (!prompt) {
     return NextResponse.json({ error: "模板不存在" }, { status: 404 });
   }
@@ -150,10 +150,7 @@ export async function DELETE(
     return NextResponse.json({ error: "只能删除自己发布的模板" }, { status: 403 });
   }
 
-  const db = getDb();
-  db.prepare(`DELETE FROM prompts WHERE id = ? AND author_id = ?`).run(
-    prompt.id,
-    user.id
-  );
+  await getDb().delete(prompts)
+    .where(and(eq(prompts.id, prompt.id), eq(prompts.authorId, user.id)));
   return NextResponse.json({ ok: true });
 }

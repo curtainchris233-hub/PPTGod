@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb, getSavedDeckById, listSavedDecksByUser } from "@/lib/db";
+import { savedDecks } from "@/lib/db/schema";
 import { validateSlidesPayload } from "@/lib/deckValidation";
+import type { SavedDeck } from "@/types/prompt";
 import { generateToken } from "@/lib/password";
 import {
   parseJsonObject,
@@ -14,7 +17,7 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ decks: [] });
   }
-  return NextResponse.json({ decks: listSavedDecksByUser(user.id) });
+  return NextResponse.json({ decks: await listSavedDecksByUser(user.id) });
 }
 
 export async function POST(request: Request) {
@@ -70,60 +73,40 @@ export async function POST(request: Request) {
 
     const db = getDb();
     const now = new Date().toISOString();
-
-    if (existingId) {
-      const prev = getSavedDeckById(existingId);
-      if (prev && prev.authorId === user.id) {
-        const nextIsPublic =
-          typeof body.isPublic === "boolean" ? body.isPublic : prev.isPublic;
-        db.prepare(
-          `UPDATE saved_decks
-           SET title = ?, subtitle = ?, audience = ?, prompt_id = ?, prompt_slug = ?, prompt_title = ?,
-               visual_spec = ?, slides_json = ?, is_public = ?, updated_at = ?
-           WHERE id = ? AND author_id = ?`
-        ).run(
-          title,
-          subtitle,
-          audience,
-          promptId,
-          promptSlug,
-          promptTitle,
-          JSON.stringify(visualSpec),
-          JSON.stringify(slides),
-          nextIsPublic ? 1 : 0,
-          now,
-          existingId,
-          user.id
-        );
-        return NextResponse.json({ deck: getSavedDeckById(existingId) });
-      }
-    }
-
-    const isPublic = typeof body.isPublic === "boolean" ? body.isPublic : false;
-    const id = `deck_${generateToken(8)}`;
-    db.prepare(
-      `INSERT INTO saved_decks (
-        id, title, subtitle, audience, prompt_id, prompt_slug, prompt_title,
-        visual_spec, slides_json, is_public, author_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      id,
+    const deckValues = {
       title,
       subtitle,
       audience,
       promptId,
       promptSlug,
       promptTitle,
-      JSON.stringify(visualSpec),
-      JSON.stringify(slides),
-      isPublic ? 1 : 0,
-      user.id,
-      now,
-      now
-    );
+      visualSpec,
+      slides: slides as SavedDeck["slides"],
+      updatedAt: now,
+    };
+
+    if (existingId) {
+      const [updated] = await db.update(savedDecks)
+        .set({ ...deckValues, isPublic: body.isPublic })
+        .where(and(eq(savedDecks.id, existingId), eq(savedDecks.authorId, user.id)))
+        .returning({ id: savedDecks.id });
+      if (updated) {
+        return NextResponse.json({ deck: await getSavedDeckById(existingId) });
+      }
+    }
+
+    const isPublic = typeof body.isPublic === "boolean" ? body.isPublic : false;
+    const id = `deck_${generateToken(8)}`;
+    await db.insert(savedDecks).values({
+      ...deckValues,
+      id,
+      isPublic,
+      authorId: user.id,
+      createdAt: now,
+    });
 
     return NextResponse.json(
-      { deck: getSavedDeckById(id) },
+      { deck: await getSavedDeckById(id) },
       { status: 201 }
     );
   } catch (err) {

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { and, eq, or, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb, getPromptBySlugOrId } from "@/lib/db";
+import { promptLikes, prompts } from "@/lib/db/schema";
 
 export async function POST(
   _request: Request,
@@ -15,45 +17,39 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  const prompt = getPromptBySlugOrId(id, user.id);
+  const prompt = await getPromptBySlugOrId(id, user.id);
   if (!prompt) {
     return NextResponse.json({ error: "模板不存在" }, { status: 404 });
   }
 
-  const db = getDb();
-  const tx = db.transaction(() => {
-    const existing = db
-      .prepare(
-        `SELECT 1 FROM prompt_likes WHERE user_id = ? AND prompt_id = ?`
-      )
-      .get(user.id, prompt.id);
+  const result = await getDb().transaction(async (tx) => {
+    const [lockedPrompt] = await tx.select({ id: prompts.id })
+      .from(prompts)
+      .where(and(eq(prompts.id, prompt.id), or(eq(prompts.isPublic, true), eq(prompts.authorId, user.id))))
+      .for("update");
+    if (!lockedPrompt) return null;
 
-    if (existing) {
-      db.prepare(
-        `DELETE FROM prompt_likes WHERE user_id = ? AND prompt_id = ?`
-      ).run(user.id, prompt.id);
-      db.prepare(
-        `UPDATE prompts SET likes_count = MAX(0, likes_count - 1) WHERE id = ?`
-      ).run(prompt.id);
-      return { liked: false };
-    } else {
-      db.prepare(
-        `INSERT INTO prompt_likes (user_id, prompt_id, created_at) VALUES (?, ?, ?)`
-      ).run(user.id, prompt.id, new Date().toISOString());
-      db.prepare(
-        `UPDATE prompts SET likes_count = likes_count + 1 WHERE id = ?`
-      ).run(prompt.id);
-      return { liked: true };
+    const [removed] = await tx.delete(promptLikes)
+      .where(and(eq(promptLikes.userId, user.id), eq(promptLikes.promptId, prompt.id)))
+      .returning({ promptId: promptLikes.promptId });
+    if (!removed) {
+      await tx.insert(promptLikes).values({
+        userId: user.id,
+        promptId: prompt.id,
+        createdAt: new Date().toISOString(),
+      });
     }
-  });
 
-  const { liked } = tx();
-  const updated = db
-    .prepare(`SELECT likes_count FROM prompts WHERE id = ?`)
-    .get(prompt.id) as { likes_count: number };
-
-  return NextResponse.json({
-    liked,
-    likesCount: updated.likes_count,
+    const adjustment = removed ? -1 : 1;
+    const [updated] = await tx.update(prompts)
+      .set({ likesCount: sql`greatest(0, ${prompts.likesCount} + ${adjustment})` })
+      .where(eq(prompts.id, prompt.id))
+      .returning({ likesCount: prompts.likesCount });
+    return { liked: !removed, likesCount: updated.likesCount };
   });
+  if (!result) {
+    return NextResponse.json({ error: "模板不存在" }, { status: 404 });
+  }
+
+  return NextResponse.json(result);
 }

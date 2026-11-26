@@ -1,21 +1,17 @@
-import crypto from "crypto";
+import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 
-export function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const derived = crypto.scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${derived}`;
-}
+const derive = promisify(scrypt);
+export const LEGACY_PASSWORD_PREFIX = "legacy-scrypt$";
 
-export function verifyPassword(password: string, storedHash: string): boolean {
-  const parts = storedHash.split(":");
-  if (parts.length !== 2) return false;
-  const [salt, keyHex] = parts;
-  const keyBuf = Buffer.from(keyHex, "hex");
-  const derivedBuf = crypto.scryptSync(password, salt, 64);
-  if (keyBuf.length !== derivedBuf.length) return false;
-  return crypto.timingSafeEqual(keyBuf, derivedBuf);
+export async function verifyLegacyPassword(password: string, storedHash: string) {
+  const [salt, keyHex] = storedHash.split(":");
+  if (!/^[a-f0-9]{32}$/.test(salt) || !/^[a-f0-9]{128}$/.test(keyHex ?? "")) return false;
+  const key = Buffer.from(keyHex, "hex");
+  const derived = (await derive(password, salt, 64)) as Buffer;
+  return timingSafeEqual(key, derived);
 }
 
 export function generateToken(bytes = 32): string {
-  return crypto.randomBytes(bytes).toString("hex");
+  return randomBytes(bytes).toString("hex");
 }

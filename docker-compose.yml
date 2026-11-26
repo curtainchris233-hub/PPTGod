@@ -1,20 +1,30 @@
 services:
-  pptgod:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: pptgod-app
-    ports:
-      - "3000:3000"
+  postgres:
+    image: postgres:17
     environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+      POSTGRES_DB: pptgod
+      POSTGRES_USER: pptgod
+      POSTGRES_PASSWORD: pptgod
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
-      - ./data:/app/data
-    restart: unless-stopped
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      test: ["CMD", "pg_isready", "-U", "pptgod", "-d", "pptgod"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pptgod:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: ${PPTGOD_DOCKER_DATABASE_URL:-postgresql://pptgod:pptgod@postgres:5432/pptgod}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

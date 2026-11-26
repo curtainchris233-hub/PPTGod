@@ -18,8 +18,8 @@ export default async function ToolsPage({
 }) {
   const sp = await searchParams;
   const viewer = await getCurrentUser();
-  const styles = listPrompts({ sort: "popular", viewerId: viewer?.id });
-  const initialDecks = viewer ? listSavedDecksByUser(viewer.id) : [];
+  const styles = await listPrompts({ sort: "popular", viewerId: viewer?.id });
+  const initialDecks = viewer ? await listSavedDecksByUser(viewer.id) : [];
   return (
     <ToolsClient
       styles={styles}

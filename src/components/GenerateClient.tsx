@@ -53,7 +53,7 @@ interface GenerateClientProps {
 }
 
 const MAX_HISTORY_SNAPSHOTS = 40;
-const MAX_UPLOAD_IMG_BYTES = 400 * 1024;
+const TARGET_IMAGE_DATA_URL_CHARS = Math.floor((400 * 1024 * 4) / 3);
 const DRAFT_STORAGE_KEY = "pptgod_unsaved_draft_v4";
 const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 let clientIdSeq = 0;
@@ -139,9 +139,12 @@ async function compressImageToDataUrl(file: File): Promise<{
     reader.onerror = () => reject(new Error("读取图片失败"));
     reader.readAsDataURL(file);
   });
+  return compressImageDataUrl(rawDataUrl);
+}
 
-  if (file.size <= MAX_UPLOAD_IMG_BYTES && rawDataUrl.length < 560_000) {
-    return { dataUrl: rawDataUrl, sizeKb: Math.round(file.size / 1024) };
+async function compressImageDataUrl(rawDataUrl: string): Promise<{ dataUrl: string; sizeKb: number }> {
+  if (rawDataUrl.length <= TARGET_IMAGE_DATA_URL_CHARS) {
+    return { dataUrl: rawDataUrl, sizeKb: Math.round((rawDataUrl.length * 0.75) / 1024) };
   }
 
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -156,24 +159,24 @@ async function compressImageToDataUrl(file: File): Promise<{
   let h = img.height;
   if (w > maxEdge || h > maxEdge) {
     const scale = maxEdge / Math.max(w, h);
-    w = Math.round(w * scale);
-    h = Math.round(h * scale);
+    w = Math.max(1, Math.round(w * scale));
+    h = Math.max(1, Math.round(h * scale));
   }
 
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return { dataUrl: rawDataUrl, sizeKb: Math.round(file.size / 1024) };
+  if (!ctx) throw new Error("图片压缩失败");
   ctx.drawImage(img, 0, 0, w, h);
 
-  let quality = 0.84;
-  let out = canvas.toDataURL("image/jpeg", quality);
-  while (out.length > 560_000 && quality > 0.45) {
-    quality -= 0.1;
-    out = canvas.toDataURL("image/jpeg", quality);
+  for (const quality of [0.84, 0.72, 0.58, 0.46]) {
+    const dataUrl = canvas.toDataURL("image/jpeg", quality);
+    if (dataUrl.length <= TARGET_IMAGE_DATA_URL_CHARS) {
+      return { dataUrl, sizeKb: Math.round((dataUrl.length * 0.75) / 1024) };
+    }
   }
-  return { dataUrl: out, sizeKb: Math.round((out.length * 0.75) / 1024) };
+  throw new Error("图片压缩后仍过大");
 }
 
 export default function GenerateClient({
@@ -1145,13 +1148,14 @@ export default function GenerateClient({
         showToast(data.error || "AI 生图失败", "error");
         return;
       }
-      if (data.dataUrl) {
+      if (typeof data.dataUrl === "string" && data.dataUrl) {
+        const { dataUrl } = await compressImageDataUrl(data.dataUrl);
         updateCurrentSlide(
           {
             imageSlot: {
               ...(currentSlide.imageSlot || { layout: "left" }),
               kind: "data-url",
-              dataUrl: data.dataUrl,
+              dataUrl,
             },
           },
           false

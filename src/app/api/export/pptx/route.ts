@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import PptxGenJS from "pptxgenjs";
+import { getCurrentUser } from "@/lib/auth";
+import { getSavedDeckById } from "@/lib/db";
 import { isValidImageDataUrl } from "@/lib/deckValidation";
 import {
   addArchetypeMotif,
@@ -8,7 +10,9 @@ import {
   renderArchetypeCover,
   type PptxThemeTokens,
 } from "@/lib/pptxArchetypes";
+import { PPTX_CONTENT_TYPE, readSavedPptx, savedPptxCacheKey, storeSavedPptx } from "@/lib/pptxStorage";
 import { pickDefaultArtworkForArchetype } from "@/lib/slideArtworks";
+import { limitToolRequest } from "@/lib/toolRateLimit";
 import type {
   DeckSlideItem,
   DecorativeMotif,
@@ -220,7 +224,23 @@ function pickContrastText(hex6: string): string {
   return 0.299 * r + 0.587 * g + 0.114 * b > 180 ? "171615" : "FFFFFF";
 }
 
+function pptxDownload(bytes: Uint8Array<ArrayBuffer>, title: string) {
+  const filename =
+    title.replace(/[^\w\u4e00-\u9fa5\-]+/g, "-").slice(0, 40).replace(/^-|-$/g, "") ||
+    "pptgod-deck";
+  return new NextResponse(bytes, {
+    headers: {
+      "Content-Type": PPTX_CONTENT_TYPE,
+      "Content-Disposition": `attachment; filename="pptgod-deck.pptx"; filename*=UTF-8''${encodeURIComponent(filename)}.pptx`,
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
 export async function POST(request: Request) {
+  const limited = await limitToolRequest(request, "export-pptx", 30);
+  if (limited) return limited;
+
   let body: Record<string, unknown>;
   try {
     const parsed: unknown = await request.json();
@@ -239,6 +259,32 @@ export async function POST(request: Request) {
   }
 
   try {
+    let cacheKey: string | undefined;
+    if (body.deckId !== undefined) {
+      const deckId = safeString(body.deckId).trim();
+      if (!deckId || deckId.length > 200) {
+        return NextResponse.json({ error: "无效的演示文稿编号" }, { status: 400 });
+      }
+      const user = await getCurrentUser();
+      if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
+
+      const deck = await getSavedDeckById(deckId);
+      if (!deck || deck.authorId !== user.id) {
+        return NextResponse.json({ error: "未找到该演示文稿" }, { status: 404 });
+      }
+      body = {
+        title: deck.title,
+        subtitle: deck.subtitle,
+        audience: deck.audience,
+        styleName: deck.promptTitle,
+        visualSpec: deck.visualSpec,
+        slides: deck.slides,
+      };
+      cacheKey = savedPptxCacheKey(user.id, deckId, body);
+      const cached = await readSavedPptx(cacheKey);
+      if (cached) return pptxDownload(cached, deck.title);
+    }
+
     const title = safeText(body.title).trim() || "PPTGod Presentation";
     const subtitle = safeText(body.subtitle).trim();
     const audience = safeText(body.audience).trim() || "核心团队";
@@ -1392,22 +1438,8 @@ export async function POST(request: Request) {
       outputType: "nodebuffer",
     })) as Buffer;
 
-    const safeFile =
-      title
-        .replace(/[^\w\u4e00-\u9fa5\-]+/g, "-")
-        .slice(0, 40)
-        .replace(/^-|-$/g, "") || "pptgod-deck";
-
-    return new NextResponse(new Uint8Array(buffer), {
-      status: 200,
-      headers: {
-        "Content-Type":
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "Content-Disposition": `attachment; filename="pptgod-deck.pptx"; filename*=UTF-8''${encodeURIComponent(
-          safeFile
-        )}.pptx`,
-      },
-    });
+    if (cacheKey) await storeSavedPptx(cacheKey, buffer);
+    return pptxDownload(new Uint8Array(buffer), title);
   } catch (err) {
     console.error("PPTX Export Error:", err);
     return NextResponse.json(

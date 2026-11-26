@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb, getSavedDeckById } from "@/lib/db";
+import { savedDecks } from "@/lib/db/schema";
 import { validateSlidesPayload } from "@/lib/deckValidation";
+import type { SavedDeck } from "@/types/prompt";
 import {
   parseJsonObject,
   safeString,
@@ -13,7 +16,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
-  const deck = getSavedDeckById(id);
+  const deck = await getSavedDeckById(id);
   if (!deck) {
     return NextResponse.json({ error: "未找到该演示文稿" }, { status: 404 });
   }
@@ -40,7 +43,7 @@ export async function PATCH(
     }
 
     const { id } = await context.params;
-    const deck = getSavedDeckById(id);
+    const deck = await getSavedDeckById(id);
     if (!deck) {
       return NextResponse.json({ error: "文稿不存在" }, { status: 404 });
     }
@@ -64,13 +67,16 @@ export async function PATCH(
       );
     }
 
-    const now = new Date().toISOString();
     const db = getDb();
-    db.prepare(
-      `UPDATE saved_decks SET is_public = ?, updated_at = ? WHERE id = ? AND author_id = ?`
-    ).run(body.isPublic ? 1 : 0, now, id, user.id);
+    const [updated] = await db.update(savedDecks)
+      .set({ isPublic: body.isPublic, updatedAt: new Date().toISOString() })
+      .where(and(eq(savedDecks.id, id), eq(savedDecks.authorId, user.id)))
+      .returning({ id: savedDecks.id });
+    if (!updated) {
+      return NextResponse.json({ error: "文稿不存在" }, { status: 404 });
+    }
 
-    return NextResponse.json({ deck: getSavedDeckById(id) });
+    return NextResponse.json({ deck: await getSavedDeckById(id) });
   } catch (err) {
     console.error("Patch deck visibility error:", err);
     return NextResponse.json(
@@ -91,7 +97,7 @@ export async function PUT(
     }
 
     const { id } = await context.params;
-    const deck = getSavedDeckById(id);
+    const deck = await getSavedDeckById(id);
     if (!deck) {
       return NextResponse.json({ error: "文稿不存在" }, { status: 404 });
     }
@@ -153,31 +159,27 @@ export async function PUT(
       return NextResponse.json({ error: slidesCheck.error }, { status: 400 });
     }
 
-    const nextIsPublic =
-      typeof body.isPublic === "boolean" ? body.isPublic : deck.isPublic;
-    const now = new Date().toISOString();
     const db = getDb();
-    db.prepare(
-      `UPDATE saved_decks
-       SET title = ?, subtitle = ?, audience = ?, prompt_id = ?, prompt_slug = ?, prompt_title = ?,
-           visual_spec = ?, slides_json = ?, is_public = ?, updated_at = ?
-       WHERE id = ? AND author_id = ?`
-    ).run(
-      title,
-      subtitle,
-      audience,
-      promptId,
-      promptSlug,
-      promptTitle,
-      JSON.stringify(visualSpec),
-      JSON.stringify(slides),
-      nextIsPublic ? 1 : 0,
-      now,
-      id,
-      user.id
-    );
+    const [updated] = await db.update(savedDecks)
+      .set({
+        title,
+        subtitle,
+        audience,
+        promptId,
+        promptSlug,
+        promptTitle,
+        visualSpec,
+        slides: slides as SavedDeck["slides"],
+        isPublic: body.isPublic,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(and(eq(savedDecks.id, id), eq(savedDecks.authorId, user.id)))
+      .returning({ id: savedDecks.id });
+    if (!updated) {
+      return NextResponse.json({ error: "文稿不存在" }, { status: 404 });
+    }
 
-    return NextResponse.json({ deck: getSavedDeckById(id) });
+    return NextResponse.json({ deck: await getSavedDeckById(id) });
   } catch (err) {
     console.error("Update deck error:", err);
     return NextResponse.json(
@@ -196,7 +198,7 @@ export async function DELETE(
     return NextResponse.json({ error: "请先登录" }, { status: 401 });
   }
   const { id } = await context.params;
-  const deck = getSavedDeckById(id);
+  const deck = await getSavedDeckById(id);
   if (!deck) {
     return NextResponse.json({ error: "文稿不存在" }, { status: 404 });
   }
@@ -205,9 +207,7 @@ export async function DELETE(
   }
 
   const db = getDb();
-  db.prepare(`DELETE FROM saved_decks WHERE id = ? AND author_id = ?`).run(
-    id,
-    user.id
-  );
+  await db.delete(savedDecks)
+    .where(and(eq(savedDecks.id, id), eq(savedDecks.authorId, user.id)));
   return NextResponse.json({ ok: true });
 }
