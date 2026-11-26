@@ -11,7 +11,7 @@ import CompareDock from "@/components/CompareDock";
 import AppShell from "@/components/layout/AppShell";
 import { AppProvider } from "@/context/AppContext";
 import { LayoutProvider } from "@/context/LayoutContext";
-import { demoAccountEnabled } from "@/lib/auth-config";
+import { demoAccountEnabled, publicPreviewEnabled } from "@/lib/auth-config";
 import "@/styles/glacier-tokens.css";
 import "@/styles/glacier-layout.css";
 import "@/styles/glacier-ui.css";
@@ -69,7 +69,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const publicPreview = process.env.PPTGOD_PUBLIC_PREVIEW === "true";
+  const publicPreview = publicPreviewEnabled();
 
   return (
     <html
