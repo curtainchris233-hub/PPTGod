@@ -1,5 +1,9 @@
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
+export function publicPreviewEnabled() {
+  return process.env.PPTGOD_PUBLIC_PREVIEW === "true";
+}
+
 function isLoopback(url: string | undefined) {
   if (!url) return false;
   try {
@@ -26,6 +30,7 @@ export function isLocalAuthEnvironment() {
   const databaseUrl = process.env.DATABASE_URL;
   const localComposeDatabase = databaseUrl ? new URL(databaseUrl).hostname === "postgres" : false;
   return process.env.PPTGOD_REQUIRE_SERVICES !== "true"
+    && !publicPreviewEnabled()
     && isLoopback(getAuthBaseUrl())
     && (isLoopback(databaseUrl) || localComposeDatabase);
 }

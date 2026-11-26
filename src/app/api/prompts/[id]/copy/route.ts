@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, eq, or, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
+import { publicPreviewEnabled } from "@/lib/auth-config";
 import { getDb, getPromptBySlugOrId } from "@/lib/db";
 import { prompts } from "@/lib/db/schema";
 import { consumeRateLimit, getClientIp } from "@/lib/rateLimit";
@@ -16,6 +17,9 @@ export async function POST(
   const prompt = await getPromptBySlugOrId(id, viewer?.id);
   if (!prompt) {
     return NextResponse.json({ error: "模板不存在" }, { status: 404 });
+  }
+  if (publicPreviewEnabled()) {
+    return NextResponse.json({ copiesCount: prompt.copiesCount, counted: false });
   }
 
   const ip = getClientIp(request);

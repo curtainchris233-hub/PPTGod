@@ -30,12 +30,14 @@ export type ProviderConfig = {
   usesSiteKey: boolean;
 };
 
+function publicProviderOnly() {
+  return process.env.PPTGOD_REQUIRE_SERVICES === "true"
+    || process.env.PPTGOD_PUBLIC_PREVIEW === "true"
+    || process.env.STRICT_PUBLIC_BYOK_ONLY === "true";
+}
+
 function allowLocalHost(host: string) {
-  return (
-    LOCAL_HOSTS.has(host) &&
-    process.env.PPTGOD_REQUIRE_SERVICES !== "true" &&
-    process.env.STRICT_PUBLIC_BYOK_ONLY !== "true"
-  );
+  return LOCAL_HOSTS.has(host) && !publicProviderOnly();
 }
 
 function isAllowedAddress(address: string, local: boolean) {
@@ -80,7 +82,7 @@ export function resolveProvider(
   if ((isIP(host) && !isAllowedAddress(host, local)) || (LOCAL_HOSTS.has(host) && !local)) {
     return { ok: false, error: "API Base URL 必须指向可公开访问的服务" };
   }
-  if (!local && endpoint.protocol !== "https:" && (usesSiteKey || process.env.PPTGOD_REQUIRE_SERVICES === "true")) {
+  if (!local && endpoint.protocol !== "https:" && (usesSiteKey || publicProviderOnly())) {
     return { ok: false, error: "API Base URL 请使用 HTTPS 地址" };
   }
 

@@ -48,3 +48,9 @@ npm run db:seed
 在正式站点打开 `/api/health`，确认返回 `ok`、`postgresql` 和至少 36 个风格。用测试账号完成邮箱验证、登录、生成、保存、下载和重置密码。用无痕窗口确认私人文稿和已保存文稿的专属下载均无法访问。
 
 [Render 免费实例](https://render.com/docs/free) · [Render 与 Cloudflare 自定义域名](https://render.com/docs/configure-cloudflare-dns) · [Cloudflare DNS 代理设置](https://developers.cloudflare.com/dns/manage-dns-records/reference/proxied-dns-records/)
+
+## 邮件和存储开通前的游客试用
+
+在同一个托管服务上设置 `PPTGOD_PUBLIC_PREVIEW=true`，同时将 `PPTGOD_REQUIRE_SERVICES` 设为 `false`。仍需配置真实的 PostgreSQL、HTTPS 站点地址与随机的登录密钥。该模式允许匿名使用生成与导出功能，暂停注册、登录、密码找回和账号相关的云端功能。单实例使用应用的请求频率限制。
+
+接通 R2、Upstash 和 Resend 后，将 `PPTGOD_PUBLIC_PREVIEW` 改为 `false`，将 `PPTGOD_REQUIRE_SERVICES` 改为 `true` 并重新部署。按上面的正式站点流程验证邮件、登录与私有文稿。

@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "@/lib/auth";
+import { publicPreviewEnabled } from "@/lib/auth-config";
 import { consumeRateLimit, getClientIp, RateLimitUnavailableError } from "@/lib/rateLimit";
 
 export async function authAttemptLimit(request: Request, action: string, limit: number, ms: number) {
+  if (publicPreviewEnabled()) {
+    return NextResponse.json(
+      { error: "游客试用版暂未开放邮箱账号。你可以继续创作并下载演示文稿。" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const status = await consumeRateLimit(`auth:${action}:${getClientIp(request)}`, limit, ms);
   if (status.allowed) return null;
   return NextResponse.json({ error: "操作过于频繁，请稍后重试" }, {

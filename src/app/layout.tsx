@@ -11,7 +11,7 @@ import CompareDock from "@/components/CompareDock";
 import AppShell from "@/components/layout/AppShell";
 import { AppProvider } from "@/context/AppContext";
 import { LayoutProvider } from "@/context/LayoutContext";
-import { demoAccountEnabled } from "@/lib/auth-config";
+import { demoAccountEnabled, publicPreviewEnabled } from "@/lib/auth-config";
 import "@/styles/glacier-tokens.css";
 import "@/styles/glacier-layout.css";
 import "@/styles/glacier-ui.css";
@@ -69,6 +69,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const publicPreview = publicPreviewEnabled();
+
   return (
     <html
       lang="zh-CN"
@@ -77,9 +79,12 @@ export default function RootLayout({
       <body>
         <AppProvider>
           <LayoutProvider>
-            <AppShell>{children}</AppShell>
+            <AppShell publicPreview={publicPreview}>{children}</AppShell>
             <CompareDock />
-            <AuthModal showDemoAccount={process.env.NODE_ENV !== "production" && demoAccountEnabled()} />
+            <AuthModal
+              publicPreview={publicPreview}
+              showDemoAccount={!publicPreview && process.env.NODE_ENV !== "production" && demoAccountEnabled()}
+            />
           </LayoutProvider>
         </AppProvider>
       </body>

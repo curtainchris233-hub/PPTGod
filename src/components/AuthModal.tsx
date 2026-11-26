@@ -293,10 +293,31 @@ function AuthFormDialog({ initialView, onClose, showDemoAccount }: AuthFormDialo
   );
 }
 
-export default function AuthModal({ showDemoAccount }: { showDemoAccount: boolean }) {
+export default function AuthModal({
+  publicPreview,
+  showDemoAccount,
+}: {
+  publicPreview: boolean;
+  showDemoAccount: boolean;
+}) {
   const { authModalOpen, authModalTab, closeAuthModal } = useApp();
 
   if (!authModalOpen) return null;
+
+  if (publicPreview) {
+    return (
+      <Dialog
+        open
+        onClose={closeAuthModal}
+        size="sm"
+        title="访客预览"
+        description="你可以直接生成和下载演示文稿，草稿保留在当前浏览器中。"
+        footer={<Button onClick={closeAuthModal}>继续体验</Button>}
+      >
+        <p className="gl-modal-section-text">邮箱注册和云端保存将在正式版开放。</p>
+      </Dialog>
+    );
+  }
 
   return (
     <AuthFormDialog

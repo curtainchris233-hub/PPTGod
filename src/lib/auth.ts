@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth";
 import { getSessionCookie } from "better-auth/cookies";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { headers } from "next/headers";
-import { getAuthBaseUrl, getAuthMailConfig } from "@/lib/auth-config";
+import { getAuthBaseUrl, getAuthMailConfig, publicPreviewEnabled } from "@/lib/auth-config";
 import { sendAccountEmail } from "@/lib/auth-email";
 import { getDb, mapPublicUser } from "@/lib/db";
 import { accounts, sessions, users, verifications } from "@/lib/db/schema";
@@ -90,6 +90,7 @@ export function getAuth() {
 }
 
 export async function getCurrentUser(): Promise<UserPublic | null> {
+  if (publicPreviewEnabled()) return null;
   const requestHeaders = await headers();
   if (!getSessionCookie(requestHeaders, { cookiePrefix: AUTH_COOKIE_PREFIX })) return null;
 

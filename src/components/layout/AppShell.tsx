@@ -312,7 +312,7 @@ function SettingsProfileForm({
   );
 }
 
-function GlacierSettingsDialog() {
+function GlacierSettingsDialog({ publicPreview }: { publicPreview: boolean }) {
   const { user, openAuthModal, logout } = useApp();
   const {
     settingsModalOpen,
@@ -368,7 +368,9 @@ function GlacierSettingsDialog() {
                 <div>
                   <strong>当前为访客模式</strong>
                   <p>
-                    登录后即可云端保存演示文稿项目、同步风格收藏夹与自定义创作者资料。
+                    {publicPreview
+                      ? "邮箱注册和云端保存将在正式版开放。"
+                      : "登录后即可云端保存演示文稿项目、同步风格收藏夹与自定义创作者资料。"}
                   </p>
                 </div>
               </div>
@@ -380,7 +382,7 @@ function GlacierSettingsDialog() {
                   openAuthModal("login");
                 }}
               >
-                立即登录 / 注册
+                {publicPreview ? "了解访客预览" : "立即登录 / 注册"}
               </Button>
             </div>
           )}
@@ -402,8 +404,10 @@ function GlacierSettingsDialog() {
 
 export default function AppShell({
   children,
+  publicPreview,
 }: {
   children: React.ReactNode;
+  publicPreview: boolean;
 }) {
   const pathname = usePathname() || "/";
   const { sidebarCollapsed, editorFullBleed, openHelpModal } = useLayout();
@@ -426,7 +430,7 @@ export default function AppShell({
         跳至主内容
       </a>
 
-      <Topbar showMenuOnDesktop={hideDesktopSidebar} />
+      <Topbar showMenuOnDesktop={hideDesktopSidebar} publicPreview={publicPreview} />
 
       <div className="gl-shell-body">
         {!hideDesktopSidebar && <Sidebar />}
@@ -476,9 +480,9 @@ export default function AppShell({
         </div>
       </div>
 
-      <MobileNavDrawer allowDesktopDrawer={hideDesktopSidebar} />
+      <MobileNavDrawer allowDesktopDrawer={hideDesktopSidebar} publicPreview={publicPreview} />
       <GlacierHelpDialog />
-      <GlacierSettingsDialog />
+      <GlacierSettingsDialog publicPreview={publicPreview} />
     </div>
   );
 }

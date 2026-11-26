@@ -21,6 +21,7 @@ import { isWorkspaceNavActive, WORKSPACE_NAV_ITEMS } from "./Sidebar";
 
 interface MobileNavDrawerProps {
   allowDesktopDrawer?: boolean;
+  publicPreview: boolean;
 }
 
 interface DrawerNavListProps {
@@ -103,6 +104,7 @@ function DrawerNavWithSearchParams({
 
 export default function MobileNavDrawer({
   allowDesktopDrawer = false,
+  publicPreview,
 }: MobileNavDrawerProps) {
   const pathname = usePathname() || "/";
   const router = useRouter();
@@ -315,7 +317,7 @@ export default function MobileNavDrawer({
               }}
             >
               <UserIcon size={16} strokeWidth={2} aria-hidden="true" />
-              <span>登录 / 注册</span>
+              <span>{publicPreview ? "访客预览" : "登录 / 注册"}</span>
             </button>
           )}
         </div>
