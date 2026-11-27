@@ -2,16 +2,19 @@
 
 # PPTGod · Glacier UI 2.0
 
-**复杂留给系统，简洁留给用户 · 冰川白玻璃拟态 AI 演示文稿创作平台**
+**把论文、课本与报告，变成「能直接出好成品」的定制 PPT 提示词包与原生演示文稿**
 
-丢入论文、课本或报告，一键得到 **定制风格 + 逐页大纲的「提示词包」**，直接粘贴到 ChatGPT / Gamma / Kimi / Claude；也可在站内生成原生 `.pptx` 与离线 `.html`
+丢入原始资料，一键提炼 **定制视觉风格规范（HEX 色板 / 字体 / 版式语法）+ 有原文依据的逐页大纲**，直接复制到 ChatGPT / Gamma / Kimi / Claude 生成成品；也可在站内编辑并导出原生可编辑 `.pptx` 与零外链离线 `.html`
 
-![Next.js 16](https://img.shields.io/badge/Next.js-16.4-172033?style=flat-square&logo=nextdotjs)
-![React 19](https://img.shields.io/badge/React-19-172033?style=flat-square&logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-2563EB?style=flat-square&logo=typescript&logoColor=white)
+![Next.js 16.4](https://img.shields.io/badge/Next.js-16.4-172033?style=flat-square&logo=nextdotjs)
+![React 19.3](https://img.shields.io/badge/React-19.3-172033?style=flat-square&logo=react)
+![TypeScript 5](https://img.shields.io/badge/TypeScript-5-2563EB?style=flat-square&logo=typescript&logoColor=white)
 ![Vanilla CSS](https://img.shields.io/badge/CSS-100%25%20Vanilla%20Glacier%202.0-2563EB?style=flat-square)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Drizzle-0D9488?style=flat-square&logo=postgresql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Drizzle%20ORM-0D9488?style=flat-square&logo=postgresql&logoColor=white)
+![E2E 87/87](https://img.shields.io/badge/E2E-87%2F87%20PASS-059669?style=flat-square)
 ![Docker Ready](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)
+
+[项目介绍](#项目介绍) · [产品功能](#产品功能全景) · [核心引擎](#核心引擎深度解析) · [技术路线与架构](#技术路线与系统架构) · [开发进程与路线图](#开发进程与路线图) · [本地运行与部署](#本地运行测试与上线)
 
 <br />
 
@@ -21,140 +24,107 @@
 
 ---
 
-## 产品定位与设计原则
+## 项目介绍
 
-**PPTGod** 基于 **Next.js 16 (App Router) + React 19 + TypeScript + 100% 纯 Vanilla CSS + PostgreSQL（Supabase + Drizzle） + `pptxgenjs` + `mammoth` + `unpdf`** 构建，全站采用 **Glacier UI 2.0 冰川白视觉语言**，遵循两条核心工程原则：**「复杂留给系统，简洁留给用户」** 与 **「所见即真实能力，零虚假功能」**。
+### 为什么做 PPTGod？
 
-| 核心维度 | 工程落地与体验标准 |
-| --- | --- |
-| **Glacier UI 2.0 冰川白系统** | `70%` 实用留白 / `20%` 冰川玻璃拟态 / `10%` AI 科技蓝点缀（`#F0F6FC` 页面底、`#E7F1FB` 冰蓝舞台、`#2563EB` 主色、`#14243C` 深海墨字）；`@supports (backdrop-filter: blur(12px))` 仅用于顶栏、浮层与首屏核心卡，卡片网格采用纯白实底 + `content-visibility: auto`，全面支持 `prefers-reduced-motion` |
-| **资料 → 提示词包（核心）** | `/pack` 把资料变成可直接粘贴到外部 AI 工具的总提示词：6 色 HEX 色板 + 字体 + 版式语法 + 必须/避免规则，配合 11 种版式交替的逐页大纲；数字只取自原文，资料不够就如实少出页，不凑空洞内容 |
-| **端到端演示创作工作流** | 从 `/` 首页输入主题或拖入资料 → `/gallery` 36 套实时 16:9 画布选风格 → `/generate` 4 步向导规划大纲 → 全屏沉浸式编辑器逐页精修与 AI 润色 → 导出原生 `.pptx` / 离线 `.html` / Marp / 演讲提纲 `.md`，或直达 `/deck/[id]?rehearsal=1` 分屏提词排练 |
-| **纯本地工具与隐私隔离** | `/tools` 工具箱纯浏览器本地运行（时长节拍、PPTX 体检换肤、抽色 WCAG 校核、Visual Director v2 生图导演词）；BYOK 自定义大模型 Key 仅当次请求透传、永不落盘；私有风格与私有文稿全链路 `404` 严格隔离 |
-| **诚实能力边界（`B1–B16`）** | 严格剔除无后端支撑的示意性伪造控件：零假 Pro 付费卡、零假通知铃铛、零假反馈表单、零假协作/回收站/分组、零伪造 `%` 进度条、零假语音评分、零未实现的编辑器自由形状/动画工具 |
+用 AI 做 PPT 时，最常见的三种挫败感是：**视觉廉价**（固定模板千篇一律、配色刺眼）、**版式单一**（从头到尾都是「标题 + 项目符号」）、**内容空洞**（编造通用套话、和原始资料脱节）。因此，许多高效用户的真实工作流其实是：**先把论文、教案或报告喂给 ChatGPT / Claude / Gamma，让它定制风格提示词，再按逐页结构生成 PPT。**
+
+**PPTGod** 正是围绕这一真实工作流打造的开源 AI 演示文稿创作平台：
+
+- **以「资料 → 提示词包（`/pack`）」为核心**：上传或粘贴原始资料，自动提炼贴合主题气质的定制视觉规范与多样化逐页大纲，按 ChatGPT、Gamma、Kimi PPT、Claude 及通用 Markdown 分别格式化，一键粘贴即用；每一条数字事实均核对原文，杜绝幻觉凑页。
+- **以「风格参考库 + 站内原生 `.pptx` 工坊」为闭环**：内置 36 套实时 16:9 渲染的视觉设计系统，既可作为 `/pack` 的风格参考锚点，也可直接在站内全屏编辑、做 100 分制设计体检、导出含原生母版/图表/表格的 `.pptx` 与独立 `.html`，并在暗场排练驾驶舱完成提词演练。
+- **两条硬性工程原则**：
+  1. **复杂留给系统，简洁留给用户**：全站采用 **Glacier UI 2.0 冰川白玻璃拟态语言**（`70%` 实用留白 / `20%` 冰川玻璃拟态 / `10%` 科技蓝点缀），100% 纯 Vanilla CSS，支持 5 断点响应式与 `prefers-reduced-motion`。
+  2. **所见即真实能力，零虚假功能（`B1–B16`）**：绝不堆砌无后端支撑的假付费卡、假通知红点、假进度百分比、假语音评分或未实现的编辑器工具；大模型不可用时诚实披露原因并降级至内置规则引擎。
+
+### 适用人群与高频场景
+
+| 使用场景 | 典型资料输入 | PPTGod 交付产物 |
+| --- | --- | --- |
+| **科研文献与学术答辩** | AI/理工科论文 PDF、开题报告、实验记录 | Nature 期刊式克制学术风提示词包、含实验数据图表/大数字页的大纲、10 分钟答辩排练计时 |
+| **中学/高校课堂公开课** | 物理/语文/化学教材章节、公开课教案 | 新课标教材插画风 / 新中式东方美学风提示词包、情境导入 + 例题分步流程版式 |
+| **商业汇报与季度复盘** | 经营复盘报告、SaaS 指标表、项目总结 | 麦肯锡咨询风 / 深色路演风提示词包、核心指标大数字与对比页、原生可编辑 `.pptx` |
+| **存量 PPT 体检与换肤** | 旧版 `.pptx`、喜欢的参考图/海报截图 | 参考图本地吸色 + WCAG 对比度校正、100 分设计体检、`1:1 保词换肤` 导出 |
 
 ---
 
-## Glacier UI 2.0 核心界面实机总览
+## 产品功能全景
 
 <table>
   <tr>
+    <td width="50%"><img src="./docs/showcase/glacier_v2/12-prompt-pack.png" alt="提示词包工作台 /pack" width="100%" /></td>
     <td width="50%"><img src="./docs/showcase/glacier_v2/02-gallery.png" alt="风格参考库 /gallery" width="100%" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>提示词包工作台（<code>/pack</code> · 核心）</b>· 定制风格色板、3 帧实时示意、多工具分步导出与可编辑大纲</sub></td>
+    <td align="center"><sub><b>风格参考库（<code>/gallery</code>）</b>· 36 套实时 16:9 画布、动态计数分类，一键带入 <code>/pack</code> 或工坊</sub></td>
+  </tr>
+  <tr>
     <td width="50%"><img src="./docs/showcase/glacier_v2/03-workshop.png" alt="创作工坊引导态 /generate" width="100%" /></td>
-  </tr>
-  <tr>
-    <td align="center"><sub><b>风格参考库（<code>/gallery</code>）</b>· 36 套实时 16:9 风格画布、动态计数分类与详情抽屉</sub></td>
-    <td align="center"><sub><b>创作工坊（<code>/generate</code> 引导态）</b>· 4 步垂直向导、资料上传与诚实示例预览</sub></td>
-  </tr>
-  <tr>
     <td width="50%"><img src="./docs/showcase/glacier_v2/04-editor.png" alt="全屏演示编辑器 /generate" width="100%" /></td>
-    <td width="50%"><img src="./docs/showcase/glacier_v2/05-projects.png" alt="我的项目 /collections" width="100%" /></td>
   </tr>
   <tr>
+    <td align="center"><sub><b>创作工坊（<code>/generate</code> 引导态）</b>· 4 步垂直向导、资料上传与诚实示例预览</sub></td>
     <td align="center"><sub><b>演示编辑器（<code>/generate</code> 编辑态）</b>· 全屏沉浸舞台、单页换版式与 AI 润色预览</sub></td>
-    <td align="center"><sub><b>我的项目（<code>/collections</code>）</b>· 真实 KPI 统计、网格/列表切换与完整项目 CRUD</sub></td>
   </tr>
   <tr>
+    <td width="50%"><img src="./docs/showcase/glacier_v2/05-projects.png" alt="我的项目 /collections" width="100%" /></td>
     <td width="50%"><img src="./docs/showcase/glacier_v2/06-studio.png" alt="提示词工作室 /studio/[slug]" width="100%" /></td>
-    <td width="50%"><img src="./docs/showcase/glacier_v2/07-compare.png" alt="风格并排对比 /compare" width="100%" /></td>
   </tr>
   <tr>
+    <td align="center"><sub><b>我的项目（<code>/collections</code>）</b>· 真实 KPI 统计、网格/列表切换与完整项目 CRUD</sub></td>
     <td align="center"><sub><b>提示词工作室（<code>/studio/[slug]</code>）</b>· 12 页型胶片条、5 维解剖与 6 大 AI 生态编译</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="./docs/showcase/glacier_v2/07-compare.png" alt="风格并排对比 /compare" width="100%" /></td>
+    <td width="50%"><img src="./docs/showcase/glacier_v2/08-tools.png" alt="纯本地效率工具箱 /tools" width="100%" /></td>
+  </tr>
+  <tr>
     <td align="center"><sub><b>风格并排对比（<code>/compare</code>）</b>· 默认三栏同主题同步比对 12 种页型</sub></td>
+    <td align="center"><sub><b>纯本地效率工具箱（<code>/tools</code>）</b>· 演讲节拍 · PPTX 换肤 · 以图抽色 WCAG · Visual Director v2</sub></td>
   </tr>
 </table>
 
-<p align="center">
-  <img src="./docs/showcase/glacier_v2/08-tools.png" alt="纯本地 PPT 效率工具箱 /tools" width="100%" />
-  <br />
-  <sub><b>纯本地效率工具箱（<code>/tools</code>）</b>· 演讲时长节拍 · PPTX 体检换肤 · 以图抽色与 WCAG 校核 · Visual Director v2 导演词</sub>
-</p>
+### 全站路由与功能模块映射
+
+| 路由 | 模块 | 核心功能 |
+| --- | --- | --- |
+| `/pack` | **提示词包工作台（核心）** | 粘贴 / 上传（PDF/DOCX/PPTX/MD/TXT）/ 6 份多学科示例 → >16k 长文档章节筛选 → 11 套设计方向或参考库锚点 + 参考图本地吸色 + WCAG 在线微调 → 11 种版式大纲编辑（含数据/备注/任意页预览/BYOK 单页润色）→ ChatGPT（单轮/两步）、Gamma（①/② 双段复制）、Kimi、Claude、通用 Markdown 一键导出 + 本地 10 份历史与 `.json` 导入导出 |
+| `/` | **工作台首页 Dashboard** | 「资料 → 提示词包」直达条、AI 生成 / 资料转 PPT / 从模板新建、文档拖拽上传、同内容 3 风格实时对比、推荐风格、真实最近项目与快速工具 |
+| `/gallery` | **风格参考库** | 36 套全领域 `VisualSpec` 视觉系统、实时统计 5 大人群分类、多维筛选与 URL 双向同步、详情抽屉（12 页型 + HEX 色板 + 一键「以此风格做提示词包」）、30 秒智能选词与资料直通车 |
+| `/generate` | **创作工坊 & 全屏编辑器** | 支持 `?style=`、`?topic=`、`?deck=`、`?handoff=1`、`?intake=1`、`?mode=create\|editor`、`?panel=audit`；内置 100 分设计体检与预览确认型 AI 助手，导出原生 `.pptx` / 离线 `.html` / Marp / 核验清单 `.md` |
+| `/studio` & `/studio/[slug]` | **交互式提示词工作室** | 12 页型胶片条、5 维提示词解剖、实时视觉参数微调、6 大 AI 生态编译、一键转入 `/pack?style=<slug>` 与 `.pptgod.json` 导出 |
+| `/compare` | **风格并排对比台** | 默认即刻展示 3 套代表风格，支持 12 页型与统一主题同步预览、快速增删替换与规范比对 |
+| `/collections` | **我的项目与个人空间** | 全部项目 / 最近编辑 / 公开分享 / 我收藏的 / 我发布的 / 我点赞的，完整项目 CRUD（重命名 / 副本 / 公开切换 / 删除）与个人资料编辑 |
+| `/deck/[id]` | **演播分享与排练驾驶舱** | 独立 16:9 暗场演播分享页，支持 `?rehearsal=1` 分屏排练（5 档倒计时、可缩放提词稿、下一页预告）；私有文稿对非作者严格 `404` |
+| `/tools` | **纯本地 PPT 效率工具箱** | 零上传纯浏览器运行：`?tab=pacing`（演讲节拍与已保存文稿排练直达）、`pptx-inspect`（PPTX 体检换肤）、`palette-wcag`（以图抽色与 WCAG 校核）、`visual-director`（生图导演词） |
+| `/create` & `/creator/[username]` | **风格创作与创作者主页** | 风格创作 / Remix 发布器（以图抽色 + WCAG 自动校正 + `.pptgod.json` 导入 + 公开/私有开关）与创作者公开作品集 |
 
 ---
 
-## 核心引擎能力深度解析
+## 核心引擎深度解析
 
-### 0. 资料 → 提示词包（`/pack`）· 定制风格 × 逐页大纲 × 多工具适配
+### 1. 资料 → 提示词包引擎（`/pack` + `/api/prompt-pack` + `/api/prompt-pack/refine`）
 
-多数人的真实流程是：把资料丢给 ChatGPT，让它先想风格提示词，再生成 PPT。`/pack` 把这一步做成可复用的工作台。粘贴或上传资料（内置 **6 份示例**：*Attention Is All You Need*、*DeepSeek-R1* 推理范式拆解、高中物理《牛顿第二定律》、初中语文《岳阳楼记》、研究生开题报告答辩、SaaS 季度经营复盘），即可得到一份可直接粘贴走的「提示词包」：
-
-| 环节 | 实现方式 |
+| 引擎环节 | 核心能力 |
 | --- | --- |
-| **① 资料洞察与长文档筛选** | 识别章节结构、场景、受众与时长，支持中英文论文数字事实提取（带单位、去噪音）；超过 16,000 字的长文档自动弹出 **章节筛选器**（默认略去参考文献/附录，保留摘要、方法、实验与结论） |
-| **② 定制风格与吸色微调** | 11 个有真实参照的设计方向按关键词自动匹配，也支持从 **风格参考库（`/gallery`）一键带入锚点**（`/pack?style=<slug>`）；支持 **参考图本地吸色**（纯前端 Canvas 提取 6 色，不上传图片）与折叠式 **WCAG 对比度实时微调**（色板 / 字体 / 必须与避免） |
-| **③ 逐页大纲与任意页预览** | 11 种版式交替编排；每页的标题、要点、**关键数据**、视觉建议与**演讲备注**均可在线编辑、排序、增删，点击任意页即可联动上方 3 帧 `SlideCanvas` 实时预览；连接 BYOK 后支持 **单页 AI 润色**（可撤销，数字严格核对原文） |
-| **④ 多工具分步导出** | ChatGPT 支持 **单轮直出 `.pptx` / 两步精修（① 先定风格 → ② 再出大纲）**；Gamma 拆为 **① 风格指令 / ② 分卡正文** 两枚独立复制按钮；并覆盖 Kimi、Claude（单文件 HTML）、通用 Markdown，另提供「仅复制风格」「仅复制大纲」「导出/导入 `.json`」与浏览器本地最近 10 份历史记录 |
-| **⑤ BYOK 预设与诚实边界** | 全局设置内置 **7 组服务商一键预设**（OpenAI / DeepSeek / Kimi / 通义千问 / 硅基流动 / Gemini / OpenRouter）与 **`POST /api/byok/test` 2 秒连通性检测**，兼容推理模型 `<think>` 块与非 `json_object` 接口；无 Key 或调用失败时自动回退规则引擎并披露原因，API Key 仅存当前标签页 `sessionStorage` |
+| **① 资料洞察与长文档章节筛选** | 识别中英文文档章节结构、场景、受众与时长，提取带单位的数字事实（支持中文单位及 `BLEU / FLOPs / ms / tokens / params / M / B / K / x / $` 等英文论文指标，自动识别英文后置指标词）。全文超过 `16,000` 字时自动触发 **章节筛选器**，默认取消勾选「参考文献 / 致谢 / 附录」，优先保留摘要、方法、实验结果与结论，避免截尾丢失核心数据 |
+| **② 风格定制、参考锚定与参考图吸色** | 内置 **11 套精调设计方向**（Nature 期刊学术、新课标教材插画、麦肯锡咨询、Apple 发布会、深色路演、新中式东方美学等）按关键词加权匹配；支持从风格参考库带入锚点（`/pack?style=<slug>`）；支持 **浏览器本地参考图吸色**（复用 `paletteExtractor.ts` 5-bit 空间量化，零图片上传）与内联 **WCAG 对比度实时校核与一键修复** |
+| **③ 逐页大纲编辑与 BYOK 单页润色** | 从 11 种版式（封面、目录、章节页、大数字、图表、对比、时间线、流程、金句、图文、总结）交替编排，严禁连续 3 页同版式；每页标题、要点、关键数据、视觉建议与演讲备注均可在线编辑，点击任意页即可联动上方 3 帧 `SlideCanvas` 预览；配置 BYOK 后支持 **单页 AI 润色**（可撤销），且服务端对大模型输出的数据逐条核对原文数字，杜绝编造 |
+| **④ 多工具分步导出与本地历史** | 针对 5 类目标工具分别定制格式：**ChatGPT**（单轮 `python-pptx` 直出 / 两步精修：① 先定风格 → ② 再出大纲）、**Gamma**（拆分为 ① 风格额外指令 与 ② `---` 分卡正文两枚独立复制按钮）、**Kimi PPT**、**Claude**（单文件可打印 HTML 幻灯片）、**通用 Markdown**；另支持「仅复制风格」「仅复制大纲」「导出/导入 `.json`」与浏览器本地最近 10 份历史管理 |
+| **⑤ BYOK 零门槛配置与多模型兼容** | 全局设置内置 **7 组服务商快捷预设**（OpenAI / DeepSeek / Kimi / 通义千问 / 硅基流动 / Gemini / OpenRouter）与 **`POST /api/byok/test` 2 秒连通性检测**；兼容 DeepSeek-R1 / `o1` / `o3` / Claude 中转等模型（自动剥离 `<think>` 推理块、遇 `response_format` HTTP 400 自动降级重试）；无 Key 或调用失败时无痛降级至规则引擎并披露 `fallbackReason` |
+
+### 2. 资料直通车引擎与 36 套风格参考库（`DocIntakeWorkbench` + `/gallery`）
+
+拖入任意 `.pdf` / `.docx` / `.pptx` / `.md` / `.txt`（单文件 `≤ 10 MB`），系统在浏览器与服务端协同完成 **多格式解析（`unpdf` / `mammoth` / `jszip`）→ 6 类材料态 × 15 场景识别 → 证据密度契约预选 → Top 3 双样张（封面 ↔ 数据页）校准**，可一键「转入提示词包工作台（`/pack`）」或「一键生成 PPT（`/generate`）」。
 
 <p align="center">
-  <img src="./docs/showcase/glacier_v2/12-prompt-pack.png" alt="提示词包工作台 /pack：资料洞察、定制风格色板、风格示意与多工具导出" width="100%" />
+  <img src="./docs/showcase/glacier_v2/09-doc-intake.png" alt="资料直通车：6 类材料分流、证据密度契约与 Top 3 双样张校准" width="100%" />
 </p>
 
-### 1. 资料直通车引擎 · 6 类材料分流 × 证据契约 × 双样张校准
-
-拖入任意 `.pdf` / `.docx` / `.pptx` / `.md` / `.txt`（单文件 `≤ 10 MB`，亦支持纯文本粘贴与 **4 份内置示例**：*Attention Is All You Need* / *DeepSeek-R1* 论文精读、人教版高中物理《牛顿第二定律》、统编版初中语文《岳阳楼记》），系统在浏览器与服务端协同完成从原稿解析到风格校准的 4 步自动路由：
-
-| 引擎环节 | 自动化决策能力 |
-| --- | --- |
-| **① 多格式解析与边界守卫** | 基于 `unpdf` / `mammoth` / `jszip` 提取正文、章节与旧 PPT 备注；自动识别扫描版图片 PDF 并温和预警，不丢弃草稿 |
-| **② 6 类材料态 × 15 场景识别** | 自动判定论文/基金、数据报表、商业汇报、教学课件、产品方案或旧 `.pptx`（旧 PPT 默认提供 **`1:1 保词换肤`** ↔ `重构故事` 路由） |
-| **③ 证据密度契约与指标抽取** | 自动抽取核心百分比、延迟、样本量与显著性指标，预选 `低认知负担 / 观点与数据均衡 / 严谨证据溯源` 表达契约并估算汇报时长 |
-| **④ Top 3 双样张交叉校准** | 推荐风格卡片支持实时切换 **「封面样张 ↔ 数据/内容样张」**，告别只看封面盲目批量生成，一键带入工坊或导出融合提示词 |
-
-<p align="center">
-  <img src="./docs/showcase/glacier_v2/09-doc-intake.png" alt="Glacier UI 2.0 资料直通车：6 类材料分流、证据密度契约与 Top 3 数据样张校准" width="100%" />
-</p>
-
----
-
-### 2. 三端 1:1 渲染引擎 · 100 分智能体检 × 原生深度 `.pptx`
-
-所有 36 套设计系统由统一的确定性 `VisualSpec` 驱动，覆盖 **20 种原生版式原型 × 16 种装饰纹理 × 12 种商业/学术页型**，并在编辑器内置 **100 分制设计体检（`deckLinter`）** 与 **预览确认型 AI 助手（`/api/polish`）**：
-
-| 交付终端 | 核心引擎能力与一致性保障 |
-| --- | --- |
-| **浏览器 16:9 实时舞台** | `SlideCanvas` 零偏移渲染全部 12 种页型；右侧属性栏支持单页 **「仅换版式不动字」** 无损重排、逐页标注来源状态（`源材料 / 推算 / 模拟假设 / 待核验`）与脚注；`Ctrl/Cmd+Z` 完整撤销栈 |
-| **100 分制设计体检与 AI 润色** | 实时评估投影对比度（WCAG 2.1 AA/AAA，支持深浅底色一键自动校正）、单页文字密度、叙事起承转合与讲稿覆盖率；AI 助手支持 `高管精炼 / 补充量化论据 / 优化演讲稿`，必须先预览 diff 再确认应用 |
-| **原生可编辑 `.pptx` 与多格式交付** | 基于 `pptxgenjs` 写入真实 **`SlideMaster` 母版**、可双击修改源数据的 **原生图表 `addChart`**、**原生表格 `addTable`** 及演讲者备注；同步支持零外链单文件 **离线 `.html`**、`Marp` Markdown 与 **`演讲提纲与来源核验清单.md`** |
-
-<p align="center">
-  <img src="./docs/showcase/glacier_v2/10-design-audit.png" alt="Glacier UI 2.0 全屏演示编辑器内置 100 分制智能设计体检抽屉" width="100%" />
-</p>
-
----
-
-### 3. 纯净演播分享与演讲排练驾驶舱（`/deck/[id]?rehearsal=1`）
-
-公开发布的演示文稿自动生成独立 16:9 暗场演播分享页（私有文稿对非作者严格返回 `404` 零泄露）。点击「排练提词」或按 **`P` 键** 即刻切入分屏排练模式：
-
-- **多场景倒计时节奏控制**：内置正计时与 **5 分钟路演 / 10 分钟国自然答辩 / 15 分钟公开课 / 30 分钟汇报** 预设，采用等宽数字（`tabular-nums`）防抖动，剩余 `< 20%` 琥珀预警、超时红灯提醒。
-- **沉浸提词与下一页预告**：当前页逐字演讲稿支持 `A- / A+` 实时缩放字号；右下角同步展示下一页 16:9 完整版式预览，点击或键盘 `← / → / Space` 平滑翻页。
-- **诚实能力定位**：聚焦真实计时、提词与翻页排练，不伪造麦克风录音或虚假 AI 语音评分；支持一键导出 `.html` / `.pptx` 或克隆至工坊继续二次编辑。
-
-<p align="center">
-  <img src="./docs/showcase/glacier_v2/11-rehearsal-cockpit.png" alt="Glacier UI 2.0 演播分享页与分屏演讲排练提词驾驶舱" width="100%" />
-</p>
-
----
-
-## 全站路由映射与 36 套精选风格矩阵
-
-### 全站路由映射
-
-| 路由 | 页面与核心能力 |
-| --- | --- |
-| `/` | **工作台首页 Dashboard**：AI 生成 / 资料转 PPT / 从模板新建、文档拖拽上传、同内容 3 风格实时对比、推荐风格、真实最近项目与快速工具；携带旧画廊查询参数时服务端自动重定向至 `/gallery` |
-| `/pack` | **提示词包工作台**：粘贴/上传/示例资料 → 定制风格（HEX 色板、字体、版式语法）+ 可编辑逐页大纲 → 按 ChatGPT / Gamma / Kimi / Claude / 通用格式导出；首页「资料转 PPT」可一键带入 |
-| `/gallery` | **风格参考库**：36 套全领域 `VisualSpec` 模板、实时统计 5 大人群分类、多维筛选与 URL 同步、详情抽屉（12 页型 + Hex 色板）、30 秒智能选词与资料直通车 |
-| `/generate` | **创作工坊 & 演示编辑器**：支持 `?style=`、`?topic=`、`?deck=`、`?handoff=1`、`?intake=1`、`?mode=create\|editor`、`?panel=audit` |
-| `/collections` | **我的项目与个人空间**：全部项目 / 最近编辑 / 公开分享 / 我收藏的 / 我发布的 / 我点赞的，完整项目 CRUD 与个人资料编辑 |
-| `/compare` | **风格并排对比台**：默认即刻展示 3 套代表风格，支持 12 页型与统一主题同步预览、快速增删替换与规范比对 |
-| `/studio` & `/studio/[slug]` | **交互式提示词工作室**：`/studio` 自动跳转精选风格；12 页型胶片条、5 维提示词解剖、6 大 AI 生态编译与 `.html` / `.pptgod.json` 导出 |
-| `/deck/[id]` | **纯净演播分享与演讲排练驾驶舱**：支持 `?rehearsal=1` 自动打开排练面板；私有文稿严格 `404` 零泄露 |
-| `/tools` | **纯本地 PPT 效率工具箱**：支持 `?tab=pacing\|pptx-inspect\|palette-wcag\|visual-director` 及已保存文稿排练直达 |
-| `/create` & `/creator/[username]` | **风格创作 / Remix 发布器**（以图抽色 + WCAG 自动校正 + `.pptgod.json` 导入）与 **创作者公开主页** |
-
-### 36 套全领域精选风格覆盖矩阵
+<details>
+<summary><b>展开查看 36 套精选风格参考库覆盖矩阵（5 大人群领域）</b></summary>
 
 | 人群领域 | 覆盖场景 | 代表风格与专属设计规范 |
 | --- | --- | --- |
@@ -164,45 +134,131 @@
 | **项目与职场**（9 套） | 项目汇报、咨询汇报、政务党建、个人述职、年度总结 | PMO 红黄绿里程碑看板（`pmo-rag-grid`）、丹宸鎏金政务红金（`civic-redgold`）、Linear 敏捷 OKR、麦肯锡高管洞察、华尔街金融终端、STAR 晋升述职、ESG 绿色精益 |
 | **生活与个人**（7 套） | 生活纪实、文化创意、个人述职 | 柯达 35mm 胶片手账游记（`polaroid-zine`）、香槟鼠尾草婚礼纪念、独立书店读书沙龙、牛油果极简生活、宋韵新中式、莫兰迪作品集 |
 
+</details>
+
+### 3. 三端 1:1 渲染引擎、100 分智能体检与演播排练（`/generate` & `/deck/[id]`）
+
+- **统一确定性 `VisualSpec`**：覆盖 **20 种原生版式原型 × 16 种装饰纹理 × 12 种商业/学术页型**，浏览器 16:9 `SlideCanvas` 舞台、原生 `.pptx` 母版（`pptxgenjs` `SlideMaster` + 可双击改数 `addChart` + `addTable` + Notes）与离线 `.html` 三端一致。
+- **100 分制设计体检（`deckLinter`）与预览确认型 AI 助手（`/api/polish`）**：实时检查 WCAG 投影对比度（支持一键修复）、文字密度、叙事结构与讲稿覆盖率；AI 润色必须先预览 diff 再确认应用并入 `Ctrl/Cmd+Z` 撤销栈。
+- **演播分享与排练驾驶舱（`/deck/[id]?rehearsal=1`）**：支持 `P` 键切入分屏提词、5 档等宽数字倒计时（`< 20%` 琥珀预警、超时红灯）、`A- / A+` 提词字号调节与下一页 16:9 预告。
+
+<table>
+  <tr>
+    <td width="50%"><img src="./docs/showcase/glacier_v2/10-design-audit.png" alt="100 分制智能设计体检抽屉" width="100%" /></td>
+    <td width="50%"><img src="./docs/showcase/glacier_v2/11-rehearsal-cockpit.png" alt="演播分享页与分屏演讲排练提词驾驶舱" width="100%" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>100 分制设计体检</b>· 对比度、密度、叙事与讲稿覆盖率一键修复</sub></td>
+    <td align="center"><sub><b>演讲排练驾驶舱</b>· 倒计时节奏控制、提词稿缩放与下一页预告</sub></td>
+  </tr>
+</table>
+
 ---
 
-## 系统架构、安全防线与项目结构
+## 技术路线与系统架构
+
+### 技术选型矩阵
+
+| 架构层次 | 技术栈与关键选型 | 选型考量 |
+| --- | --- | --- |
+| **前端与路由** | Next.js `16.4.6` (App Router) + React `19.3.0` + TypeScript `5` (`strict: true`) | SSR/RSC 混合渲染、SEO 与动态 OG 图生成、Server Actions / Route Handlers 一体化 |
+| **视觉与样式体系** | **100% Pure Vanilla CSS**（零 TailwindCSS / 零第三方 UI 库）+ `lucide-react` | Glacier UI 2.0 令牌化体系（`glacier-tokens.css`）、零运行时样式开销、精准控制玻璃拟态降级与打印/响应式表现 |
+| **AI 编排与多模型适配** | `@mastra/core` + `@ai-sdk/openai-compatible` + `undici` 自定义 DNS/IP Transport | 统一兼容 OpenAI / DeepSeek / Kimi / 通义千问 / 硅基流动 / Gemini / OpenRouter，支持 `<think>` 剥离、`response_format` 降级与严格 SSRF 隔离 |
+| **文档解析与多格式导出** | `unpdf`（PDF）、`mammoth`（DOCX）、`jszip`（PPTX 解析）、`pptxgenjs`（原生母版/图表/表格 `.pptx`） | 无外部重型 Python/LibreOffice 依赖，纯 Node.js 完成解析与可编辑 `.pptx` / 离线 `.html` 交付 |
+| **数据库与身份认证** | PostgreSQL（兼容 Supabase / Docker PG）+ `drizzle-orm` + `better-auth` | 强类型 Schema（独立 `pptgod` pgSchema）、完整会话/邮箱找回/访客体验切换 |
+| **限流与对象存储** | `@upstash/redis`（可选分布式限流，本地自动内存兜底）+ `@aws-sdk/client-s3`（Cloudflare R2 可选存储） | 兼顾零配置本地开发与公网生产弹性部署 |
+| **自动化验证体系** | TypeScript + ESLint + Playwright Python 4-Tier 87 项 E2E（含 `--backup-db` 零漂移校验） | 覆盖 API 契约、诚实边界 `B1–B16`、安全隔离 `S1–S22`、核心交互流与 5 断点（`390–1920px`）零溢出 |
+
+### 核心技术路线
+
+1. **「BYOK 大模型优先 + 确定性规则引擎兜底」双引擎架构**
+   - 有用户自带 Key（或站点共享 Key）时，调用大模型生成结构化 JSON，经 `sanitizePackStyle` / `sanitizePackSlides` 与 `groundSlides`（逐条校验数字是否真实出现于原文）净化后输出；
+   - 无 Key、网络超时或接口异常时，自动回退至零延迟确定性规则引擎，并通过 `fallbackReason` 诚实告知用户原因，保证任何环境下开箱即用。
+2. **「单一视觉真源（`VisualSpec` / `PackStyle`）」驱动多端渲染**
+   - 浏览器 16:9 `SlideCanvas`、`/pack` 风格示意与 5 工具提示词导出、服务端 `pptxgenjs` 母版导出、独立离线 `.html` 均从同一份结构化色板/字体/版式规范派生，并经 `paletteExtractor.ts` 统一执行 WCAG 2.1 对比度护栏。
+3. **「浏览器本地优先 + 零泄露隐私防线（`S1–S22`）」**
+   - 参考图吸色、长文档章节筛选、提示词包 10 份历史与 `/tools` 工具箱全部在客户端完成；BYOK `apiKey` 严格仅存当前标签页 `sessionStorage`（绝不写入 `localStorage`、不落库、不回显）；服务端使用 `undici` socket 级 DNS 解析拦截私网/云元数据 IP（防 DNS Rebinding SSRF）；私有风格与私有文稿全链路返回 `404`。
+
+### 系统架构图
 
 ```mermaid
-flowchart LR
-    D["工作台 / 与资料直通车\nPDF / Word / TXT / PPTX (≤10MB)"] --> A["6 类材料分流 & 15 场景契约\n双样张校准 · 证据密度 · 1:1/重构路由"]
-    A --> C["/studio/[slug] 提示词工作室\n6 大 AI 生态 + Visual Director v2"]
-    A --> E["/generate 创作工坊 & 演示编辑器\n4 步向导 · 无损换版式 · 100 分体检 · AI 助手"]
-    B["/gallery 36 套设计系统 + /tools 本地工具箱\n20 原型 × 16 纹理 · WCAG 校核"] --> E
-    E --> F["原生深度交付\nSlideMaster/Chart/Table .pptx · 提纲清单 .md · .html"]
-    E --> G["/deck/[id]?rehearsal=1 演播与排练驾驶舱\n倒计时 + 提词稿 + 下一页预告"]
-    E --> H[("PostgreSQL & /collections 项目库\n深层校验 · SSRF 防护 · 限流")]
+flowchart TB
+  subgraph Client["浏览器端 · Glacier UI 2.0（Pure Vanilla CSS + React 19）"]
+    Home["首页 / & 资料直通车"]
+    Pack["/pack 提示词包工作台<br/>长文档章节筛选 · 本地吸色 · 10 份本地历史"]
+    Gallery["/gallery 风格参考库 (36套)<br/>/compare · /studio/[slug]"]
+    Workshop["/generate 创作工坊 & 全屏编辑器<br/>100分体检 · SlideCanvas · AI润色"]
+    Tools["/tools 纯本地工具箱<br/>/deck/[id]?rehearsal=1 排练驾驶舱"]
+    ByokStore["byokLocalStore<br/>sessionStorage 仅存当前标签页 Key"]
+  end
+
+  subgraph API["Next.js 16 App Router 后端（26 个 API 路由）"]
+    Parse["POST /api/parse-document<br/>unpdf · mammoth · jszip"]
+    PackAPI["POST /api/prompt-pack & /refine<br/>原文数字核对 · 规则引擎兜底"]
+    ByokTest["POST /api/byok/test<br/>2s 连通检测 · SSRF 拦截"]
+    DeckAPI["/api/outline · /generate · /polish<br/>/api/export/pptx (pptxgenjs)"]
+    CoreAPI["/api/auth/* · /api/prompts/* · /api/decks/*"]
+  end
+
+  subgraph Infra["模型与存储基础设施"]
+    LLM["OpenAI / DeepSeek / Kimi / Qwen<br/>Gemini / OpenRouter（undici SSRF 隔离）"]
+    PG[("PostgreSQL · Drizzle ORM<br/>pptgod schema + Better Auth")]
+    Opt["Upstash Redis 限流 · Cloudflare R2 存储"]
+  end
+
+  Home --> Parse
+  Home --> Pack
+  Gallery -->|"?style=slug 风格锚点"| Pack
+  Gallery --> Workshop
+  Pack --> Parse
+  Pack --> PackAPI
+  Pack -->|".md / .json / 5 工具一键复制"| External["ChatGPT · Gamma · Kimi · Claude"]
+  Pack -->|"站内继续生成"| Workshop
+  ByokStore --> ByokTest
+  ByokStore --> PackAPI
+  ByokStore --> DeckAPI
+  Workshop --> DeckAPI
+  Workshop --> Tools
+  PackAPI --> LLM
+  ByokTest --> LLM
+  DeckAPI --> LLM
+  CoreAPI --> PG
+  API -.-> Opt
 ```
 
-- **深层 `VisualSpec` 强校验**：严格校验所有 CSS 色值、4 色图表元组、20 原型 / 16 纹理枚举、圆角 `[0, 32]` 与 `brandFooter` 纯文本防 XSS。
-- **BYOK SSRF 与隐私隔离**：拦截云元数据地址、RFC1918/IPv6 内网段与混淆 IP；BYOK `apiKey` 永不写入数据库 且不回显；登录/注册 `429` 限流；私有风格与私有文稿在 SSR、API、OG 图像与 `/sitemap.xml` 全链路严格零泄露。
-
 <details>
-<summary><b>展开查看项目目录结构</b></summary>
+<summary><b>展开查看项目目录结构（26 个后端 API 路由）</b></summary>
 
 ```text
 PPTGod/
 ├── src/
-│   ├── app/                    # Next.js 16 App Router 页面与 22 个后端 API 路由
+│   ├── app/
+│   │   ├── pack/               # /pack 提示词包工作台（支持 ?style=<slug> 风格锚点）
+│   │   ├── gallery/            # /gallery 风格参考库
+│   │   ├── generate/           # /generate 创作工坊与全屏演示编辑器
+│   │   ├── studio/             # /studio 与 /studio/[slug] 提示词工作室 + 动态 OG 图
+│   │   ├── compare/            # /compare 风格并排对比台
+│   │   ├── collections/        # /collections 我的项目与个人空间
+│   │   ├── deck/[id]/          # /deck/[id] 纯净演播分享与排练驾驶舱
+│   │   ├── tools/              # /tools 纯本地 PPT 效率工具箱
+│   │   ├── create/ & creator/  # 风格创作/Remix 发布器与创作者公开主页
+│   │   └── api/                # 26 个后端路由（auth/byok/prompt-pack/parse-document/outline/generate/polish/export/prompts/decks/health）
 │   ├── components/
+│   │   ├── pack/               # 提示词包工作台与结果面板（PromptPackWorkbench / PackResultPanels）
 │   │   ├── layout/             # Glacier UI 2.0 全局框架（AppShell / Topbar / Sidebar / MobileNavDrawer / PageHeader）
-│   │   ├── ui/                 # 通用无框架 UI 组件库（Button / Dialog / Drawer / Input / Select / Tabs / Stepper / UploadDropzone 等）
+│   │   ├── ui/                 # 无框架通用 UI 组件库（Button / Dialog / Drawer / Input / Select / Tabs / Stepper / UploadDropzone 等）
 │   │   ├── dashboard/          # 首页工作台组件（CreatePanel / StyleShowcase / WorkspacePanels）
-│   │   ├── presentation/       # 演示与卡片展示组件（SlidePreviewFrame / StyleCard / StyleDetailDrawer / ProjectCard）
-│   │   ├── generate/           # 创作工坊向导、全屏演示编辑器、设计体检、大纲草案与配图管理
+│   │   ├── presentation/       # 演示与卡片组件（SlidePreviewFrame / StyleCard / StyleDetailDrawer / ProjectCard）
+│   │   ├── generate/           # 工坊向导、全屏编辑器、设计体检、大纲草案与配图管理
 │   │   └── slide-canvas/       # 16:9 SlideCanvas 渲染核心（20 原型 × 16 纹理 × 12 页型）
-│   ├── context/                # AppContext（认证/对比/全局状态）与 LayoutContext（侧栏/全屏编辑/弹窗）
-│   ├── lib/                    # PostgreSQL、文档解析、大纲与生成、设计体检、WCAG 校核、PPTX/HTML/Marp 导出、SSRF 防护
-│   ├── styles/                 # 100% 纯 Vanilla CSS（glacier-tokens / glacier-layout / glacier-ui 与分模块样式）
+│   ├── context/                # AppContext（认证/对比/全局状态）与 LayoutContext（侧栏/全屏/设置弹窗）
+│   ├── hooks/                  # useDeckWorkshop 状态编排 Hook
+│   ├── lib/                    # promptPack / promptPackEngine / presentationAgent / providerRequest / byokLocalStore / paletteExtractor / deckLinter / db (Drizzle) / auth (Better Auth)
+│   ├── styles/                 # 100% 纯 Vanilla CSS（glacier-tokens / glacier-layout / glacier-ui / pack / dashboard / gallery / generate 等）
 │   └── types/                  # 领域与 VisualSpec 强类型定义
 ├── public/brand/               # Glacier 冰川矢量 Logo 与低对比雪峰装饰 SVG
-├── docs/                       # 开发规范、架构文档、测试设施说明与 Glacier UI 2.0 实机截图
-├── tests/e2e/glacier_v2/       # Glacier 全栈 Playwright 回归测试
+├── docs/                       # 架构文档、部署指南、设计规范、测试说明与实机截图
+├── tests/e2e/glacier_v2/       # Glacier 4-Tier 87 项 Playwright 端到端回归测试套件
 ├── Dockerfile & docker-compose.yml
 └── README.md
 ```
@@ -211,9 +267,37 @@ PPTGod/
 
 ---
 
-## 本地运行与上线
+## 开发进程与路线图
 
-使用 Node.js 22（至少 22.13）。将 `.env.example` 复制为 `.env` 并设置随机的 `BETTER_AUTH_SECRET`。可以使用现有 PostgreSQL，或只启动 Docker Compose 中的本地数据库。
+### 已完成里程碑（v1 → M7）
+
+| 阶段 | 对应 PR / 提交 | 核心交付内容 | 质量验证 |
+| --- | --- | --- | --- |
+| **v1–v5** | 早期基线 (`9277001`) | 建立 36 套全领域视觉设计系统（20 原型 × 16 纹理 × 12 页型）、提示词工作室、并排对比与社区基础能力 | 基础全量验收 |
+| **v6** | PR #1 (`5ff7173`) | 以图抽色与 WCAG 2.1 自动校核、100 分制设计体检（`deckLinter`）、`brandFooter` 三端同步、`/deck/[id]` 演讲排练驾驶舱与 Docker/SEO | 99/99 E2E |
+| **v7** | PR #2 (`1a06100`) | Drop-a-Doc 资料直通车（PDF/DOCX/PPTX/MD/TXT 多格式解析 + 6 类材料分流 + 双样张推荐） | 全量回归通过 |
+| **v8** | PR #3 (`66d0087`) | Canvas-First 极简减法重构、Evidence-First 证据契约、原生 PPTX `SlideMaster`/`addChart`/`addTable` 与 `/tools` 纯本地效率工具箱 | 全量回归通过 |
+| **M1–M4** | PR #4 (`949d53f`) | **Glacier UI 2.0 冰川白玻璃拟态全站重构**：令牌化无框架 UI 库、AppShell、首页/画廊/工坊/全屏编辑器/项目库重构、严格执行诚实边界 `B1–B16` | **68/68** Glacier 4-Tier E2E + 5 断点零溢出 |
+| **文档与示例升级** | PR #5 (`bb6d097`) & PR #6 (`20264a6`) | 清理冗余资产并重构文档体系；将旧参考内容全面替换为 AI 经典论文（Transformer / DeepSeek-R1）与初高中教材公开课 | 全量回归通过 |
+| **云端架构与 M5** | `f2cdbb1` / `fddf5d8` / PR #9 (`bb2694f`) | 数据库升级至 **PostgreSQL + Drizzle ORM**、认证切换为 **Better Auth** 并开放访客试用；完成 URL 双向同步、本地 BYOK 闭环（`sessionStorage` 仅存 Key）、次级页视觉统一、`useDeckWorkshop` 解耦与移动端 390px 编辑器打磨 | **79/79** Glacier E2E + PostgreSQL 零漂移 |
+| **M6** | PR #10 (`214dee6`) | **资料 → 提示词包工作台（`/pack`）首发**：11 套精调设计方向、关键词自动匹配、11 种版式可编辑大纲、3 帧实时风格示意、ChatGPT / Gamma / Kimi / Claude / 通用 5 工具导出、BYOK 自动降级规则引擎与原文数字核对 | **83/83** Glacier E2E + `[DB HYGIENE PASS]` |
+| **M7（当前）** | PR #11 (`5e03527`) | **提示词包深度进化与全站闭环**：① 7 组 BYOK 服务商一键预设 + `POST /api/byok/test` 2 秒连通检测 + 推理模型 `<think>`/`response_format` 兼容；② Gamma 双段独立复制 + ChatGPT 两步精修 + 仅复制风格/大纲 + `.json` 导入导出 + 本地 10 份历史；③ 参考图本地吸色 + WCAG 在线风格微调 + 大纲数据/备注编辑 + 任意页预览 + BYOK 单页 AI 润色 + 6 份示例；④ 顶栏新增 `/pack`、「风格画廊」升级「风格参考库」并打通 `/pack?style=<slug>` 与首页上传弹窗；⑤ >16k 长文档章节筛选器与英文论文指标提取增强 | **87/87** Glacier E2E + `[DB HYGIENE PASS]` |
+
+### 后续开发路线图（Planned · M8+）
+
+- [ ] **提示词包云端持久化与只读分享**：登录用户可将提示词包保存至 PostgreSQL 并在 `/collections` 管理，支持生成只读分享链接给团队或同学直接复用。
+- [ ] **自定义风格方向库与品牌规范包**：支持把用户在 `/pack` 微调或吸色后的风格保存为可复用的个人设计方向（含一键导入/导出品牌色板规范）。
+- [ ] **多资料联合提炼与引用溯源增强**：支持同时上传多份参考材料（如论文 PDF + 补充实验表格）合并提取，大纲出处精确关联到文件名与具体章节。
+- [ ] **站内原生 `.pptx` 版面精致度升级**：将 `/pack` 的 11 套精调设计方向与多样化图表/对比/流程布局进一步反哺至站内 `pptxgenjs` 导出引擎。
+- [ ] **真实大模型提示词包评测集**：建立覆盖学术、教学、商业三类真实长文档的自动化质量评估脚本，持续打磨各外部工具（ChatGPT / Gamma / Kimi / Claude）的成品还原度。
+
+---
+
+## 本地运行、测试与上线
+
+### 本地快速启动
+
+运行环境要求 **Node.js 22**（`>= 22.13.0 < 23`）。将 `.env.example` 复制为 `.env`，填入随机的 `BETTER_AUTH_SECRET`，可直接用 Docker Compose 启动本地 PostgreSQL：
 
 ```bash
 cp .env.example .env
@@ -225,21 +309,24 @@ npm run db:seed
 npm run dev
 ```
 
-本地启动后访问 `http://localhost:3000`。种子脚本会补齐 36 套公开风格。连本地数据库时，可在开发环境里设置 `PPTGOD_ENABLE_DEMO_ACCOUNT=true` 启用体验账号。
+本地启动后访问 `http://localhost:3000`。种子脚本会自动写入 36 套公开风格参考模板；本地开发可在 `.env` 中设置 `PPTGOD_ENABLE_DEMO_ACCOUNT=true` 启用体验账号。
 
-配置 PostgreSQL、Cloudflare R2、Upstash 和 Resend，或迁移历史文稿，见[上线指南](./docs/DEPLOYMENT.md)。
+生产环境配置 PostgreSQL（如 Supabase）、Cloudflare R2、Upstash Redis、Resend 邮件服务或从旧版 SQLite 迁移历史文稿，详见 **[上线部署指南](./docs/DEPLOYMENT.md)**。
+
+### 静态检查与 87 项端到端验证
 
 ```bash
+# TypeScript 严格检查、ESLint 与生产构建
 npm run typecheck
 npm run lint
 npm run build
 
-# 列出 Glacier UI 2.0 全部 87 项 4-Tier 用例
+# 查看 Glacier UI 2.0 全部 87 项 4-Tier E2E 用例清单
 npm run test:e2e:list
 
-# 在独立端口 3010 启动生产构建后运行全量端到端验证（勿对 3000 端口运行）
+# 在独立端口 3010 启动生产构建后运行全量 E2E（请勿对 3000 开发端口运行）
 npm start -- --hostname 127.0.0.1 --port 3010
-PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_glacier_e2e.py --tier all
+PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_glacier_e2e.py --tier all --backup-db
 ```
 
 ---
@@ -248,7 +335,8 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_gla
 
 | 文档 | 说明 |
 | --- | --- |
+| [docs/PROJECT.md](./docs/PROJECT.md) | 项目架构、功能清单 `F1–F41`、诚实能力边界 `B1–B16` 与 M1–M7 完整里程碑记录 |
+| [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) | 生产环境部署指南（PostgreSQL / Supabase、Cloudflare R2、Upstash Redis、Resend 与数据迁移） |
+| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 87 项 4-Tier E2E 测试基础设施与验收规范 |
 | [docs/PPTGod_Glacier_UI_2.0_Development_Spec.md](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) | Glacier UI 2.0 视觉与开发执行规范（Tokens、组件、页面、响应式、验收清单） |
-| [docs/PROJECT.md](./docs/PROJECT.md) | Glacier UI 2.0 架构、功能清单 `F1–F41`、能力边界 `B1–B16` 与里程碑记录 |
-| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 87 项 4-Tier E2E 测试基础设施说明 |
-| [docs/PPTGod_UI_Design_Spec.md](./docs/PPTGod_UI_Design_Spec.md) | 冰川白工作台早期设计规范与首页改版对照图 |
+| [docs/PPTGod_UI_Design_Spec.md](./docs/PPTGod_UI_Design_Spec.md) | 冰川白工作台早期设计规范与首页改版对照 |
