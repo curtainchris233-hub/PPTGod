@@ -57,7 +57,7 @@ export const metadata: Metadata = {
     process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
   ),
   title: {
-    default: "PPTGod · AI 演示文稿创作平台与可视化风格画廊",
+    default: "PPTGod · AI 提示词包工作台与 PPT 风格参考库",
     template: "%s | PPTGod",
   },
   description:

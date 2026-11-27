@@ -195,6 +195,215 @@ def g3_pack_04_mobile_390_no_overflow(ctx: TestContext) -> None:
         guard.assert_no_browser_errors("G3_PACK_04")
 
 
+def g3_pack_05_byok_presets_and_test_ssrf(ctx: TestContext) -> None:
+    # 1. API contract + SSRF guard + zero key echo on /api/byok/test
+    empty = ctx.api().post("/api/byok/test", json_body={"apiKey": "", "apiBase": "https://api.openai.com/v1"})
+    empty.assert_status(400, "G3_PACK_05 empty apiKey")
+
+    ssrf_secret = "sk-e2e-ssrf-secret-must-not-echo"
+    ssrf = ctx.api().post(
+        "/api/byok/test",
+        json_body={
+            "apiKey": ssrf_secret,
+            "apiBase": "http://169.254.169.254/latest/meta-data",
+            "model": "gpt-4o-mini",
+        },
+    )
+    ssrf.assert_status(400, "G3_PACK_05 SSRF private IP blocked")
+    assert ssrf_secret not in ssrf.text(), "SECURITY: apiKey echoed back in /api/byok/test SSRF error"
+
+    bad_type = ctx.api().post("/api/byok/test", json_body={"apiKey": 12345})
+    bad_type.assert_status(400, "G3_PACK_05 non-string apiKey")
+
+    # 2. UI presets & test button inside SettingsModal opened from /pack
+    with ctx.browser_page() as guard:
+        page = guard.page
+        guard.goto_ok(f"{ctx.base_url}/pack")
+        click_resilient(
+            page,
+            [lambda p: p.get_by_role("button", name="接入自己的大模型")],
+            description="Open BYOK settings from /pack",
+        )
+        dlg = locate_first(page, ["#gl-settings-dialog"], description="SettingsModal")
+        click_resilient(dlg, ["#gl-settings-byok-preset-deepseek"], description="DeepSeek preset")
+        assert dlg.locator("#gl-settings-byok-base").input_value() == "https://api.deepseek.com/v1"
+        assert dlg.locator("#gl-settings-byok-model").input_value() == "deepseek-chat"
+
+        click_resilient(dlg, ["#gl-settings-byok-preset-kimi"], description="Kimi preset")
+        assert dlg.locator("#gl-settings-byok-base").input_value() == "https://api.moonshot.cn/v1"
+        locate_first(dlg, ["#gl-settings-byok-test-btn"], description="BYOK test connection button")
+        guard.assert_no_browser_errors("G3_PACK_05")
+
+
+def g3_pack_06_gamma_split_and_chatgpt_twostep_copy(ctx: TestContext) -> None:
+    with ctx.browser_page() as guard:
+        page = guard.page
+        guard.goto_ok(f"{ctx.base_url}/pack")
+        page.evaluate("() => { try { localStorage.removeItem('pptgod_prompt_pack_v1'); } catch (e) {} }")
+        page.reload()
+        page.wait_for_load_state("networkidle")
+
+        click_resilient(page, ["#pg-pack-tab-sample"], description="Sample tab")
+        click_resilient(page, ["#pg-pack-sample-deepseek-r1"], description="DeepSeek-R1 sample")
+        page.wait_for_selector("#pg-pack-export", timeout=30_000)
+
+        page.evaluate(
+            """() => {
+              window.__pgCopied = '';
+              Object.defineProperty(navigator, 'clipboard', {
+                configurable: true,
+                value: { writeText: (t) => { window.__pgCopied = t; return Promise.resolve(); } },
+              });
+            }"""
+        )
+
+        # ChatGPT two-step mode
+        click_resilient(page, ["#pg-pack-chatgpt-twostep"], description="ChatGPT two-step mode")
+        locate_first(page, ["#pg-pack-chatgpt-split"], description="ChatGPT two-step split cards")
+        click_resilient(page, ["#pg-pack-copy-step1"], description="Copy ChatGPT step 1")
+        page.wait_for_function("() => (window.__pgCopied || '').includes('设计规范')", timeout=5_000)
+        step1 = page.evaluate("() => window.__pgCopied")
+        assert "风格已就绪" in step1, "ChatGPT step 1 must confirm style before slides"
+
+        click_resilient(page, ["#pg-pack-copy-step2"], description="Copy ChatGPT step 2")
+        page.wait_for_function("() => (window.__pgCopied || '').includes('逐页内容')", timeout=5_000)
+        step2 = page.evaluate("() => window.__pgCopied")
+        assert "python-pptx" in step2 and "DeepSeek-R1" in step2
+
+        # Gamma two-part copy
+        click_resilient(page, ["#pg-pack-tool-gamma"], description="Gamma tab")
+        locate_first(page, ["#pg-pack-gamma-split"], description="Gamma split cards")
+        click_resilient(page, ["#pg-pack-copy-gamma-style"], description="Copy Gamma part 1 style")
+        page.wait_for_function("() => (window.__pgCopied || '').includes('设计方向')", timeout=5_000)
+        gamma_style = page.evaluate("() => window.__pgCopied")
+        assert "---" not in gamma_style, "Gamma part 1 should only contain style instructions"
+
+        click_resilient(page, ["#pg-pack-copy-gamma-cards"], description="Copy Gamma part 2 cards")
+        page.wait_for_function("() => (window.__pgCopied || '').includes('---')", timeout=5_000)
+        gamma_cards = page.evaluate("() => window.__pgCopied")
+        assert "---" in gamma_cards and "DeepSeek-R1" in gamma_cards
+
+        # Partial copy buttons
+        click_resilient(page, ["#pg-pack-copy-style-btn"], description="Copy style only button")
+        page.wait_for_function("() => (window.__pgCopied || '').includes('设计规范')", timeout=5_000)
+        click_resilient(page, ["#pg-pack-copy-outline-btn"], description="Copy outline only button")
+        page.wait_for_function("() => (window.__pgCopied || '').includes('逐页内容')", timeout=5_000)
+        guard.assert_no_browser_errors("G3_PACK_06")
+
+
+def g3_pack_07_style_editor_outline_data_notes_and_history(ctx: TestContext) -> None:
+    with ctx.browser_page() as guard:
+        page = guard.page
+        guard.goto_ok(f"{ctx.base_url}/pack")
+        page.evaluate(
+            """() => {
+              try {
+                localStorage.removeItem('pptgod_prompt_pack_v1');
+                localStorage.removeItem('pptgod_prompt_pack_history_v1');
+              } catch (e) {}
+            }"""
+        )
+        page.reload()
+        page.wait_for_load_state("networkidle")
+
+        # 1. Load Chinese literature sample -> verify neo-chinese direction
+        click_resilient(page, ["#pg-pack-tab-sample"], description="Sample tab")
+        click_resilient(page, ["#pg-pack-sample-yueyanglou"], description="Yueyanglou sample")
+        page.wait_for_selector("#pg-pack-style", timeout=30_000)
+        style_title = page.locator("#pg-pack-style-title").inner_text()
+        assert "新中式" in style_title, f"Expected neo-chinese style for 岳阳楼记, got {style_title!r}"
+
+        # 2. Inline style HEX tweak reflects immediately in exported prompt
+        click_resilient(page, ["#pg-pack-style-edit-toggle"], description="Open inline style editor")
+        color_inp = locate_first(page, ["#pg-pack-color-input-4"], description="Primary HEX input")
+        color_inp.fill("#1E40AF")
+        page.wait_for_timeout(150)
+        assert "#1E40AF" in page.locator("#pg-pack-prompt-preview").inner_text()
+
+        # 3. Outline data & speaker notes editing reflect immediately in exported prompt
+        first_slide_btn = page.locator("#pg-pack-outline .gl-pack-slide-title").first
+        first_slide_btn.click()
+        click_resilient(page, ["#pg-pack-add-datum-btn"], description="Add slide datum button")
+        data_rows = page.locator("#pg-pack-outline .gl-pack-data-row")
+        last_row = data_rows.last
+        last_row.locator("input").nth(0).fill("测试指标")
+        last_row.locator("input").nth(1).fill("99%")
+        page.locator("#pg-pack-slide-note-input").fill("这是测试演讲备注")
+        page.wait_for_timeout(150)
+        prompt_text = page.locator("#pg-pack-prompt-preview").inner_text()
+        assert "测试指标 = 99%" in prompt_text, "Edited datum missing from prompt preview"
+        assert "这是测试演讲备注" in prompt_text, "Edited speaker note missing from prompt preview"
+
+        # 4. Generate a second sample and switch back via local history
+        click_resilient(page, ["#pg-pack-tab-sample"], description="Sample tab again")
+        click_resilient(page, ["#pg-pack-sample-thesis-proposal"], description="Thesis proposal sample")
+        page.wait_for_function(
+            "() => (document.querySelector('#pg-pack-insight')?.textContent || '').includes('开题报告')",
+            timeout=30_000,
+        )
+        click_resilient(page, ["#pg-pack-history-toggle"], description="Toggle history panel")
+        hist_items = page.locator("#pg-pack-history-panel .gl-pack-history-load")
+        assert hist_items.count() >= 2, f"Expected >= 2 history items, got {hist_items.count()}"
+        hist_items.filter(has_text="岳阳楼记").first.click()
+        page.wait_for_function(
+            "() => (document.querySelector('#pg-pack-insight')?.textContent || '').includes('岳阳楼记')",
+            timeout=10_000,
+        )
+        hist_raw = page.evaluate("() => localStorage.getItem('pptgod_prompt_pack_history_v1') || ''")
+        assert "apiKey" not in hist_raw, "SECURITY: history store must never persist apiKey"
+        guard.assert_no_browser_errors("G3_PACK_07")
+
+
+def g3_pack_08_topbar_style_anchor_and_long_doc_picker(ctx: TestContext) -> None:
+    with ctx.browser_page() as guard:
+        page = guard.page
+        guard.goto_ok(f"{ctx.base_url}/pack?style=nature-okabe-ito-evidence")
+
+        # 1. Topbar /pack active indicator & renamed 风格参考库 nav item
+        pack_nav = locate_first(page, ["#pg-nav-pack"], description="Topbar /pack nav link")
+        assert pack_nav.get_attribute("aria-current") == "page", "Topbar #pg-nav-pack missing aria-current='page'"
+        gallery_nav = locate_first(page, ["#pg-nav-gallery"], description="Topbar /gallery nav link")
+        assert "风格参考库" in (gallery_nav.inner_text() or ""), (
+            f"Expected Topbar #pg-nav-gallery to say 风格参考库, got {gallery_nav.inner_text()!r}"
+        )
+
+        # 2. Style reference anchor banner rendered from ?style=nature-okabe-ito-evidence
+        anchor_banner = locate_first(page, ["#pg-pack-anchor-banner"], description="Style anchor banner")
+        assert "Nature" in (anchor_banner.inner_text() or "") or "顶刊" in (anchor_banner.inner_text() or "")
+
+        # 3. Long document (>16,000 chars) triggers section picker and auto-unchecks 参考文献
+        long_doc = (
+            "长论文多模态文档理解研究\n"
+            "# 摘要\n"
+            + ("本文提出分层自适应多模态解析框架，准确率达到 88.5%，吞吐量提升 2.1 倍。" * 60)
+            + "\n# 实验结果\n"
+            + ("在复杂版面基准上，相比基线提升 14.2%，视觉 Token 减少 42%。" * 60)
+            + "\n# 结论\n"
+            + ("核心结论：分层分辨率编码兼顾精度与速度，适合大规模论文知识库构建，核心指标达成率 96%。" * 30)
+            + "\n# 参考文献\n"
+            + ("[1] Vaswani et al. Attention Is All You Need. NeurIPS 2017. " * 220)
+        )
+        assert len(long_doc) > 17_000
+        page.locator("#pg-pack-text").fill(long_doc)
+        picker = locate_first(page, ["#pg-pack-section-picker"], description="Long-doc section picker")
+        picker_text = picker.inner_text()
+        assert "参考文献" in picker_text and "结论" in picker_text
+        # Confirm 参考文献 checkbox is unchecked by default while 结论 is checked
+        ref_checked = picker.locator("li", has_text="参考文献").locator("input[type='checkbox']").is_checked()
+        concl_checked = picker.locator("li", has_text="结论").locator("input[type='checkbox']").is_checked()
+        assert not ref_checked, "References section should be unchecked by default for >16k docs"
+        assert concl_checked, "Conclusion section should remain checked for >16k docs"
+
+        click_resilient(page, ["#pg-pack-generate-btn"], description="Generate anchored long-doc pack")
+        page.wait_for_function(
+            "() => (document.querySelector('#pg-pack-insight')?.textContent || '').includes('长论文多模态')",
+            timeout=30_000,
+        )
+        exported = page.locator("#pg-pack-prompt-preview").inner_text()
+        assert "96%" in exported or "88.5%" in exported, "Long-doc conclusion/abstract metrics missing after section filtering"
+        guard.assert_no_browser_errors("G3_PACK_08")
+
+
 def get_specs() -> list[TestSpec]:
     return [
         TestSpec(
@@ -227,6 +436,38 @@ def get_specs() -> list[TestSpec]:
             "/pack at 390px: zero horizontal overflow after generation",
             g3_pack_04_mobile_390_no_overflow,
             ("ui", "pack", "rwd"),
+            True,
+        ),
+        TestSpec(
+            "G3_PACK_05",
+            3,
+            "BYOK presets + /api/byok/test SSRF guard & zero key echo",
+            g3_pack_05_byok_presets_and_test_ssrf,
+            ("api", "ui", "byok", "security"),
+            True,
+        ),
+        TestSpec(
+            "G3_PACK_06",
+            3,
+            "/pack Gamma two-part copy, ChatGPT two-step copy & partial style/outline copy",
+            g3_pack_06_gamma_split_and_chatgpt_twostep_copy,
+            ("ui", "pack", "export"),
+            True,
+        ),
+        TestSpec(
+            "G3_PACK_07",
+            3,
+            "/pack style HEX edit, outline data/note edit & 10-item local history switching",
+            g3_pack_07_style_editor_outline_data_notes_and_history,
+            ("ui", "pack", "editor"),
+            True,
+        ),
+        TestSpec(
+            "G3_PACK_08",
+            3,
+            "Topbar /pack active pill, ?style reference anchor & >16k long-doc section picker",
+            g3_pack_08_topbar_style_anchor_and_long_doc_picker,
+            ("ui", "pack", "integration"),
             True,
         ),
     ]

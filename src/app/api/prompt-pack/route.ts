@@ -3,10 +3,13 @@ import { isPlainObject } from "@/lib/deckValidation";
 import { generatePresentationJson } from "@/lib/presentationAgent";
 import { resolveProvider } from "@/lib/providerRequest";
 import {
+  directionToStyle,
+  getDesignDirection,
   sanitizePackSlides,
   sanitizePackStyle,
   type PackLanguage,
   type PackSlide,
+  type PackStyle,
   type PromptPack,
 } from "@/lib/promptPack";
 import {
@@ -73,6 +76,12 @@ export async function POST(request: Request) {
   const rawCount = safeNumber(body.slideCount);
   const language: PackLanguage =
     body.language === "en" || body.language === "bilingual" ? body.language : "zh";
+  const anchorStyle: PackStyle | undefined = isPlainObject(body.anchorStyle)
+    ? sanitizePackStyle(
+        body.anchorStyle,
+        directionToStyle(getDesignDirection(safeString(body.anchorStyle.directionId)), "")
+      )
+    : undefined;
   const input: PackRequestInput = {
     text: text.slice(0, MAX_CHARS),
     fileName: safeString(body.fileName).trim().slice(0, 120),
@@ -82,6 +91,7 @@ export async function POST(request: Request) {
       Number.isFinite(rawCount) && rawCount > 0 ? Math.max(5, Math.min(24, Math.round(rawCount))) : undefined,
     language,
     directionId: safeString(body.directionId).trim().slice(0, 40) || undefined,
+    ...(anchorStyle ? { anchorStyle } : {}),
   };
   const mode = body.mode === "smart" ? "smart" : "auto";
 

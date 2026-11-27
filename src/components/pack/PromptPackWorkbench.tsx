@@ -8,10 +8,16 @@ import {
   ClipboardList,
   Cpu,
   FileText,
+  FolderUp,
+  History,
+  ListChecks,
+  Palette,
   Settings2,
   Sparkles,
+  Trash2,
   Upload,
   Wand2,
+  X,
 } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
 import { Button, Stepper, UploadDropzone, type StepperStep, type UploadFileItem } from "@/components/ui";
@@ -24,9 +30,19 @@ import {
   DESIGN_DIRECTIONS,
   PACK_DRAFT_KEY,
   consumePackHandoff,
+  deletePackHistory,
   isPromptPack,
+  outlineDocumentSections,
   packSlideToCanvas,
+  parsePackJsonImport,
+  pickDefaultLongDocSectionIds,
+  readPackHistory,
+  upsertPackHistory,
+  type DocumentSectionSlice,
+  type PackHistoryEntry,
   type PackLanguage,
+  type PackSlide,
+  type PackStyle,
   type PackTool,
   type PromptPack,
 } from "@/lib/promptPack";
@@ -35,6 +51,7 @@ import "@/styles/pack.css";
 
 type InputTab = "paste" | "upload" | "sample";
 const MAX_CHARS = 16000;
+const MAX_RAW_CHARS = 120000;
 const MIN_CHARS = 20;
 
 interface Draft {
@@ -42,6 +59,7 @@ interface Draft {
   tool: PackTool;
   language: PackLanguage;
   fallbackReason?: string;
+  historyId?: string;
 }
 
 function readDraft(): Draft | null {
@@ -55,13 +73,31 @@ function readDraft(): Draft | null {
       tool: (parsed.tool as PackTool) || "chatgpt",
       language: (parsed.language as PackLanguage) || "zh",
       fallbackReason: parsed.fallbackReason,
+      historyId: typeof parsed.historyId === "string" ? parsed.historyId : undefined,
     };
   } catch {
     return null;
   }
 }
 
-export default function PromptPackWorkbench() {
+function formatHistoryTime(ts: number): string {
+  try {
+    const d = new Date(ts);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${mm}-${dd} ${hh}:${min}`;
+  } catch {
+    return "";
+  }
+}
+
+export default function PromptPackWorkbench({
+  initialAnchorStyle = null,
+}: {
+  initialAnchorStyle?: PackStyle | null;
+}) {
   const router = useRouter();
   const { showToast } = useApp();
   const { openSettingsModal } = useLayout();
@@ -74,9 +110,13 @@ export default function PromptPackWorkbench() {
   const [slideCount, setSlideCount] = useState(10);
   const [language, setLanguage] = useState<PackLanguage>("zh");
   const [directionId, setDirectionId] = useState("auto");
+  const [anchorStyle, setAnchorStyle] = useState<PackStyle | null>(initialAnchorStyle);
   const [rulesOnly, setRulesOnly] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<UploadFileItem[]>([]);
   const [parsing, setParsing] = useState(false);
+
+  // Long-document (> 16,000 chars) section selection (derived without effect cascades)
+  const [sectionOverrides, setSectionOverrides] = useState<{ docKey: string; ids: string[] } | null>(null);
 
   const [pack, setPack] = useState<PromptPack | null>(null);
   const [tool, setTool] = useState<PackTool>("chatgpt");
@@ -85,14 +125,47 @@ export default function PromptPackWorkbench() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [byok, setByok] = useState<ByokLocalPrefs | null>(null);
+
+  // Interactive polish & history state
+  const [activeSlideId, setActiveSlideId] = useState<string | null>(null);
+  const [refiningSlideId, setRefiningSlideId] = useState<string | null>(null);
+  const [undoMap, setUndoMap] = useState<Record<string, PackSlide>>({});
+  const [history, setHistory] = useState<PackHistoryEntry[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [activeHistoryId, setActiveHistoryId] = useState<string | undefined>();
+
   const resultRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const jsonInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const sync = () => setByok(readByokPrefs());
     Promise.resolve().then(sync);
     return subscribeByokPrefs(sync);
   }, []);
+
+  // Recompute long-document sections whenever raw text exceeds MAX_CHARS.
+  const isLongDoc = text.length > MAX_CHARS;
+  const docKey = isLongDoc ? `${text.length}:${text.slice(0, 64)}:${text.slice(-64)}` : "";
+  const docSections: DocumentSectionSlice[] = useMemo(
+    () => (isLongDoc ? outlineDocumentSections(text) : []),
+    [isLongDoc, text]
+  );
+
+  const selectedSectionIds = useMemo(() => {
+    if (!isLongDoc) return [];
+    if (sectionOverrides && sectionOverrides.docKey === docKey) {
+      return sectionOverrides.ids;
+    }
+    return pickDefaultLongDocSectionIds(docSections, MAX_CHARS);
+  }, [isLongDoc, docKey, sectionOverrides, docSections]);
+
+  const effectiveSource = useMemo(() => {
+    if (!isLongDoc) return text;
+    const chosen = docSections.filter((s) => selectedSectionIds.includes(s.id));
+    if (!chosen.length) return text.slice(0, MAX_CHARS);
+    return chosen.map((s) => s.text).join("\n\n").slice(0, MAX_CHARS);
+  }, [isLongDoc, text, docSections, selectedSectionIds]);
 
   const hasKey = Boolean(byok?.apiKey);
   const engineLabel = rulesOnly
@@ -102,8 +175,25 @@ export default function PromptPackWorkbench() {
       : "内置规则引擎（免 Key）";
 
   const generate = useCallback(
-    async (override?: { text: string; fileName: string; topic?: string; audience?: string; slideCount?: number }) => {
-      const src = (override?.text ?? text).trim();
+    async (override?: {
+      text: string;
+      fileName: string;
+      topic?: string;
+      audience?: string;
+      slideCount?: number;
+      anchorStyle?: PackStyle | null;
+    }) => {
+      const rawSrc = (override?.text ?? effectiveSource).trim();
+      const src =
+        rawSrc.length > MAX_CHARS
+          ? (() => {
+              const secs = outlineDocumentSections(rawSrc);
+              const ids = new Set(pickDefaultLongDocSectionIds(secs, MAX_CHARS));
+              const picked = secs.filter((s) => ids.has(s.id)).map((s) => s.text).join("\n\n");
+              return (picked || rawSrc).slice(0, MAX_CHARS);
+            })()
+          : rawSrc;
+
       if (src.length < MIN_CHARS) {
         setError(`资料内容太少（至少 ${MIN_CHARS} 个字）。可以粘贴论文摘要、课本章节、会议纪要或报告正文。`);
         return;
@@ -114,6 +204,7 @@ export default function PromptPackWorkbench() {
       setLoading(true);
       setError(null);
       const prefs = readByokPrefs();
+      const useAnchor = override?.anchorStyle !== undefined ? override.anchorStyle : anchorStyle;
       try {
         const res = await fetch("/api/prompt-pack", {
           method: "POST",
@@ -127,6 +218,7 @@ export default function PromptPackWorkbench() {
             slideCount: override?.slideCount ?? slideCount,
             language,
             directionId,
+            ...(useAnchor ? { anchorStyle: useAnchor } : {}),
             mode: rulesOnly ? "smart" : "auto",
             ...(prefs.apiKey && !rulesOnly
               ? { apiKey: prefs.apiKey, apiBase: prefs.apiBase, model: prefs.modelName }
@@ -140,6 +232,12 @@ export default function PromptPackWorkbench() {
         }
         const nextPack = data.pack as PromptPack;
         setPack(nextPack);
+        setActiveSlideId(null);
+        setUndoMap({});
+        const saved = upsertPackHistory({ pack: nextPack, tool, language });
+        setActiveHistoryId(saved.id);
+        setHistory(saved.items);
+
         const want = nextPack.insight.requestedSlides ?? 0;
         setShortNotice(want && nextPack.slides.length < want - 1 ? { got: nextPack.slides.length, want } : null);
         setFallbackReason(typeof data.fallbackReason === "string" ? data.fallbackReason : undefined);
@@ -157,22 +255,23 @@ export default function PromptPackWorkbench() {
         }
       }
     },
-    [text, fileName, topic, audience, slideCount, language, directionId, rulesOnly]
+    [effectiveSource, fileName, topic, audience, slideCount, language, directionId, anchorStyle, rulesOnly, tool]
   );
 
-  // Mount: homepage handoff → auto-generate; otherwise restore last draft.
+  // Mount: load local history; handle homepage handoff → auto-generate; otherwise restore last draft.
   useEffect(() => {
     let cancelled = false;
     Promise.resolve().then(() => {
       if (cancelled) return;
+      setHistory(readPackHistory());
       const handoff = consumePackHandoff();
       if (handoff) {
-        setText(handoff.text);
+        setText(handoff.text.slice(0, MAX_RAW_CHARS));
         setFileName(handoff.fileName);
         if (handoff.topic) setTopic(handoff.topic);
         if (handoff.audience) setAudience(handoff.audience);
         if (handoff.slideCount) setSlideCount(handoff.slideCount);
-        void generate(handoff);
+        void generate({ ...handoff, anchorStyle: initialAnchorStyle });
         return;
       }
       const draft = readDraft();
@@ -181,6 +280,7 @@ export default function PromptPackWorkbench() {
         setTool(draft.tool);
         setLanguage(draft.language);
         setFallbackReason(draft.fallbackReason);
+        setActiveHistoryId(draft.historyId);
       }
     });
     return () => {
@@ -189,15 +289,21 @@ export default function PromptPackWorkbench() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist the latest pack (never includes the BYOK key).
+  // Persist the latest pack draft & keep active history item synchronized (never includes BYOK key).
   useEffect(() => {
     if (!pack) return;
     try {
-      window.localStorage.setItem(PACK_DRAFT_KEY, JSON.stringify({ pack, tool, language, fallbackReason }));
+      window.localStorage.setItem(
+        PACK_DRAFT_KEY,
+        JSON.stringify({ pack, tool, language, fallbackReason, historyId: activeHistoryId })
+      );
     } catch {
       // quota / private mode — ignore
     }
-  }, [pack, tool, language, fallbackReason]);
+    if (activeHistoryId) {
+      upsertPackHistory({ id: activeHistoryId, pack, tool, language });
+    }
+  }, [pack, tool, language, fallbackReason, activeHistoryId]);
 
   const loadSample = (id: string) => {
     const s = PACK_SAMPLES.find((x) => x.id === id);
@@ -229,7 +335,7 @@ export default function PromptPackWorkbench() {
         return;
       }
       const extracted = String(data.text || "");
-      setText(extracted.slice(0, MAX_CHARS));
+      setText(extracted.slice(0, MAX_RAW_CHARS));
       setFileName(data.fileName || file.name);
       if (data.suggestedTopic) setTopic(String(data.suggestedTopic).slice(0, 60));
       setUploadFiles([
@@ -238,10 +344,16 @@ export default function PromptPackWorkbench() {
           name: data.fileName || file.name,
           size: file.size,
           status: "success",
-          statusText: `已提取 ${extracted.length.toLocaleString("zh-CN")} 字${extracted.length > MAX_CHARS ? `（使用前 ${MAX_CHARS} 字）` : ""}`,
+          statusText:
+            extracted.length > MAX_CHARS
+              ? `已提取 ${extracted.length.toLocaleString("zh-CN")} 字（已开启长文档章节筛选）`
+              : `已提取 ${extracted.length.toLocaleString("zh-CN")} 字`,
           warning: data.warning,
         },
       ]);
+      if (extracted.length > MAX_CHARS) {
+        setTab("paste");
+      }
     } catch {
       setUploadFiles([{ id, name: file.name, size: file.size, status: "error", error: "网络异常，请重试" }]);
     } finally {
@@ -249,18 +361,135 @@ export default function PromptPackWorkbench() {
     }
   };
 
+  const handleRefineSlide = async (slide: PackSlide, instruction: string) => {
+    if (!pack || refiningSlideId) return;
+    const prefs = readByokPrefs();
+    if (!prefs.apiKey) {
+      showToast("请先在设置中配置 BYOK API Key 后再使用单页润色", "error");
+      openSettingsModal();
+      return;
+    }
+    setRefiningSlideId(slide.id);
+    try {
+      const res = await fetch("/api/prompt-pack/refine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slide,
+          topic: pack.insight.topic,
+          audience: pack.insight.audience,
+          styleName: pack.style.name,
+          instruction,
+          language,
+          sourceText: effectiveSource.slice(0, 6000),
+          apiKey: prefs.apiKey,
+          apiBase: prefs.apiBase,
+          model: prefs.modelName,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.slide) {
+        showToast(data.error || "单页润色失败，请稍后重试", "error");
+        return;
+      }
+      setUndoMap((prev) => ({ ...prev, [slide.id]: slide }));
+      setPack((prev) =>
+        prev
+          ? {
+              ...prev,
+              slides: prev.slides.map((s) => (s.id === slide.id ? (data.slide as PackSlide) : s)),
+            }
+          : prev
+      );
+      showToast(`已润色「${(data.slide as PackSlide).title}」（可随时撤销）`, "success");
+    } catch {
+      showToast("网络异常，单页润色失败", "error");
+    } finally {
+      setRefiningSlideId(null);
+    }
+  };
+
+  const handleUndoRefine = (slideId: string) => {
+    const prevSlide = undoMap[slideId];
+    if (!prevSlide || !pack) return;
+    setPack({
+      ...pack,
+      slides: pack.slides.map((s) => (s.id === slideId ? prevSlide : s)),
+    });
+    setUndoMap((prev) => {
+      const copy = { ...prev };
+      delete copy[slideId];
+      return copy;
+    });
+    showToast("已恢复润色前的本页内容", "default");
+  };
+
+  const handleLoadHistory = (entry: PackHistoryEntry) => {
+    setPack(entry.pack);
+    setTool(entry.tool);
+    setLanguage(entry.language);
+    setActiveHistoryId(entry.id);
+    setActiveSlideId(null);
+    setFallbackReason(undefined);
+    setShortNotice(null);
+    setHistoryOpen(false);
+    showToast(`已切换到「${entry.topic}」`, "success");
+  };
+
+  const handleDeleteHistory = (id: string) => {
+    const next = deletePackHistory(id);
+    setHistory(next);
+    if (activeHistoryId === id) setActiveHistoryId(undefined);
+  };
+
+  const handleImportJson = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = parsePackJsonImport(String(reader.result || ""));
+      if (!parsed.ok) {
+        showToast(parsed.error, "error");
+        return;
+      }
+      setPack(parsed.pack);
+      setTool(parsed.tool);
+      setLanguage(parsed.language);
+      setActiveSlideId(null);
+      setFallbackReason(undefined);
+      setShortNotice(null);
+      const saved = upsertPackHistory({
+        pack: parsed.pack,
+        tool: parsed.tool,
+        language: parsed.language,
+      });
+      setActiveHistoryId(saved.id);
+      setHistory(saved.items);
+      showToast(`已导入提示词包「${parsed.pack.insight.topic}」`, "success");
+    };
+    reader.readAsText(file, "utf-8");
+  };
+
+  const toggleSection = (id: string) => {
+    const nextIds = selectedSectionIds.includes(id)
+      ? selectedSectionIds.filter((x) => x !== id)
+      : [...selectedSectionIds, id];
+    setSectionOverrides({ docKey, ids: nextIds });
+  };
+
   const sendToGenerate = () => {
     if (!pack) return;
     saveDocIntakeHandoff({
       fileName: pack.insight.fileName || fileName || "提示词包资料.txt",
       fileType: "txt",
-      charCount: text.length || pack.insight.charCount,
-      text: text || pack.slides.map((s) => [s.title, ...s.points].join("\n")).join("\n\n"),
+      charCount: effectiveSource.length || pack.insight.charCount,
+      text: effectiveSource || pack.slides.map((s) => [s.title, ...s.points].join("\n")).join("\n\n"),
       topic: pack.insight.topic,
       subtitle: pack.insight.subtitle,
       audience: pack.insight.audience,
       slideCount: Math.min(20, pack.slides.length),
-      styleSlug: "",
+      styleSlug: pack.style.referenceSlug ?? "",
       autoGenerate: false,
       parsedOutline: pack.slides.slice(0, 20).map((s, i) => ({
         id: `outline_${i + 1}`,
@@ -274,16 +503,16 @@ export default function PromptPackWorkbench() {
   };
 
   const steps: StepperStep[] = useMemo(() => {
-    const hasText = text.trim().length >= MIN_CHARS;
+    const hasText = effectiveSource.trim().length >= MIN_CHARS;
     return [
       { id: "source", title: "资料", status: pack || hasText ? "completed" : "active" },
       { id: "style", title: "风格", status: pack ? "completed" : hasText ? "active" : "upcoming" },
       { id: "outline", title: "逐页大纲", status: pack ? "completed" : "upcoming" },
       { id: "export", title: "复制到 AI 工具", status: pack ? "active" : "upcoming" },
     ];
-  }, [pack, text]);
+  }, [pack, effectiveSource]);
 
-  const charCount = text.length;
+  const effectiveCharCount = effectiveSource.length;
 
   return (
     <main className="gl-pack" id="pg-pack-page">
@@ -292,7 +521,88 @@ export default function PromptPackWorkbench() {
         title="提示词包工作台"
         subtitle="把论文、课本、报告变成可直接粘贴到 ChatGPT / Gamma / Kimi / Claude 的 PPT 提示词：定制风格 + 逐页大纲，数据只取自你的资料"
         compact
+        actions={
+          <div className="gl-pack-header-actions">
+            <input
+              ref={jsonInputRef}
+              id="pg-pack-import-json-input"
+              type="file"
+              accept="application/json,.json"
+              className="gl-sr-only"
+              onChange={handleImportJson}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              id="pg-pack-import-json-btn"
+              leftIcon={<FolderUp size={14} />}
+              onClick={() => jsonInputRef.current?.click()}
+            >
+              导入 .json
+            </Button>
+            <Button
+              size="sm"
+              variant={historyOpen ? "primary" : "secondary"}
+              id="pg-pack-history-toggle"
+              aria-expanded={historyOpen}
+              leftIcon={<History size={14} />}
+              onClick={() => {
+                setHistoryOpen((v) => {
+                  const next = !v;
+                  if (next) setHistory(readPackHistory());
+                  return next;
+                });
+              }}
+            >
+              历史记录{history.length ? ` (${history.length})` : ""}
+            </Button>
+          </div>
+        }
       />
+
+      {historyOpen ? (
+        <section className="gl-pack-card gl-pack-history" id="pg-pack-history-panel" aria-label="本地提示词包历史">
+          <header className="gl-pack-card-head is-compact">
+            <div>
+              <p className="gl-pack-eyebrow">本地历史记录（最多保留 10 份 · 仅存浏览器，不含 API Key）</p>
+            </div>
+            <button type="button" className="gl-pack-mini-btn" onClick={() => setHistoryOpen(false)}>
+              收起 <X size={12} aria-hidden="true" />
+            </button>
+          </header>
+          {history.length ? (
+            <ul className="gl-pack-history-list">
+              {history.map((item) => {
+                const isCurrent = item.id === activeHistoryId;
+                return (
+                  <li key={item.id} className={`gl-pack-history-item ${isCurrent ? "is-current" : ""}`}>
+                    <button
+                      type="button"
+                      className="gl-pack-history-load"
+                      onClick={() => handleLoadHistory(item)}
+                    >
+                      <strong>{item.topic}</strong>
+                      <span>
+                        {item.styleName} · {item.slideCount} 页 · {formatHistoryTime(item.savedAt)}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="gl-pack-history-del"
+                      aria-label={`删除历史记录 ${item.topic}`}
+                      onClick={() => handleDeleteHistory(item.id)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="gl-pack-history-empty">还没有保存过提示词包。生成第一份后会自动保存在这里。</p>
+          )}
+        </section>
+      ) : null}
 
       <Stepper steps={steps} orientation="horizontal" ariaLabel="提示词包生成步骤" className="gl-pack-stepper" />
 
@@ -304,7 +614,9 @@ export default function PromptPackWorkbench() {
               资料输入
             </h2>
             <span className="gl-pack-count" aria-live="polite">
-              {charCount.toLocaleString("zh-CN")} / {MAX_CHARS.toLocaleString("zh-CN")} 字
+              {isLongDoc
+                ? `已选 ${effectiveCharCount.toLocaleString("zh-CN")} / ${MAX_CHARS.toLocaleString("zh-CN")} 字（原文 ${text.length.toLocaleString("zh-CN")} 字）`
+                : `${effectiveCharCount.toLocaleString("zh-CN")} / ${MAX_CHARS.toLocaleString("zh-CN")} 字`}
             </span>
           </header>
 
@@ -336,8 +648,8 @@ export default function PromptPackWorkbench() {
               id="pg-pack-text"
               className="gl-pack-textarea"
               value={text}
-              maxLength={MAX_CHARS}
-              placeholder={"粘贴论文摘要、课本章节、读书笔记、会议纪要或经营报告…\n\n小技巧：保留原文的小标题（如「一、背景」「## 方法」），大纲会更贴合资料结构。"}
+              maxLength={MAX_RAW_CHARS}
+              placeholder={"粘贴论文摘要、课本章节、读书笔记、会议纪要或经营报告…\n\n小技巧：保留原文的小标题（如「一、背景」「## 方法」），大纲会更贴合资料结构；超过 16,000 字的长文档会自动弹出章节筛选器。"}
               onChange={(e) => setText(e.target.value)}
             />
           ) : null}
@@ -377,6 +689,84 @@ export default function PromptPackWorkbench() {
                 </li>
               ))}
             </ul>
+          ) : null}
+
+          {isLongDoc && docSections.length > 1 ? (
+            <div className="gl-pack-sections" id="pg-pack-section-picker">
+              <div className="gl-pack-sections-head">
+                <span>
+                  <ListChecks size={13} aria-hidden="true" /> 长文档章节筛选（已自动略去参考文献/附录，防截断尾部结论）
+                </span>
+                <button
+                  type="button"
+                  className="gl-pack-mini-btn"
+                  onClick={() => setSectionOverrides(null)}
+                >
+                  智能勾选
+                </button>
+              </div>
+              <ul className="gl-pack-sections-list">
+                {docSections.map((sec) => {
+                  const checked = selectedSectionIds.includes(sec.id);
+                  return (
+                    <li key={sec.id}>
+                      <label className={checked ? "is-checked" : ""}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleSection(sec.id)}
+                        />
+                        <span className="gl-pack-sec-name">
+                          {sec.heading}
+                          {sec.isAppendix ? <em>附录/参考</em> : null}
+                        </span>
+                        <span className="gl-pack-sec-chars">{sec.charCount.toLocaleString("zh-CN")} 字</span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+
+          {anchorStyle ? (
+            <div className="gl-pack-anchor-banner" id="pg-pack-anchor-banner">
+              <div className="gl-pack-anchor-info">
+                <span className="gl-pack-anchor-dots" aria-hidden="true">
+                  {anchorStyle.colors.slice(0, 5).map((c) => (
+                    <i key={c.role} style={{ background: c.hex }} />
+                  ))}
+                </span>
+                <div>
+                  <strong>
+                    <Palette size={12} aria-hidden="true" /> 风格参考锚点：{anchorStyle.name}
+                  </strong>
+                  <span>生成时将保留该参考库风格的色板与视觉气质</span>
+                </div>
+              </div>
+              <div className="gl-pack-anchor-actions">
+                {pack && pack.style.referenceSlug !== anchorStyle.referenceSlug ? (
+                  <button
+                    type="button"
+                    className="gl-pack-mini-btn"
+                    onClick={() => {
+                      setPack({ ...pack, style: anchorStyle });
+                      showToast(`已将参考风格「${anchorStyle.name}」套用到当前提示词包`, "success");
+                    }}
+                  >
+                    直接套用到当前结果
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  id="pg-pack-clear-anchor-btn"
+                  className="gl-pack-mini-btn"
+                  onClick={() => setAnchorStyle(null)}
+                >
+                  清除锚点 <X size={12} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
           ) : null}
 
           <div className="gl-pack-fields">
@@ -428,8 +818,15 @@ export default function PromptPackWorkbench() {
             </label>
             <label className="gl-pack-field">
               <span>风格基底</span>
-              <select id="pg-pack-direction" value={directionId} onChange={(e) => setDirectionId(e.target.value)}>
-                <option value="auto">按资料自动匹配</option>
+              <select
+                id="pg-pack-direction"
+                value={directionId}
+                onChange={(e) => {
+                  setDirectionId(e.target.value);
+                  if (e.target.value !== "auto") setAnchorStyle(null);
+                }}
+              >
+                <option value="auto">{anchorStyle ? `使用参考锚点（${anchorStyle.name}）` : "按资料自动匹配"}</option>
                 {DESIGN_DIRECTIONS.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
@@ -538,7 +935,11 @@ export default function PromptPackWorkbench() {
               ) : null}
 
               <PackStyleCard pack={pack} onChange={setPack} onToast={showToast} />
-              <PackPreviewStrip pack={pack} />
+              <PackPreviewStrip
+                pack={pack}
+                activeSlideId={activeSlideId}
+                onClearActive={() => setActiveSlideId(null)}
+              />
               <PackExportPanel
                 pack={pack}
                 tool={tool}
@@ -547,7 +948,17 @@ export default function PromptPackWorkbench() {
                 onToast={showToast}
                 onSendToGenerate={sendToGenerate}
               />
-              <PackOutlineEditor pack={pack} onChange={setPack} />
+              <PackOutlineEditor
+                pack={pack}
+                onChange={setPack}
+                activeSlideId={activeSlideId}
+                onPreviewSlide={setActiveSlideId}
+                hasByok={hasKey && !rulesOnly}
+                refiningSlideId={refiningSlideId}
+                undoMap={undoMap}
+                onRefineSlide={(s, hint) => void handleRefineSlide(s, hint)}
+                onUndoRefine={handleUndoRefine}
+              />
             </div>
           ) : null}
         </div>
@@ -584,7 +995,7 @@ function PackEmptyState({ onSample }: { onSample: (id: string) => void }) {
           </div>
         </li>
       </ol>
-      <p className="gl-pack-label">没有现成资料？试试示例：</p>
+      <p className="gl-pack-label">没有现成资料？试试示例（共 {PACK_SAMPLES.length} 份）：</p>
       <div className="gl-pack-empty-samples">
         {PACK_SAMPLES.map((s) => (
           <button key={s.id} type="button" className="gl-pack-sample is-inline" onClick={() => onSample(s.id)}>

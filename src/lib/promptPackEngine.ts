@@ -21,6 +21,7 @@ import {
   type PackLanguage,
   type PackLayout,
   type PackSlide,
+  type PackStyle,
   type PromptPack,
 } from "@/lib/promptPack";
 import type { DocumentAnalysisResult } from "@/types/prompt";
@@ -33,6 +34,7 @@ export interface PackRequestInput {
   slideCount?: number;
   language: PackLanguage;
   directionId?: string;
+  anchorStyle?: PackStyle;
 }
 
 interface SourceSection {
@@ -48,8 +50,8 @@ const HEADING_RES: RegExp[] = [
   /^#{1,4}\s+(.+)$/,
   /^[一二三四五六七八九十]{1,3}[、.．]\s*(.+)$/,
   /^(第[一二三四五六七八九十\d]{1,3}[章节部分课讲单元].*)$/,
-  /^\d{1,2}(?:\.\d{1,2}){0,2}[\s、.．]\s*([^。；;！!？?]{2,28})$/,
-  /^((?:abstract|introduction|background|related work|method(?:s|ology)?|experiments?|results?|discussion|conclusions?|摘要|引言|背景|方法|实验|结果|讨论|结论|小结|总结|展望)\b.{0,20})$/i,
+  /^\d{1,2}(?:\.\d{1,2}){0,2}[\s、.．]\s*([^。；;！!？?]{2,36})$/,
+  /^((?:(?:abstract|introduction|background|related work|method(?:s|ology)?|architecture|experiments?|evaluation|results?|discussion|limitations?|conclusions?)\b|摘要|引言|背景|方法|实验|结果|讨论|结论|小结|总结|展望).{0,24})$/i,
 ];
 
 function cleanLine(line: string): string {
@@ -57,7 +59,7 @@ function cleanLine(line: string): string {
 }
 
 function detectHeading(line: string, next: string | undefined): string | null {
-  if (line.length > 36) return null;
+  if (line.length > 42) return null;
   for (const re of HEADING_RES) {
     const m = line.match(re);
     if (m) {
@@ -68,7 +70,7 @@ function detectHeading(line: string, next: string | undefined): string | null {
   // Short stand-alone line followed by a longer paragraph.
   if (
     line.length >= 2 &&
-    line.length <= 18 &&
+    line.length <= 22 &&
     !/[。；;！!？?，,：:.]$/.test(line) &&
     next !== undefined &&
     next.length > line.length + 12
@@ -82,16 +84,19 @@ function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[。！？!?；;])|\n|(?<=[a-z0-9)]\.)\s+(?=[A-Z])/)
     .map((s) => s.replace(/^[\s\-*•·>\d.、()（）]+(?=\S)/, "").trim())
-    .filter((s) => s.length >= 8 && s.length <= 220);
+    .filter((s) => s.length >= 8 && s.length <= 240);
 }
 
 const VALUE_RE =
-  /-?\d+(?:,\d{3})*(?:\.\d+)?\s*(?:%|％|倍|个百分点|pp|亿元|万元|亿|万|元|美元|kg|km|cm|mm|N|m\/s²|m\/s|ms|秒|分钟|小时|天|年|个|人|次|家|项|篇|BLEU|FLOPs|GB|TB|x)(?![A-Za-z])/g;
+  /(?:\$\s*\d+(?:,\d{3})*(?:\.\d+)?\s*(?:[MBK]|billion|million|thousand)?\b|-?\d+(?:,\d{3})*(?:\.\d+)?\s*(?:%|％|倍|个百分点|pp|pts|亿元|万元|亿|万|元|美元|USD|kg|km|cm|mm|N|m\/s²|m\/s|ms|s|Hz|GHz|fps|秒|分钟|小时|天|days?|年|个|人|次|家|项|篇|BLEU|FLOPs|GB|TB|MB|tokens?|params?|parameters?|layers?|heads?|epochs?|GPUs?|[MBK]|x)(?![A-Za-z]))/gi;
 const LABEL_TRAIL_RE =
-  /(?:达到|分别为|依次为|为|是|约|仅|共|取得|达|有|由|的|降至|提升至|增至|延长至|缩短至|受到|=|:|：)\s*$/;
+  /(?:达到|分别为|依次为|为|是|约|仅|共|取得|达|有|由|的|降至|提升至|增至|延长至|缩短至|受到|achieves?|achieving|reaches?|reaching|drops?|unlocks?|gains?|is|are|of|by|to|at|with|only|over|about|around|and|or|=|:|：)\s*$/i;
 const LABEL_LEAD_RE =
-  /^(?:首先|其次|然后|最后|其中|本季度|本期|已知|保持|测得|使用|本|该|在|和|与|及|的|其|将|从|使|而|且|并|则|约|求|比|含)+/;
-const VERB_ONLY_RE = /^(?:增至|降至|延长至|缩短至|高于|低于|增长|上升|下降|提升至?|减少)$/;
+  /^(?:首先|其次|然后|最后|其中|本季度|本期|已知|保持|测得|使用|本|该|在|和|与|及|的|其|将|从|使|而|且|并|则|约|求|比|含|(?:in|on|at|for|with|and|or|the|a|an|our|this|that|its|we|it)\s+)+/i;
+const VERB_ONLY_RE =
+  /^(?:增至|降至|延长至|缩短至|高于|低于|增长|上升|下降|提升至?|减少|up|down|to|by|at|is|are|and|or|with|of|for|achieving|reaching|unlock|drops?)$/i;
+const EN_POST_STOP_RE =
+  /^(?:over|than|for|at|in|on|with|and|or|to|from|of|by|as|is|are|was|were|that|which|where|when)$/i;
 
 function cleanLabel(raw: string): string {
   let label = raw
@@ -99,8 +104,15 @@ function cleanLabel(raw: string): string {
     .replace(/[()（）]/g, "")
     .replace(/\s+/g, " ")
     .trim();
-  for (let i = 0; i < 2; i += 1) label = label.replace(LABEL_TRAIL_RE, "").trim();
-  label = label.replace(LABEL_LEAD_RE, "").trim();
+  for (let i = 0; i < 3; i += 1) label = label.replace(LABEL_TRAIL_RE, "").trim();
+  for (let i = 0; i < 2; i += 1) label = label.replace(LABEL_LEAD_RE, "").trim();
+  const isMostlyLatin = /[A-Za-z]/.test(label) && !/[\u4e00-\u9fff]/.test(label);
+  if (isMostlyLatin) {
+    const words = label.split(/\s+/).filter(Boolean);
+    if (words.length > 3) label = words.slice(-3).join(" ");
+    if (label.length > 22) label = label.slice(-22).trim();
+    return label.replace(LABEL_LEAD_RE, "").trim();
+  }
   if (label.length > 12) {
     const de = label.lastIndexOf("的");
     const tail = de >= 0 ? label.slice(de + 1).trim() : "";
@@ -115,20 +127,47 @@ function cleanLabel(raw: string): string {
   return label;
 }
 
+function extractEnglishPostNoun(after: string): string {
+  const clause = after.split(/[.,;!?，。；！？\n]/)[0]?.trim() ?? "";
+  if (!clause || /[\u4e00-\u9fff]/.test(clause)) return "";
+  const words = clause.split(/\s+/).filter(Boolean);
+  const picked: string[] = [];
+  for (const w of words) {
+    const clean = w.replace(/[^A-Za-z0-9_-]/g, "");
+    if (!clean || EN_POST_STOP_RE.test(clean)) break;
+    picked.push(clean);
+    if (picked.length >= 2) break;
+  }
+  return picked.join(" ");
+}
+
 function extractFacts(text: string): PackDatum[] {
   const out: PackDatum[] = [];
   const seen = new Set<string>();
   for (const m of text.matchAll(VALUE_RE)) {
     const start = m.index ?? 0;
-    const before = text.slice(Math.max(0, start - 32), start);
+    const end = start + m[0].length;
+    const sliceStart = Math.max(0, start - 44);
+    let before = text.slice(sliceStart, start);
+    if (sliceStart > 0 && /[A-Za-z]/.test(before[0] ?? "") && /[A-Za-z]/.test(text[sliceStart - 1] ?? "")) {
+      before = before.replace(/^[A-Za-z]+/, "");
+    }
     // Stay inside the current clause and after any previous number.
     const clause = (before.split(/[，,。；;：:、\n]/).pop() ?? "").replace(
       /^.*\d(?:\.\d+)?\s*(?:[A-Za-z%％²\/]+|个百分点|亿元|万元|亿|万|元|天|秒|年|个|人|次|家|项|篇)?\s*/,
       ""
     );
-    const label = cleanLabel(clause);
+    let label = cleanLabel(clause);
+    const afterNoun = extractEnglishPostNoun(text.slice(end, end + 36));
+    if (afterNoun && (label.length < 2 || VERB_ONLY_RE.test(label) || (!/[\u4e00-\u9fff]/.test(clause) && label.split(/\s+/).length <= 1))) {
+      label = afterNoun;
+    }
     if (label.length < 2 || VERB_ONLY_RE.test(label) || /^[\d\s.]+$/.test(label)) continue;
-    const value = m[0].replace(/\s+/g, "");
+    const value = m[0].replace(/\s+/g, (ws, offset, full) => {
+      // Keep single space before multi-letter English units like "3.5 days" or "28.4 BLEU"
+      const rest = full.slice(offset + ws.length);
+      return /^[A-Za-z]{2,}/.test(rest) ? " " : "";
+    });
     if (/^(?:19|20)\d{2}年$/.test(value)) continue;
     const key = `${label}|${value}`;
     if (seen.has(key)) continue;
@@ -291,10 +330,13 @@ export function buildRuleBasedPack(input: PackRequestInput): {
   const { title, sections } = parseSections(text);
   const topic = (input.topic || title || sections[0]?.heading || input.fileName.replace(/\.[^.]+$/, "") || "我的演示").slice(0, 60);
   const analysis = analyzeMaterial(text, input.fileName, topic);
-  const direction = input.directionId && input.directionId !== "auto"
-    ? getDesignDirection(input.directionId)
-    : pickDesignDirection(analysis.detectedScenario, text);
-  const autoPicked = !input.directionId || input.directionId === "auto";
+  const anchor = input.anchorStyle;
+  const direction = anchor
+    ? getDesignDirection(anchor.directionId)
+    : input.directionId && input.directionId !== "auto"
+      ? getDesignDirection(input.directionId)
+      : pickDesignDirection(analysis.detectedScenario, text);
+  const autoPicked = !anchor && (!input.directionId || input.directionId === "auto");
   const detectedAudience = analysis.suggestedAudience || "通用听众";
   const audience = (
     input.audience || (autoPicked ? defaultAudienceFor(direction.id, detectedAudience) : detectedAudience)
@@ -439,13 +481,22 @@ export function buildRuleBasedPack(input: PackRequestInput): {
     .slice(0, 2)
     .join("与")}，${allFacts.length ? `能让资料中的 ${allFacts.length} 组关键数据更醒目` : "能让论点层次更清晰"}。`;
 
+  const resolvedStyle: PackStyle = anchor
+    ? {
+        ...anchor,
+        rationale:
+          anchor.rationale ||
+          `以参考风格「${anchor.name}」为视觉锚点，面向${audience}，内容全部取自你的资料。`,
+      }
+    : directionToStyle(direction, rationale);
+
   return {
     analysis,
     pack: {
       version: 1,
       engine: "smart",
       insight,
-      style: directionToStyle(direction, rationale),
+      style: resolvedStyle,
       slides,
     },
   };
@@ -493,6 +544,13 @@ JSON 结构：
 
 export function buildPackUserInput(input: PackRequestInput, rule: PromptPack, slideCount: number): string {
   const i = rule.insight;
+  const anchorLine = input.anchorStyle
+    ? `用户从风格参考库指定了参考锚点「${input.anchorStyle.name}」（主色 ${input.anchorStyle.colors
+        .map((c) => `${c.role} ${c.hex}`)
+        .join(" / ")}；字体 ${input.anchorStyle.headingFont}），请保留其视觉气质并针对资料微调`
+    : input.directionId && input.directionId !== "auto"
+      ? `用户指定风格基底：${getDesignDirection(input.directionId).name}（请在此基础上为资料定制）`
+      : "";
   return [
     `主题：${i.topic}`,
     `受众：${i.audience}`,
@@ -500,9 +558,7 @@ export function buildPackUserInput(input: PackRequestInput, rule: PromptPack, sl
     `目标页数：${slideCount}`,
     i.sections.length ? `资料章节：${i.sections.join(" / ")}` : "",
     i.keyFacts.length ? `资料中的数字事实：${i.keyFacts.join("；")}` : "资料中没有可用的数字事实",
-    input.directionId && input.directionId !== "auto"
-      ? `用户指定风格基底：${getDesignDirection(input.directionId).name}（请在此基础上为资料定制）`
-      : "",
+    anchorLine,
     `资料原文：\n${input.text.slice(0, 12000)}`,
   ]
     .filter(Boolean)

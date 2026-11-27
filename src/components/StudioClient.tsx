@@ -8,6 +8,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   Columns2,
   Copy,
   Download,
@@ -467,7 +468,7 @@ export default function StudioClient({
           <div className="pg-studio-crumbs">
             <Link href="/gallery" className="pg-back-link">
               <ArrowLeft size={15} />
-              <span>风格画廊</span>
+              <span>风格参考库</span>
             </Link>
             <span className="pg-crumb-sep">/</span>
             {!prompt.isPublic && (
@@ -480,6 +481,15 @@ export default function StudioClient({
           </div>
 
           <div className="pg-studio-header-actions">
+            <Link
+              href={`/pack?style=${encodeURIComponent(prompt.slug)}`}
+              className="pg-btn pg-btn-secondary pg-btn-sm"
+              id="pg-studio-to-pack-btn"
+            >
+              <ClipboardList size={14} />
+              <span>做提示词包</span>
+            </Link>
+
             <Link
               href={generateHref}
               className="pg-btn pg-btn-primary pg-btn-sm"

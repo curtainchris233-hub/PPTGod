@@ -4,12 +4,14 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  AlertCircle,
   Check,
   FileText,
   KeyRound,
   Keyboard,
   Layers,
   LogOut,
+  PlugZap,
   Search,
   ShieldCheck,
   Trash2,
@@ -19,11 +21,13 @@ import { Button, Dialog, TextInput } from "@/components/ui";
 import { useApp } from "@/context/AppContext";
 import { useLayout } from "@/context/LayoutContext";
 import {
+  BYOK_PROVIDER_PRESETS,
   clearByokSessionKey,
   readByokPrefs,
   subscribeByokPrefs,
   writeByokPrefs,
   type ByokLocalPrefs,
+  type ByokProviderPreset,
 } from "@/lib/byokLocalStore";
 import type { UserPublic } from "@/types/prompt";
 import MobileNavDrawer from "./MobileNavDrawer";
@@ -324,12 +328,25 @@ function SettingsProfileForm({
 function SettingsByokForm() {
   const { showToast } = useApp();
   const [prefs, setPrefs] = useState<ByokLocalPrefs>(() => readByokPrefs());
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<
+    { ok: true; message: string } | { ok: false; message: string } | null
+  >(null);
 
   useEffect(() => {
     return subscribeByokPrefs((next) => {
       setPrefs(next);
     });
   }, []);
+
+  const applyPreset = (preset: ByokProviderPreset) => {
+    setPrefs((prev) => ({
+      ...prev,
+      apiBase: preset.apiBase,
+      modelName: preset.modelName,
+    }));
+    setTestResult(null);
+  };
 
   const handleSave = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -341,16 +358,56 @@ function SettingsByokForm() {
       apiKey: prefs.apiKey.trim(),
     });
     setPrefs(saved);
-    showToast("本地 BYOK 模型配置已同步至工坊与编辑器", "success");
+    showToast("本地 BYOK 模型配置已同步至提示词包、工坊与编辑器", "success");
+  };
+
+  const handleTest = async () => {
+    const cleanKey = prefs.apiKey.trim();
+    if (!cleanKey) {
+      setTestResult({ ok: false, message: "请先填写 API Key 后再测试连接" });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/byok/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: cleanKey,
+          apiBase: prefs.apiBase.trim() || "https://api.openai.com/v1",
+          model: prefs.modelName.trim() || "gpt-4o-mini",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        const ms = typeof data.latencyMs === "number" ? `${data.latencyMs}ms` : "";
+        setTestResult({
+          ok: true,
+          message: `已连通 ${data.model || prefs.modelName}${ms ? `（响应 ${ms}）` : ""}，点击「保存本地配置」即可启用`,
+        });
+      } else {
+        setTestResult({
+          ok: false,
+          message: data.error || "连接失败，请检查 Base URL、模型名与 API Key",
+        });
+      }
+    } catch {
+      setTestResult({ ok: false, message: "网络异常，无法发起连接测试" });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const handleClearKey = () => {
     const cleared = clearByokSessionKey();
     setPrefs(cleared);
+    setTestResult(null);
     showToast("已清除当前浏览器会话的 API Key", "default");
   };
 
   const hasKey = prefs.apiKey.trim().length > 0;
+  const normalizedBase = prefs.apiBase.trim().replace(/\/+$/, "");
 
   return (
     <form className="gl-settings-form" onSubmit={handleSave}>
@@ -389,13 +446,35 @@ function SettingsByokForm() {
         </span>
       </div>
 
+      <div className="gl-byok-presets" aria-label="常用模型服务商预设">
+        <span className="gl-byok-presets-label">快捷填充服务商</span>
+        <div className="gl-byok-presets-row">
+          {BYOK_PROVIDER_PRESETS.map((preset) => {
+            const active = normalizedBase === preset.apiBase.replace(/\/+$/, "");
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                id={`gl-settings-byok-preset-${preset.id}`}
+                className={`gl-byok-preset-btn ${active ? "is-active" : ""}`}
+                title={`${preset.hint}（${preset.modelName}）`}
+                onClick={() => applyPreset(preset)}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <TextInput
         id="gl-settings-byok-base"
         label="API Base URL（OpenAI / DeepSeek 兼容）"
         value={prefs.apiBase}
-        onChange={(event) =>
-          setPrefs((prev) => ({ ...prev, apiBase: event.target.value }))
-        }
+        onChange={(event) => {
+          setPrefs((prev) => ({ ...prev, apiBase: event.target.value }));
+          setTestResult(null);
+        }}
         placeholder="https://api.openai.com/v1"
       />
 
@@ -404,9 +483,10 @@ function SettingsByokForm() {
           id="gl-settings-byok-model"
           label="文本模型名称"
           value={prefs.modelName}
-          onChange={(event) =>
-            setPrefs((prev) => ({ ...prev, modelName: event.target.value }))
-          }
+          onChange={(event) => {
+            setPrefs((prev) => ({ ...prev, modelName: event.target.value }));
+            setTestResult(null);
+          }}
           placeholder="gpt-4o-mini / deepseek-chat"
         />
         <TextInput
@@ -426,11 +506,27 @@ function SettingsByokForm() {
         type="password"
         autoComplete="off"
         value={prefs.apiKey}
-        onChange={(event) =>
-          setPrefs((prev) => ({ ...prev, apiKey: event.target.value }))
-        }
+        onChange={(event) => {
+          setPrefs((prev) => ({ ...prev, apiKey: event.target.value }));
+          setTestResult(null);
+        }}
         placeholder="sk-..."
       />
+
+      {testResult ? (
+        <div
+          id="gl-settings-byok-test-result"
+          role="status"
+          className={`gl-byok-test-result ${testResult.ok ? "is-ok" : "is-err"}`}
+        >
+          {testResult.ok ? (
+            <Check size={14} aria-hidden="true" />
+          ) : (
+            <AlertCircle size={14} aria-hidden="true" />
+          )}
+          <span>{testResult.message}</span>
+        </div>
+      ) : null}
 
       <div className="gl-settings-form-actions">
         <Button
@@ -444,14 +540,29 @@ function SettingsByokForm() {
         >
           清除会话 Key
         </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          size="sm"
-          id="gl-settings-byok-save-btn"
-        >
-          保存本地配置
-        </Button>
+        <div className="gl-byok-actions-right">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            id="gl-settings-byok-test-btn"
+            disabled={!hasKey || testing}
+            loading={testing}
+            loadingText="测试中…"
+            leftIcon={<PlugZap size={13} />}
+            onClick={() => void handleTest()}
+          >
+            测试连接
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            id="gl-settings-byok-save-btn"
+          >
+            保存本地配置
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -535,7 +646,7 @@ function GlacierSettingsDialog({ publicPreview }: { publicPreview: boolean }) {
 
         <section className="gl-modal-section" aria-label="本地 BYOK 模型配置">
           <h3 className="gl-settings-section-title">
-            本地 BYOK 模型配置（工坊与编辑器通用）
+            本地 BYOK 模型配置（提示词包、工坊与编辑器通用）
           </h3>
           {settingsModalOpen && <SettingsByokForm key="open" />}
         </section>

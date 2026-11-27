@@ -3484,7 +3484,8 @@ class SuiteRunner:
             except Exception as err:  # noqa: BLE001 — classify unexpected errors strictly as ERROR
                 dur = round((time.perf_counter() - t0) * 1000.0, 1)
                 if attempt < attempts and self._is_chromium_crash(err):
-                    self.playwright.restart_browser()
+                    self.playwright.close()
+                    time.sleep(0.4)
                     continue
                 tb = traceback.format_exc(limit=8)
                 return TestResult(

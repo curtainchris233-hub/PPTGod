@@ -37,7 +37,7 @@
 
 ## 2. Authoritative 4-Tier E2E Package Layout (`tests/e2e/glacier_v2/**`)
 
-Obsolete v8 `tests/e2e/{config,helpers,run_e2e,tier1..tier10}.py` have been retired; `tests/e2e/glacier_v2/` is the single authoritative 83-test E2E suite (invocable via `npm run test:e2e` / `npm run test:e2e:list`):
+Obsolete v8 `tests/e2e/{config,helpers,run_e2e,tier1..tier10}.py` have been retired; `tests/e2e/glacier_v2/` is the single authoritative 87-test E2E suite (invocable via `npm run test:e2e` / `npm run test:e2e:list`):
 
 ```text
 tests/e2e/glacier_v2/
@@ -157,7 +157,7 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 \
 - `G3_FLOW_01`: Client-side URL & query sync regressions (`/generate` ↔ Sidebar `设计体检` `/generate?panel=audit` ↔ `返回工坊` ↔ `?mode=editor`/`?mode=create`; Topbar global search while already on `/gallery`; `/tools` ↔ Sidebar `?tab=pacing`; `/collections` `?tab=` sync).
 - `G3_FLOW_02`: Browser-local BYOK closed loop (`SettingsModal` ↔ Full-Bleed Editor reactive state sync, verifying `apiKey` lives strictly in `sessionStorage` and NEVER in `localStorage` or SQLite — `S22`).
 - `G3_FLOW_03`: Workshop Advanced Settings end-to-end parameter forwarding (`evidenceDensity: "high-evidence"` + `.pptx` auto-defaulted `routeMode: "beautify-1to1"` verified on `POST /api/generate`).
-- `G3_PACK_01..04`: Prompt Pack `/pack` workbench — sample → rule-engine pack (textbook direction auto-pick, outline/preview/export panels), tool tabs switch master prompt + clipboard copy, outline edit/add/delete reflected in prompt, homepage `CreatePanel` hand-off and broken-BYOK honest fallback notice.
+- `G3_PACK_01..08`: Prompt Pack `/pack` workbench — sample → rule-engine pack (textbook direction auto-pick, outline/preview/export panels), tool tabs switch master prompt + clipboard copy, outline edit/add/delete reflected in prompt, homepage `CreatePanel` hand-off and broken-BYOK honest fallback notice.
 - `G3_FLOW_04`: Full cross-route creator journey (`/generate` → generate deck → Cloud Save → `/collections` verify saved card → `/deck/[id]?rehearsal=1` Rehearsal Cockpit → LIFO cleanup).
 
 ### Tier 4 — 5-Breakpoint RWD Gate, Mobile Editor Ergonomics & Glacier Visual Parity (`tier4_scenarios_rwd_perf.py` — 7 Tests)

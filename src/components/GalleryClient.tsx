@@ -434,7 +434,7 @@ export default function GalleryClient({
       <PageHeader
         className="gl-gallery-hero"
         icon={<Images size={22} />}
-        title="风格画廊"
+        title="风格参考库"
         subtitle={`精选 ${prompts.length} 套高品质 PPT 视觉设计系统，覆盖学术、商务、科技、教育等全领域，一键预览并应用于演示文稿。`}
         actions={
           <div className="gl-gallery-hero-actions">

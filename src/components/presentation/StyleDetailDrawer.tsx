@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   Check,
+  ClipboardList,
   Columns2,
   Copy,
   Heart,
@@ -232,14 +233,25 @@ export default function StyleDetailDrawer({
             </Link>
           </div>
 
-          <Link
-            href={generateHref}
-            className="gl-btn gl-btn--primary gl-btn--md"
-            onClick={onClose}
-          >
-            <Sparkles size={15} aria-hidden="true" />
-            <span>使用此风格</span>
-          </Link>
+          <div className="gl-sdrawer-footer-secondary">
+            <Link
+              href={`/pack?style=${encodeURIComponent(prompt.slug)}`}
+              id="gl-sdrawer-to-pack-btn"
+              className="gl-btn gl-btn--secondary gl-btn--md"
+              onClick={onClose}
+            >
+              <ClipboardList size={15} aria-hidden="true" />
+              <span>以此风格做提示词包</span>
+            </Link>
+            <Link
+              href={generateHref}
+              className="gl-btn gl-btn--primary gl-btn--md"
+              onClick={onClose}
+            >
+              <Sparkles size={15} aria-hidden="true" />
+              <span>使用此风格</span>
+            </Link>
+          </div>
         </div>
       }
     >
