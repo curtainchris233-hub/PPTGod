@@ -16,6 +16,66 @@ export const DEFAULT_BYOK_PREFS: ByokLocalPrefs = {
   apiKey: "",
 };
 
+export interface ByokProviderPreset {
+  id: string;
+  label: string;
+  apiBase: string;
+  modelName: string;
+  hint: string;
+}
+
+export const BYOK_PROVIDER_PRESETS: readonly ByokProviderPreset[] = [
+  {
+    id: "openai",
+    label: "OpenAI",
+    apiBase: "https://api.openai.com/v1",
+    modelName: "gpt-4o-mini",
+    hint: "官方 GPT-4o / 4o-mini",
+  },
+  {
+    id: "deepseek",
+    label: "DeepSeek",
+    apiBase: "https://api.deepseek.com/v1",
+    modelName: "deepseek-chat",
+    hint: "高性价比中文理解",
+  },
+  {
+    id: "kimi",
+    label: "Kimi",
+    apiBase: "https://api.moonshot.cn/v1",
+    modelName: "moonshot-v1-32k",
+    hint: "长文档中文能力强",
+  },
+  {
+    id: "qwen",
+    label: "通义千问",
+    apiBase: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    modelName: "qwen-plus",
+    hint: "阿里云百炼兼容模式",
+  },
+  {
+    id: "siliconflow",
+    label: "硅基流动",
+    apiBase: "https://api.siliconflow.cn/v1",
+    modelName: "Qwen/Qwen2.5-72B-Instruct",
+    hint: "国内聚合开源模型",
+  },
+  {
+    id: "gemini",
+    label: "Gemini",
+    apiBase: "https://generativelanguage.googleapis.com/v1beta/openai",
+    modelName: "gemini-2.5-flash",
+    hint: "Google OpenAI 兼容接口",
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    apiBase: "https://openrouter.ai/api/v1",
+    modelName: "openai/gpt-4o-mini",
+    hint: "一站路由多家模型",
+  },
+];
+
 const BYOK_PREFS_STORAGE_KEY = "pptgod_byok_prefs_v1";
 const BYOK_SESSION_KEY_STORAGE = "pptgod_byok_session_key_v1";
 const BYOK_UPDATED_EVENT = "pptgod:byok-updated";

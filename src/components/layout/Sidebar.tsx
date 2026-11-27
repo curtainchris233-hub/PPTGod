@@ -34,7 +34,7 @@ export const WORKSPACE_NAV_ITEMS: readonly WorkspaceNavItem[] = [
   { key: "pack", label: "提示词包", href: "/pack", icon: ClipboardList },
   { key: "create-deck", label: "新建演示", href: "/generate", icon: PlusSquare },
   { key: "projects", label: "我的项目", href: "/collections", icon: Folder },
-  { key: "gallery", label: "风格画廊", href: "/gallery", icon: LayoutGrid },
+  { key: "gallery", label: "风格参考库", href: "/gallery", icon: LayoutGrid },
   {
     key: "studio",
     label: "提示词工作室",

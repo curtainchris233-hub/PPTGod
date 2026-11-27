@@ -8,7 +8,7 @@ import { listPrompts } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "风格画廊 · 浏览全部 PPT 视觉风格",
+  title: "风格参考库 · 浏览全部 PPT 视觉风格",
   description:
     "按场景、配色与版式浏览 PPTGod 全部演示文稿视觉风格，查看真实画布预览、收藏、加入对比，或一键用该风格生成 PPT。",
 };

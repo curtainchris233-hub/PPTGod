@@ -5,10 +5,19 @@
  * adapters and per-tool master-prompt renderers. The server-only rule engine
  * and LLM instructions live in `promptPackEngine.ts`.
  */
+import {
+  autoFixPaletteContrast,
+  evaluatePaletteContrast,
+  parseColorToRgb,
+  rgbToHex,
+  type ExtractedImageStyle,
+  type PaletteContrastReport,
+} from "@/lib/paletteExtractor";
 import type {
   DecorativeMotif,
   DeckSlideItem,
   LayoutArchetype,
+  PromptItem,
   SlideType,
   TypographyMood,
   VisualSpec,
@@ -107,6 +116,8 @@ export interface PackColor {
 
 export interface PackStyle {
   directionId: string;
+  /** Optional slug when anchored from the 36-style reference library (/gallery). */
+  referenceSlug?: string;
   name: string;
   reference: string;
   rationale: string;
@@ -423,13 +434,18 @@ export function getDesignDirection(id: string | undefined | null): DesignDirecti
 
 const KEYWORD_DIRECTIONS: { id: string; re: RegExp }[] = [
   { id: "textbook-illustrated", re: /定律|公式|课堂|教学|例题|学生|课本|教材|知识点|课后|习题|探究|公开课|单元/g },
-  { id: "nature-academic", re: /论文|摘要|abstract|实验结果|数据集|基线|baseline|BLEU|arXiv|参考文献|消融|SOTA|模型架构/gi },
+  {
+    id: "nature-academic",
+    re: /论文|摘要|abstract|实验结果|数据集|基线|baseline|BLEU|arXiv|参考文献|消融|SOTA|模型架构|开题报告|文献综述|研究内容|实验计划|答辩|methodology|experiments?/gi,
+  },
   { id: "vc-pitch-dark", re: /融资|路演|投资人|估值|天使轮|A 轮|B 轮|商业模式|市场规模|TAM/g },
 ];
 
 export function pickDesignDirection(scenario: string, text = ""): DesignDirection {
   const t = text.slice(0, 4000);
-  if (/故宫|非遗|国风|诗词|书法|传统文化|水墨/.test(t)) return getDesignDirection("neo-chinese");
+  if (/故宫|非遗|国风|诗词|书法|传统文化|水墨|文言文|古文|岳阳楼记/.test(t)) {
+    return getDesignDirection("neo-chinese");
+  }
   const scored = KEYWORD_DIRECTIONS.map((k) => ({ id: k.id, n: t.match(k.re)?.length ?? 0 })).sort(
     (a, b) => b.n - a.n
   );
@@ -463,6 +479,105 @@ export function directionToStyle(direction: DesignDirection, rationale: string):
     chartStyle: direction.chartStyle,
     dos: [...direction.dos],
     donts: [...direction.donts],
+  };
+}
+
+function normalizeToHex6(color: string, fallback: string): string {
+  const clean = (color || "").trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(clean)) return clean.toUpperCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(clean)) {
+    return `#${clean[1]}${clean[1]}${clean[2]}${clean[2]}${clean[3]}${clean[3]}`.toUpperCase();
+  }
+  if (/^rgba?\(/i.test(clean)) {
+    return rgbToHex(parseColorToRgb(clean));
+  }
+  return fallback;
+}
+
+/**
+ * Convert a 36-style reference library PromptItem into a PackStyle anchor so
+ * users can bring any curated gallery style directly into /pack.
+ */
+export function promptItemToPackStyle(item: PromptItem): PackStyle {
+  const direction =
+    DESIGN_DIRECTIONS.find((d) => d.spec.archetype === item.visualSpec.layout.archetype) ??
+    DESIGN_DIRECTIONS.find((d) => d.scenarios.includes(item.scenario)) ??
+    getDesignDirection(DIRECTION_FALLBACK_ID);
+  const p = item.visualSpec.palette;
+  const bg = normalizeToHex6(p.bg, direction.colors[0].hex);
+  const surface = normalizeToHex6(p.surface, direction.colors[1].hex);
+  const text = normalizeToHex6(p.text, direction.colors[2].hex);
+  const muted = normalizeToHex6(p.muted, direction.colors[3].hex);
+  const primary = normalizeToHex6(p.accent, direction.colors[4].hex);
+  const chartColors = [0, 1, 2, 3].map((i) =>
+    normalizeToHex6(p.chartColors[i] ?? "", direction.chartColors[i] ?? primary)
+  );
+  const accent2 = chartColors[1] && chartColors[1] !== primary ? chartColors[1] : direction.colors[5].hex;
+
+  return {
+    directionId: direction.id,
+    referenceSlug: item.slug,
+    name: item.title.slice(0, 32),
+    reference: `风格参考库 · ${item.englishTitle || item.title}`,
+    rationale: `以风格参考库「${item.title}」为视觉锚点（${item.scenario} · ${item.styleCategory}），保留其配色与排版气质，内容全部贴合你的资料。`,
+    keywords: (item.tags.length ? item.tags.slice(0, 4) : direction.keywords).map((k) => k.slice(0, 12)),
+    colors: roles(bg, surface, text, muted, primary, accent2),
+    chartColors,
+    headingFont: item.visualSpec.typography.headingFontLabel || direction.headingFont,
+    bodyFont: item.visualSpec.typography.bodyFontLabel || direction.bodyFont,
+    numberFont: direction.numberFont,
+    layoutGrammar: item.promptAnatomy.layout?.trim().slice(0, 200) || direction.layoutGrammar,
+    imagery: item.promptAnatomy.style?.trim().slice(0, 160) || direction.imagery,
+    chartStyle: direction.chartStyle,
+    dos: [...direction.dos],
+    donts: [...direction.donts],
+  };
+}
+
+/** Apply client-side extracted image palette onto an existing PackStyle. */
+export function extractedPaletteToPackStyle(
+  extracted: ExtractedImageStyle,
+  base: PackStyle,
+  imageName?: string
+): PackStyle {
+  const p = extracted.palette;
+  const bg = normalizeToHex6(p.bg, base.colors[0]?.hex ?? "#FFFFFF");
+  const surface = normalizeToHex6(p.surface, base.colors[1]?.hex ?? "#F4F6F8");
+  const text = normalizeToHex6(p.text, base.colors[2]?.hex ?? "#111827");
+  const muted = normalizeToHex6(p.muted, base.colors[3]?.hex ?? "#6B7280");
+  const primary = normalizeToHex6(p.accent, base.colors[4]?.hex ?? "#2563EB");
+  const chartColors = [0, 1, 2, 3].map((i) =>
+    normalizeToHex6(p.chartColors[i] ?? "", base.chartColors[i] ?? primary)
+  );
+  const accent2 = chartColors[1] || primary;
+  const label = imageName ? `参考图「${imageName.slice(0, 24)}」` : "参考图";
+  return {
+    ...base,
+    reference: `从${label}本地提取色板（原参考：${base.reference.replace(/^从参考图.*?（原参考：|）$/g, "")}）`,
+    rationale: `已从${label}在浏览器本地提取 6 色色板并对齐 WCAG 可读性（${extracted.isDarkCanvas ? "深色画布" : "浅色画布"}），版式与逐页大纲保持不变。`,
+    colors: roles(bg, surface, text, muted, primary, accent2),
+    chartColors,
+  };
+}
+
+export function evaluatePackStyleContrast(style: PackStyle): PaletteContrastReport {
+  return evaluatePaletteContrast(packStyleToVisualSpec(style).palette);
+}
+
+export function autoFixPackStyleContrast(style: PackStyle): PackStyle {
+  const fixed = autoFixPaletteContrast(packStyleToVisualSpec(style).palette);
+  const bg = normalizeToHex6(fixed.bg, style.colors[0]?.hex ?? "#FFFFFF");
+  const surface = normalizeToHex6(fixed.surface, style.colors[1]?.hex ?? "#F4F6F8");
+  const text = normalizeToHex6(fixed.text, style.colors[2]?.hex ?? "#111827");
+  const muted = normalizeToHex6(fixed.muted, style.colors[3]?.hex ?? "#6B7280");
+  const primary = normalizeToHex6(fixed.accent, style.colors[4]?.hex ?? "#2563EB");
+  const accent2 = normalizeToHex6(fixed.chartColors[1] ?? "", style.colors[5]?.hex ?? primary);
+  return {
+    ...style,
+    colors: roles(bg, surface, text, muted, primary, accent2),
+    chartColors: [0, 1, 2, 3].map((i) =>
+      normalizeToHex6(fixed.chartColors[i] ?? "", style.chartColors[i] ?? primary)
+    ),
   };
 }
 
@@ -550,8 +665,10 @@ export function sanitizePackStyle(raw: unknown, fallback: PackStyle): PackStyle 
   const rawCharts = Array.isArray(raw.chartColors) ? raw.chartColors : [];
   const chartColors = fallback.chartColors.map((fb, i) => hex(rawCharts[i], fb));
   const base = getDesignDirection(str(raw.directionId, 40, fallback.directionId));
+  const referenceSlug = str(raw.referenceSlug, 80, fallback.referenceSlug ?? "") || undefined;
   return {
     directionId: base.id,
+    ...(referenceSlug ? { referenceSlug } : {}),
     name: str(raw.name, 40, fallback.name),
     reference: str(raw.reference, 80, fallback.reference),
     rationale: str(raw.rationale, 240, fallback.rationale),
@@ -738,8 +855,8 @@ export function packSlideToCanvas(
   }
 }
 
-/** Choose up to 3 visually distinct slides for the live style proof. */
-export function pickPreviewSlides(slides: PackSlide[]): PackSlide[] {
+/** Choose up to 3 visually distinct slides for the live style proof (optionally pinning an active slide). */
+export function pickPreviewSlides(slides: PackSlide[], activeSlideId?: string | null): PackSlide[] {
   const picked: PackSlide[] = [];
   const want: PackLayout[][] = [
     ["cover"],
@@ -754,12 +871,22 @@ export function pickPreviewSlides(slides: PackSlide[]): PackSlide[] {
     if (picked.length >= 3) break;
     if (!picked.includes(s)) picked.push(s);
   }
-  return picked.slice(0, 3);
+  const result = picked.slice(0, 3);
+  if (activeSlideId) {
+    const focused = slides.find((x) => x.id === activeSlideId);
+    if (focused && !result.includes(focused)) {
+      if (result.length >= 3) result[2] = focused;
+      else result.push(focused);
+    }
+  }
+  return result;
 }
 
 /* ==========================================================================
    6. Master prompt renderers
    ========================================================================== */
+
+export type ChatgptExportMode = "oneshot" | "twostep";
 
 const LANG_LINE: Record<PackLanguage, string> = {
   zh: "全部使用简体中文。",
@@ -812,14 +939,75 @@ const LAYOUT_RULE =
 const HONESTY_RULE =
   "只使用上面给出的事实与数据；资料中没有的数据写成「[待补充]」，不要编造数字、引用或人名。";
 
+export function renderStyleOnlyPrompt(pack: PromptPack, language: PackLanguage = "zh"): string {
+  return [
+    `你是一位顶级演示文稿视觉设计总监。下面是我即将制作的 PPT 的背景与设计规范，请先记住并确认这套视觉系统（暂不生成文件）。`,
+    `## 背景\n${contextBlock(pack)}`,
+    `## 设计规范\n${styleBlock(pack.style)}`,
+    `**为什么适合这份资料：**${pack.style.rationale}`,
+    `## 规则\n- ${LAYOUT_RULE}\n- ${HONESTY_RULE}\n- ${LANG_LINE[language]}\n- 请简要确认你理解的配色层级、版式节奏，回复「风格已就绪，请发送逐页大纲」。`,
+  ].join("\n\n");
+}
+
+export function renderOutlineOnlyPrompt(pack: PromptPack, language: PackLanguage = "zh"): string {
+  const n = pack.slides.length;
+  return [
+    `请严格按照刚才确认的「设计规范」，根据下面的逐页内容（共 ${n} 页），用代码解释器（python-pptx）生成一份 16:9（13.333in × 7.5in）的 .pptx 文件并提供下载链接。`,
+    `## 逐页内容（共 ${n} 页）\n${slidesBlock(pack)}`,
+    `## 实现要求\n1. ${LAYOUT_RULE}\n2. 图表页用 python-pptx 原生图表（可在 PowerPoint 中编辑），按图表色序列着色，直接标注数据标签。\n3. 字号：标题 32–40pt，正文 16–20pt；单页 ≤ 5 条要点，每条 ≤ 30 字；四周留 ≥ 0.6in 边距。\n4. 把「演讲备注」写入每页 notes；页脚放页码。\n5. ${HONESTY_RULE}\n6. ${LANG_LINE[language]}`,
+  ].join("\n\n");
+}
+
+export function renderGammaParts(
+  pack: PromptPack,
+  language: PackLanguage = "zh"
+): { instructions: string; cards: string } {
+  const instructions = [
+    `设计方向：${pack.style.name}（参考 ${pack.style.reference}）。`,
+    `配色：${pack.style.colors.map((c) => `${c.role} ${c.hex}`).join("，")}；图表色 ${pack.style.chartColors.join("、")}。`,
+    `字体：标题 ${pack.style.headingFont}，正文 ${pack.style.bodyFont}。`,
+    `版式：${pack.style.layoutGrammar}。图片：${pack.style.imagery}。`,
+    `每张卡片按标注的【版式】排版，避免全部是要点列表。${HONESTY_RULE}${LANG_LINE[language]}`,
+  ].join("\n");
+  const cards = pack.slides
+    .map((s) => {
+      const body = [
+        `# ${s.title}`,
+        ...s.points.map((p) => `- ${p}`),
+        s.data.length ? s.data.map((d) => `**${d.value}** ${d.label}`).join(" ｜ ") : "",
+        s.visual ? `> 视觉：${s.visual}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      return `<!-- 版式：${packLayoutLabel(s.layout)} -->\n${body}`;
+    })
+    .join("\n\n---\n\n");
+  return { instructions, cards };
+}
+
+export function renderChatgptTwoStep(
+  pack: PromptPack,
+  language: PackLanguage = "zh"
+): { step1: string; step2: string } {
+  return {
+    step1: renderStyleOnlyPrompt(pack, language),
+    step2: renderOutlineOnlyPrompt(pack, language),
+  };
+}
+
 export function renderMasterPrompt(
   pack: PromptPack,
   tool: PackTool,
-  language: PackLanguage = "zh"
+  language: PackLanguage = "zh",
+  options?: { chatgptMode?: ChatgptExportMode }
 ): string {
   const n = pack.slides.length;
   switch (tool) {
-    case "chatgpt":
+    case "chatgpt": {
+      if (options?.chatgptMode === "twostep") {
+        const { step1, step2 } = renderChatgptTwoStep(pack, language);
+        return `【第 1 轮 · 发送风格规范（确认视觉基准）】\n\n${step1}\n\n---\n\n【第 2 轮 · 发送逐页大纲（生成 .pptx）】\n\n${step2}`;
+      }
       return [
         `你是一位顶级演示文稿设计师兼 python-pptx 工程师。请根据下面的「设计规范」与「逐页内容」，用代码解释器生成一份 16:9（13.333in × 7.5in）的 .pptx 文件并提供下载链接。`,
         `## 背景\n${contextBlock(pack)}`,
@@ -827,29 +1015,10 @@ export function renderMasterPrompt(
         `## 逐页内容（共 ${n} 页）\n${slidesBlock(pack)}`,
         `## 实现要求\n1. ${LAYOUT_RULE}\n2. 图表页用 python-pptx 原生图表（可在 PowerPoint 中编辑），按图表色序列着色，直接标注数据标签。\n3. 字号：标题 32–40pt，正文 16–20pt；单页 ≤ 5 条要点，每条 ≤ 30 字；四周留 ≥ 0.6in 边距。\n4. 把「演讲备注」写入每页 notes；页脚放页码。\n5. 需要配图的位置放置与色板协调的占位色块，并在占位框内写明图片内容建议。\n6. ${HONESTY_RULE}\n7. ${LANG_LINE[language]}\n8. 生成后先列出每页的版式与标题供我核对，再给出下载链接。`,
       ].join("\n\n");
+    }
     case "gamma": {
-      const instructions = [
-        `【① 粘贴到 Gamma「额外指令 / Additional instructions」】`,
-        `设计方向：${pack.style.name}（参考 ${pack.style.reference}）。`,
-        `配色：${pack.style.colors.map((c) => `${c.role} ${c.hex}`).join("，")}；图表色 ${pack.style.chartColors.join("、")}。`,
-        `字体：标题 ${pack.style.headingFont}，正文 ${pack.style.bodyFont}。`,
-        `版式：${pack.style.layoutGrammar}。图片：${pack.style.imagery}。`,
-        `每张卡片按标注的【版式】排版，避免全部是要点列表。${HONESTY_RULE}${LANG_LINE[language]}`,
-      ].join("\n");
-      const cards = pack.slides
-        .map((s) => {
-          const body = [
-            `# ${s.title}`,
-            ...s.points.map((p) => `- ${p}`),
-            s.data.length ? s.data.map((d) => `**${d.value}** ${d.label}`).join(" ｜ ") : "",
-            s.visual ? `> 视觉：${s.visual}` : "",
-          ]
-            .filter(Boolean)
-            .join("\n");
-          return `<!-- 版式：${packLayoutLabel(s.layout)} -->\n${body}`;
-        })
-        .join("\n\n---\n\n");
-      return `${instructions}\n\n【② 粘贴到 Gamma「粘贴文本 / Paste in text」，选择“按 --- 分卡”】\n\n${cards}`;
+      const { instructions, cards } = renderGammaParts(pack, language);
+      return `【① 粘贴到 Gamma「额外指令 / Additional instructions」】\n${instructions}\n\n【② 粘贴到 Gamma「粘贴文本 / Paste in text」，选择“按 --- 分卡”】\n\n${cards}`;
     }
     case "kimi":
       return [
@@ -891,11 +1060,13 @@ export function renderPackMarkdown(pack: PromptPack, language: PackLanguage = "z
 }
 
 /* ==========================================================================
-   7. Client handoff (homepage → /pack)
+   7. Client handoff, local history (10 items) & JSON import/export
    ========================================================================== */
 
 export const PACK_HANDOFF_KEY = "pptgod_pack_handoff_v1";
 export const PACK_DRAFT_KEY = "pptgod_prompt_pack_v1";
+export const PACK_HISTORY_KEY = "pptgod_prompt_pack_history_v1";
+const MAX_HISTORY_ITEMS = 10;
 
 export interface PackHandoff {
   text: string;
@@ -911,7 +1082,7 @@ export function savePackHandoff(payload: Omit<PackHandoff, "savedAt">): void {
   try {
     window.sessionStorage.setItem(
       PACK_HANDOFF_KEY,
-      JSON.stringify({ ...payload, text: payload.text.slice(0, 16000), savedAt: Date.now() })
+      JSON.stringify({ ...payload, text: payload.text.slice(0, 80000), savedAt: Date.now() })
     );
   } catch {
     // storage unavailable — /pack simply opens empty
@@ -933,3 +1104,236 @@ export function consumePackHandoff(): PackHandoff | null {
     return null;
   }
 }
+
+export interface PackHistoryEntry {
+  id: string;
+  savedAt: number;
+  topic: string;
+  styleName: string;
+  slideCount: number;
+  tool: PackTool;
+  language: PackLanguage;
+  pack: PromptPack;
+}
+
+export function readPackHistory(): PackHistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(PACK_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item): item is PackHistoryEntry => {
+        return (
+          isObj(item) &&
+          typeof item.id === "string" &&
+          typeof item.savedAt === "number" &&
+          isPromptPack(item.pack)
+        );
+      })
+      .slice(0, MAX_HISTORY_ITEMS);
+  } catch {
+    return [];
+  }
+}
+
+export function upsertPackHistory(entry: {
+  id?: string;
+  pack: PromptPack;
+  tool: PackTool;
+  language: PackLanguage;
+}): { id: string; items: PackHistoryEntry[] } {
+  const id = entry.id || `ph_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const nextItem: PackHistoryEntry = {
+    id,
+    savedAt: Date.now(),
+    topic: entry.pack.insight.topic || "未命名提示词包",
+    styleName: entry.pack.style.name || "定制风格",
+    slideCount: entry.pack.slides.length,
+    tool: entry.tool,
+    language: entry.language,
+    pack: entry.pack,
+  };
+  const existing = readPackHistory().filter((item) => item.id !== id);
+  const items = [nextItem, ...existing].slice(0, MAX_HISTORY_ITEMS);
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(PACK_HISTORY_KEY, JSON.stringify(items));
+    } catch {
+      // ignore quota errors
+    }
+  }
+  return { id, items };
+}
+
+export function deletePackHistory(id: string): PackHistoryEntry[] {
+  const items = readPackHistory().filter((item) => item.id !== id);
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(PACK_HISTORY_KEY, JSON.stringify(items));
+    } catch {
+      // ignore
+    }
+  }
+  return items;
+}
+
+export function serializePackJson(pack: PromptPack, tool: PackTool, language: PackLanguage): string {
+  return JSON.stringify(
+    {
+      schema: "pptgod.promptpack.v1",
+      exportedAt: new Date().toISOString(),
+      tool,
+      language,
+      pack,
+    },
+    null,
+    2
+  );
+}
+
+export function parsePackJsonImport(
+  raw: string
+): { ok: true; pack: PromptPack; tool: PackTool; language: PackLanguage } | { ok: false; error: string } {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isObj(parsed)) return { ok: false, error: "文件内容不是合法 JSON" };
+    const candidate = isPromptPack(parsed.pack) ? parsed.pack : isPromptPack(parsed) ? parsed : null;
+    if (!candidate) return { ok: false, error: "未识别到有效的 PPTGod 提示词包结构" };
+    const toolRaw = typeof parsed.tool === "string" ? (parsed.tool as PackTool) : "chatgpt";
+    const tool: PackTool = PACK_TOOLS.some((t) => t.id === toolRaw) ? toolRaw : "chatgpt";
+    const langRaw = parsed.language;
+    const language: PackLanguage = langRaw === "en" || langRaw === "bilingual" ? langRaw : "zh";
+    return { ok: true, pack: candidate, tool, language };
+  } catch {
+    return { ok: false, error: "JSON 解析失败，请确认文件完整" };
+  }
+}
+
+/* ==========================================================================
+   8. Client-safe long-document section slicer (> 16,000 chars)
+   ========================================================================== */
+
+export interface DocumentSectionSlice {
+  id: string;
+  heading: string;
+  text: string;
+  charCount: number;
+  isAppendix: boolean;
+}
+
+const SLICE_HEADING_RES: RegExp[] = [
+  /^#{1,4}\s+(.+)$/,
+  /^[一二三四五六七八九十]{1,3}[、.．]\s*(.+)$/,
+  /^(第[一二三四五六七八九十\d]{1,3}[章节部分课讲单元].*)$/,
+  /^\d{1,2}(?:\.\d{1,2}){0,2}[\s、.．]\s*([^。；;！!？?]{2,42})$/,
+  /^((?:(?:abstract|introduction|background|related work|method(?:s|ology)?|architecture|experiments?|evaluation|results?|discussion|limitations?|conclusions?|references?|acknowledg(?:e)?ments?|appendix)\b|摘要|引言|背景|方法|模型|实验|结果|讨论|结论|小结|总结|参考文献|致谢|附录).{0,24})$/i,
+];
+
+const APPENDIX_HEADING_RE =
+  /^(?:(?:references?|bibliography|acknowledg(?:e)?ments?|appendix|supplementary)\b|参考文献|引用文献|致谢|鸣谢|附录|补充材料)/i;
+
+export function outlineDocumentSections(text: string): DocumentSectionSlice[] {
+  const lines = text.split(/\r?\n/);
+  const buckets: { heading: string; lines: string[] }[] = [];
+  let current: { heading: string; lines: string[] } | null = null;
+
+  lines.forEach((rawLine, idx) => {
+    const line = rawLine.trim();
+    if (!line) {
+      if (current) current.lines.push("");
+      return;
+    }
+    let matchedHeading: string | null = null;
+    if (idx > 0 && line.length <= 48 && !/[。；;！!？?]$/.test(line)) {
+      for (const re of SLICE_HEADING_RES) {
+        const m = line.match(re);
+        if (m) {
+          matchedHeading = (m[1] ?? line).replace(/[#*]/g, "").trim();
+          break;
+        }
+      }
+    }
+    if (matchedHeading) {
+      current = { heading: matchedHeading.slice(0, 36), lines: [rawLine] };
+      buckets.push(current);
+      return;
+    }
+    if (!current) {
+      const introTitle =
+        idx === 0 && line.length <= 40 ? line.replace(/^#+\s*/, "").slice(0, 32) : "开头 / 摘要";
+      current = { heading: introTitle, lines: [rawLine] };
+      buckets.push(current);
+    } else {
+      current.lines.push(rawLine);
+    }
+  });
+
+  // Fallback for unstructured long docs: split into ~3500-char chunks so user can select parts.
+  if (buckets.length <= 1 && text.length > 4000) {
+    const chunks: DocumentSectionSlice[] = [];
+    const chunkLen = 3500;
+    for (let pos = 0, part = 1; pos < text.length; pos += chunkLen, part += 1) {
+      const slice = text.slice(pos, pos + chunkLen);
+      chunks.push({
+        id: `sec_${part}`,
+        heading: `第 ${part} 部分（${pos + 1}–${Math.min(text.length, pos + chunkLen)} 字）`,
+        text: slice,
+        charCount: slice.length,
+        isAppendix: false,
+      });
+    }
+    return chunks;
+  }
+
+  return buckets
+    .map((b, i) => {
+      const joined = b.lines.join("\n").trim();
+      return {
+        id: `sec_${i + 1}`,
+        heading: b.heading,
+        text: joined,
+        charCount: joined.length,
+        isAppendix: APPENDIX_HEADING_RE.test(b.heading),
+      };
+    })
+    .filter((s) => s.charCount > 0);
+}
+
+/**
+ * Default smart selection for >16k long documents:
+ * Drop references/acknowledgements/appendix first; keep core sections (preferring
+ * intro/abstract, methods, experiments/results, and conclusion) within maxChars.
+ */
+export function pickDefaultLongDocSectionIds(
+  sections: DocumentSectionSlice[],
+  maxChars = 16000
+): string[] {
+  const core = sections.filter((s) => !s.isAppendix);
+  const pool = core.length ? core : sections;
+  const totalCore = pool.reduce((sum, s) => sum + s.charCount, 0);
+  if (totalCore <= maxChars) return pool.map((s) => s.id);
+
+  // Prioritize first section (abstract/intro) and last section (conclusion/results), then fill middle.
+  const selected = new Set<string>();
+  let used = 0;
+  const tryAdd = (s: DocumentSectionSlice | undefined) => {
+    if (!s || selected.has(s.id)) return;
+    if (used + s.charCount <= maxChars || selected.size === 0) {
+      selected.add(s.id);
+      used += s.charCount;
+    }
+  };
+  const priorityRe = /摘要|abstract|实验|result|结论|conclusion|核心|summary|方法|method/i;
+  tryAdd(pool[0]);
+  tryAdd(pool[pool.length - 1]);
+  for (const s of pool) {
+    if (priorityRe.test(s.heading)) tryAdd(s);
+  }
+  for (const s of pool) {
+    tryAdd(s);
+  }
+  return sections.filter((s) => selected.has(s.id)).map((s) => s.id);
+}
+

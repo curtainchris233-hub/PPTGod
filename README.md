@@ -39,11 +39,11 @@
 
 <table>
   <tr>
-    <td width="50%"><img src="./docs/showcase/glacier_v2/02-gallery.png" alt="风格画廊 /gallery" width="100%" /></td>
+    <td width="50%"><img src="./docs/showcase/glacier_v2/02-gallery.png" alt="风格参考库 /gallery" width="100%" /></td>
     <td width="50%"><img src="./docs/showcase/glacier_v2/03-workshop.png" alt="创作工坊引导态 /generate" width="100%" /></td>
   </tr>
   <tr>
-    <td align="center"><sub><b>风格画廊（<code>/gallery</code>）</b>· 36 套实时 16:9 风格画布、动态计数分类与详情抽屉</sub></td>
+    <td align="center"><sub><b>风格参考库（<code>/gallery</code>）</b>· 36 套实时 16:9 风格画布、动态计数分类与详情抽屉</sub></td>
     <td align="center"><sub><b>创作工坊（<code>/generate</code> 引导态）</b>· 4 步垂直向导、资料上传与诚实示例预览</sub></td>
   </tr>
   <tr>
@@ -76,15 +76,15 @@
 
 ### 0. 资料 → 提示词包（`/pack`）· 定制风格 × 逐页大纲 × 多工具适配
 
-多数人的真实流程是：把资料丢给 ChatGPT，让它先想风格提示词，再生成 PPT。`/pack` 把这一步做成可复用的工作台。粘贴或上传资料（也可以用 3 份内置示例：*Attention Is All You Need* 精读笔记、高中物理《牛顿第二定律》教案、示例 SaaS 季度经营复盘），得到一份能直接复制走的「提示词包」：
+多数人的真实流程是：把资料丢给 ChatGPT，让它先想风格提示词，再生成 PPT。`/pack` 把这一步做成可复用的工作台。粘贴或上传资料（内置 **6 份示例**：*Attention Is All You Need*、*DeepSeek-R1* 推理范式拆解、高中物理《牛顿第二定律》、初中语文《岳阳楼记》、研究生开题报告答辩、SaaS 季度经营复盘），即可得到一份可直接粘贴走的「提示词包」：
 
 | 环节 | 实现方式 |
 | --- | --- |
-| **① 资料洞察** | 识别章节结构、场景、受众与时长，抽取原文中的数字事实（带单位、去除年份噪音） |
-| **② 定制风格** | 11 个有真实参照的设计方向（Nature 期刊、教材插画、麦肯锡咨询、Apple Keynote、新中式等），按资料关键词与场景自动匹配；输出 6 色 HEX（对比度约束）、图表色序列、中英字体、版式语法、图片/图表规范与必须/避免清单；可一键换风格，大纲内容保持不变 |
-| **③ 逐页大纲** | 从 11 种版式中交替选用：封面、目录、大数字、图表、对比、时间线、流程、金句、图文、总结等。每页包含要点、数据、视觉建议、演讲备注和出处，均可在线编辑、排序、增删 |
-| **④ 多工具导出** | 按工具分别排版：ChatGPT（python-pptx 直出 `.pptx`）、Gamma（两段式：额外指令 + `---` 分卡正文）、Kimi、Claude（单文件 HTML 幻灯片）以及通用 Markdown；支持一键复制、下载 `.md`，也可交给站内工坊生成 `.pptx` |
-| **⑤ 引擎与诚实边界** | 浏览器里配置了 BYOK Key 时，由大模型定制风格与大纲，再经服务端净化：HEX 校验、版式白名单，数字不在原文中的数据会被丢弃。没有 Key 或调用失败时，自动回退到内置规则引擎，并展示回退原因。不显示伪造的进度百分比，API Key 只存在当前标签页 |
+| **① 资料洞察与长文档筛选** | 识别章节结构、场景、受众与时长，支持中英文论文数字事实提取（带单位、去噪音）；超过 16,000 字的长文档自动弹出 **章节筛选器**（默认略去参考文献/附录，保留摘要、方法、实验与结论） |
+| **② 定制风格与吸色微调** | 11 个有真实参照的设计方向按关键词自动匹配，也支持从 **风格参考库（`/gallery`）一键带入锚点**（`/pack?style=<slug>`）；支持 **参考图本地吸色**（纯前端 Canvas 提取 6 色，不上传图片）与折叠式 **WCAG 对比度实时微调**（色板 / 字体 / 必须与避免） |
+| **③ 逐页大纲与任意页预览** | 11 种版式交替编排；每页的标题、要点、**关键数据**、视觉建议与**演讲备注**均可在线编辑、排序、增删，点击任意页即可联动上方 3 帧 `SlideCanvas` 实时预览；连接 BYOK 后支持 **单页 AI 润色**（可撤销，数字严格核对原文） |
+| **④ 多工具分步导出** | ChatGPT 支持 **单轮直出 `.pptx` / 两步精修（① 先定风格 → ② 再出大纲）**；Gamma 拆为 **① 风格指令 / ② 分卡正文** 两枚独立复制按钮；并覆盖 Kimi、Claude（单文件 HTML）、通用 Markdown，另提供「仅复制风格」「仅复制大纲」「导出/导入 `.json`」与浏览器本地最近 10 份历史记录 |
+| **⑤ BYOK 预设与诚实边界** | 全局设置内置 **7 组服务商一键预设**（OpenAI / DeepSeek / Kimi / 通义千问 / 硅基流动 / Gemini / OpenRouter）与 **`POST /api/byok/test` 2 秒连通性检测**，兼容推理模型 `<think>` 块与非 `json_object` 接口；无 Key 或调用失败时自动回退规则引擎并披露原因，API Key 仅存当前标签页 `sessionStorage` |
 
 <p align="center">
   <img src="./docs/showcase/glacier_v2/12-prompt-pack.png" alt="提示词包工作台 /pack：资料洞察、定制风格色板、风格示意与多工具导出" width="100%" />
@@ -145,7 +145,7 @@
 | --- | --- |
 | `/` | **工作台首页 Dashboard**：AI 生成 / 资料转 PPT / 从模板新建、文档拖拽上传、同内容 3 风格实时对比、推荐风格、真实最近项目与快速工具；携带旧画廊查询参数时服务端自动重定向至 `/gallery` |
 | `/pack` | **提示词包工作台**：粘贴/上传/示例资料 → 定制风格（HEX 色板、字体、版式语法）+ 可编辑逐页大纲 → 按 ChatGPT / Gamma / Kimi / Claude / 通用格式导出；首页「资料转 PPT」可一键带入 |
-| `/gallery` | **风格画廊**：36 套全领域 `VisualSpec` 模板、实时统计 5 大人群分类、多维筛选与 URL 同步、详情抽屉（12 页型 + Hex 色板）、30 秒智能选词与资料直通车 |
+| `/gallery` | **风格参考库**：36 套全领域 `VisualSpec` 模板、实时统计 5 大人群分类、多维筛选与 URL 同步、详情抽屉（12 页型 + Hex 色板）、30 秒智能选词与资料直通车 |
 | `/generate` | **创作工坊 & 演示编辑器**：支持 `?style=`、`?topic=`、`?deck=`、`?handoff=1`、`?intake=1`、`?mode=create\|editor`、`?panel=audit` |
 | `/collections` | **我的项目与个人空间**：全部项目 / 最近编辑 / 公开分享 / 我收藏的 / 我发布的 / 我点赞的，完整项目 CRUD 与个人资料编辑 |
 | `/compare` | **风格并排对比台**：默认即刻展示 3 套代表风格，支持 12 页型与统一主题同步预览、快速增删替换与规范比对 |
@@ -234,7 +234,7 @@ npm run typecheck
 npm run lint
 npm run build
 
-# 列出 Glacier UI 2.0 全部 83 项 4-Tier 用例
+# 列出 Glacier UI 2.0 全部 87 项 4-Tier 用例
 npm run test:e2e:list
 
 # 在独立端口 3010 启动生产构建后运行全量端到端验证（勿对 3000 端口运行）
@@ -250,5 +250,5 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_gla
 | --- | --- |
 | [docs/PPTGod_Glacier_UI_2.0_Development_Spec.md](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) | Glacier UI 2.0 视觉与开发执行规范（Tokens、组件、页面、响应式、验收清单） |
 | [docs/PROJECT.md](./docs/PROJECT.md) | Glacier UI 2.0 架构、功能清单 `F1–F41`、能力边界 `B1–B16` 与里程碑记录 |
-| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 83 项 4-Tier E2E 测试基础设施说明 |
+| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 87 项 4-Tier E2E 测试基础设施说明 |
 | [docs/PPTGod_UI_Design_Spec.md](./docs/PPTGod_UI_Design_Spec.md) | 冰川白工作台早期设计规范与首页改版对照图 |

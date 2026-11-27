@@ -90,9 +90,15 @@ export default function Topbar({ showMenuOnDesktop = false, publicPreview }: Top
       active: pathname === "/",
     },
     {
+      id: "pg-nav-pack",
+      href: "/pack",
+      label: "提示词包",
+      active: pathname === "/pack" || pathname.startsWith("/pack/"),
+    },
+    {
       id: "pg-nav-gallery",
       href: "/gallery",
-      label: "风格画廊",
+      label: "风格参考库",
       active: pathname === "/gallery" || pathname.startsWith("/gallery/"),
     },
     {

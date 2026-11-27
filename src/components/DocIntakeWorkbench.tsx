@@ -7,6 +7,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Check,
+  ClipboardList,
   Columns3,
   Copy,
   Download,
@@ -24,6 +25,7 @@ import { useApp } from "@/context/AppContext";
 import { saveDocIntakeHandoff } from "@/lib/docIntakeHandoff";
 import { analyzeDocumentAndRecommendStyles } from "@/lib/documentAnalyzer";
 import { compilePrompt } from "@/lib/promptCompiler";
+import { savePackHandoff } from "@/lib/promptPack";
 import {
   DOMAIN_TABS,
   EVIDENCE_DENSITY_LABELS,
@@ -487,6 +489,24 @@ export default function DocIntakeWorkbench({
     );
   };
 
+  const handleSendToPack = () => {
+    if (!parsed) return;
+    const finalTopic = topic.trim() || parsed.suggestedTopic;
+    const finalAudience = audience.trim() || parsed.analysis.suggestedAudience;
+    savePackHandoff({
+      text: parsed.text,
+      fileName: parsed.fileName,
+      topic: finalTopic,
+      audience: finalAudience,
+      slideCount,
+    });
+    const styleQuery = selectedPrompt?.slug
+      ? `?style=${encodeURIComponent(selectedPrompt.slug)}`
+      : "";
+    onClose();
+    router.push(`/pack${styleQuery}`);
+  };
+
   const handleCompareTop3 = () => {
     if (recommendedEntries.length === 0) return;
     const ids = recommendedEntries.map((entry) => entry.prompt.id);
@@ -735,16 +755,27 @@ export default function DocIntakeWorkbench({
                     </span>
                   </span>
                 </div>
-                <button
-                  type="button"
-                  className="pg-btn pg-btn-primary pg-btn-sm"
-                  id="pg-intake-auto-gen-btn"
-                  onClick={() => handleAutoGeneratePpt()}
-                >
-                  <Sparkles size={14} />
-                  <span>一键生成 PPT</span>
-                  <ArrowRight size={14} />
-                </button>
+                <div className="pg-btn-group">
+                  <button
+                    type="button"
+                    className="pg-btn pg-btn-primary pg-btn-sm"
+                    id="pg-intake-to-pack-btn"
+                    onClick={handleSendToPack}
+                  >
+                    <ClipboardList size={14} />
+                    <span>转入提示词包工作台</span>
+                    <ArrowRight size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className="pg-btn pg-btn-secondary pg-btn-sm"
+                    id="pg-intake-auto-gen-btn"
+                    onClick={() => handleAutoGeneratePpt()}
+                  >
+                    <Sparkles size={14} />
+                    <span>一键生成 PPT</span>
+                  </button>
+                </div>
               </div>
 
               {parsed.analysis.keyMetrics.length > 0 && (

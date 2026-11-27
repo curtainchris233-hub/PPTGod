@@ -27,7 +27,7 @@ export default function NotFound() {
             href="/gallery"
             className="gl-btn gl-btn--secondary gl-btn--md"
           >
-            浏览风格画廊
+            浏览风格参考库
           </Link>
         </div>
       </GlacierPanel>

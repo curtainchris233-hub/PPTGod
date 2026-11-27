@@ -1013,7 +1013,7 @@ export default function CollectionsClient({
               description={
                 tab === "mine"
                   ? "使用风格创作器调配一套 16:9 视觉母版，支持公开分享或私密保存。"
-                  : "前往风格画廊浏览 36+ 套视觉设计系统，随时收藏或用于生成 PPT。"
+                  : "前往风格参考库浏览 36+ 套视觉设计系统，随时收藏或用于生成 PPT。"
               }
               primaryAction={
                 !user && tab !== "favorites" ? (
@@ -1036,7 +1036,7 @@ export default function CollectionsClient({
                     href="/gallery"
                     className="gl-btn gl-btn--primary gl-btn--md"
                   >
-                    浏览风格画廊
+                    浏览风格参考库
                   </Link>
                 )
               }
