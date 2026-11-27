@@ -5,8 +5,10 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Cloud,
   Download,
   FileCode,
@@ -197,6 +199,7 @@ export default function PresentationEditorView({
   onDiscardPolish,
 }: PresentationEditorViewProps) {
   const [rightTab, setRightTab] = useState<"slide" | "theme">("slide");
+  const [mobileInspectorOpen, setMobileInspectorOpen] = useState(true);
   const [zoom, setZoom] = useState<number>(100);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreWrapRef = useRef<HTMLDivElement | null>(null);
@@ -657,7 +660,25 @@ export default function PresentationEditorView({
 
         {/* Right: 2 Real Inspector Tabs + Honest AI Assistant Card */}
         <aside className="gl-ed-right" aria-label="属性与主题面板">
-          <div className="gl-ed-right-card">
+          <div
+            className={`gl-ed-right-card ${
+              mobileInspectorOpen ? "" : "is-mobile-collapsed"
+            }`}
+          >
+            <button
+              type="button"
+              className="gl-ed-right-mobile-toggle"
+              aria-expanded={mobileInspectorOpen}
+              onClick={() => setMobileInspectorOpen((v) => !v)}
+            >
+              <span>属性与主题检查器</span>
+              {mobileInspectorOpen ? (
+                <ChevronUp size={15} aria-hidden="true" />
+              ) : (
+                <ChevronDown size={15} aria-hidden="true" />
+              )}
+            </button>
+
             <div
               className="gl-ed-right-tabs"
               role="tablist"

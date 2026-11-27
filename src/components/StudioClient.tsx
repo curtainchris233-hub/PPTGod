@@ -1047,7 +1047,7 @@ export default function StudioClient({
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <button
                     type="submit"
-                    className="pg-btn pg-btn-ink pg-btn-sm"
+                    className="pg-btn pg-btn-primary pg-btn-sm"
                     disabled={reviewSubmitting}
                     id="pg-review-submit-btn"
                   >
