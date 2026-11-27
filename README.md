@@ -10,8 +10,7 @@
 ![React 19](https://img.shields.io/badge/React-19-172033?style=flat-square&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-2563EB?style=flat-square&logo=typescript&logoColor=white)
 ![Vanilla CSS](https://img.shields.io/badge/CSS-100%25%20Vanilla%20Glacier%202.0-2563EB?style=flat-square)
-![SQLite WAL](https://img.shields.io/badge/SQLite-WAL%20Mode-0D9488?style=flat-square&logo=sqlite&logoColor=white)
-![Glacier E2E](https://img.shields.io/badge/Glacier%20E2E-68%2F68%20PASS-15803D?style=flat-square)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Drizzle-0D9488?style=flat-square&logo=postgresql&logoColor=white)
 ![Docker Ready](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)
 
 <br />
@@ -24,7 +23,7 @@
 
 ## 产品定位与设计原则
 
-**PPTGod** 基于 **Next.js 16 (App Router) + React 19 + TypeScript + 100% 纯 Vanilla CSS + SQLite (`better-sqlite3`, WAL) + `pptxgenjs` + `mammoth` + `unpdf`** 构建，全站采用 **Glacier UI 2.0 冰川白视觉语言**，遵循两条核心工程原则：**「复杂留给系统，简洁留给用户」** 与 **「所见即真实能力，零虚假功能」**。
+**PPTGod** 基于 **Next.js 16 (App Router) + React 19 + TypeScript + 100% 纯 Vanilla CSS + PostgreSQL（Supabase + Drizzle） + `pptxgenjs` + `mammoth` + `unpdf`** 构建，全站采用 **Glacier UI 2.0 冰川白视觉语言**，遵循两条核心工程原则：**「复杂留给系统，简洁留给用户」** 与 **「所见即真实能力，零虚假功能」**。
 
 | 核心维度 | 工程落地与体验标准 |
 | --- | --- |
@@ -159,11 +158,11 @@ flowchart LR
     B["/gallery 36 套设计系统 + /tools 本地工具箱\n20 原型 × 16 纹理 · WCAG 校核"] --> E
     E --> F["原生深度交付\nSlideMaster/Chart/Table .pptx · 提纲清单 .md · .html"]
     E --> G["/deck/[id]?rehearsal=1 演播与排练驾驶舱\n倒计时 + 提词稿 + 下一页预告"]
-    E --> H[("SQLite WAL 持久化 & /collections 项目库\n深层校验 · SSRF 防护 · 限流")]
+    E --> H[("PostgreSQL & /collections 项目库\n深层校验 · SSRF 防护 · 限流")]
 ```
 
 - **深层 `VisualSpec` 强校验**：严格校验所有 CSS 色值、4 色图表元组、20 原型 / 16 纹理枚举、圆角 `[0, 32]` 与 `brandFooter` 纯文本防 XSS。
-- **BYOK SSRF 与隐私隔离**：拦截云元数据地址、RFC1918/IPv6 内网段与混淆 IP；BYOK `apiKey` 永不落盘 SQLite 且不回显；登录/注册 `429` 限流；私有风格与私有文稿在 SSR、API、OG 图像与 `/sitemap.xml` 全链路严格零泄露。
+- **BYOK SSRF 与隐私隔离**：拦截云元数据地址、RFC1918/IPv6 内网段与混淆 IP；BYOK `apiKey` 永不写入数据库 且不回显；登录/注册 `429` 限流；私有风格与私有文稿在 SSR、API、OG 图像与 `/sitemap.xml` 全链路严格零泄露。
 
 <details>
 <summary><b>展开查看项目目录结构</b></summary>
@@ -180,12 +179,12 @@ PPTGod/
 │   │   ├── generate/           # 创作工坊向导、全屏演示编辑器、设计体检、大纲草案与配图管理
 │   │   └── slide-canvas/       # 16:9 SlideCanvas 渲染核心（20 原型 × 16 纹理 × 12 页型）
 │   ├── context/                # AppContext（认证/对比/全局状态）与 LayoutContext（侧栏/全屏编辑/弹窗）
-│   ├── lib/                    # SQLite WAL、文档解析、大纲与生成、设计体检、WCAG 校核、PPTX/HTML/Marp 导出、SSRF 防护
+│   ├── lib/                    # PostgreSQL、文档解析、大纲与生成、设计体检、WCAG 校核、PPTX/HTML/Marp 导出、SSRF 防护
 │   ├── styles/                 # 100% 纯 Vanilla CSS（glacier-tokens / glacier-layout / glacier-ui 与分模块样式）
 │   └── types/                  # 领域与 VisualSpec 强类型定义
 ├── public/brand/               # Glacier 冰川矢量 Logo 与低对比雪峰装饰 SVG
 ├── docs/                       # 开发规范、架构文档、测试设施说明与 Glacier UI 2.0 实机截图
-├── tests/e2e/glacier_v2/       # 独立 68 项全栈黑盒 Playwright E2E 套件（含 WAL 卫生与 B1–B16 反造假验证）
+├── tests/e2e/glacier_v2/       # Glacier 全栈 Playwright 回归测试
 ├── Dockerfile & docker-compose.yml
 └── README.md
 ```
@@ -194,51 +193,36 @@ PPTGod/
 
 ---
 
-## 本地运行、Docker 部署与质量验证
+## 本地运行与上线
 
-### 1. 本地开发运行
+使用 Node.js 22（至少 22.13）。将 `.env.example` 复制为 `.env` 并设置随机的 `BETTER_AUTH_SECRET`。可以使用现有 PostgreSQL，或只启动 Docker Compose 中的本地数据库。
 
 ```bash
-npm install
+cp .env.example .env
+# 用 openssl rand -hex 32 生成随机值，填入 .env 的 BETTER_AUTH_SECRET
+docker compose up -d postgres
+npm ci
+npm run db:migrate
+npm run db:seed
 npm run dev
 ```
 
-首次启动自动在 `./data/pptgod.db`（WAL 模式）初始化数据库并幂等写入 **36 套全领域精选风格**、3 个种子账号（体验账号：`demo@pptgod.studio` / `demo1234`）与 5 条初始实测评价。
+本地启动后访问 `http://localhost:3000`。种子脚本会补齐 36 套公开风格。连本地数据库时，可在开发环境里设置 `PPTGOD_ENABLE_DEMO_ACCOUNT=true` 启用体验账号。
 
-### 2. Docker Compose 一键自托管部署
-
-```bash
-docker compose up -d --build
-
-# 验证生产探活端点
-curl http://localhost:3000/api/health
-```
-
-### 3. 生产构建与 Glacier UI 2.0 独立 79 项 4-Tier E2E 套件
+配置 PostgreSQL、Cloudflare R2、Upstash 和 Resend，或迁移历史文稿，见[上线指南](./docs/DEPLOYMENT.md)。
 
 ```bash
-# 静态类型检查、React 19 严格 ESLint 与生产构建
 npm run typecheck
 npm run lint
 npm run build
 
-# 列出 Glacier UI 2.0 全部 79 项用例（Tiers 1–4）
+# 列出 Glacier UI 2.0 全部 79 项 4-Tier 用例
 npm run test:e2e:list
 
-# 在独立端口 3010 运行全量黑盒端到端验证（自动执行 WAL 安全快照与数据卫生审计）
-./node_modules/.bin/next start --port 3010 --hostname 127.0.0.1
-PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright npm run test:e2e
+# 在独立端口 3010 启动生产构建后运行全量端到端验证（勿对 3000 端口运行）
+npm start -- --hostname 127.0.0.1 --port 3010
+PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_glacier_e2e.py --tier all
 ```
-
-### 实测验收报告
-
-| 检查项 | 实测结果 |
-| --- | --- |
-| **TypeScript / ESLint / Next Build** | `0 errors, 0 warnings` |
-| **5 断点响应式（`1920 / 1440 / 1024 / 768 / 390px`）** | 全站 9 大核心与次级路由（45 组合） **`0px` 水平溢出**、**`0` 控制台/运行时错误**，`390px` 移动端编辑器胶片条防截断与可折叠检查器实测通过 |
-| **Web Vitals & 键盘无障碍（8 路由实测）** | **LCP `420–1080 ms`**（目标 `≤ 2500 ms`）、**CLS `0.0000–0.0003`**（目标 `≤ 0.1`），完整 `:focus-visible` 焦点环与 `<main>`/`<h1>` 地标 |
-| **Glacier E2E 79 项 4-Tier 全量套件（单次连续运行）** | **79/79 PASS**（Tier-1 API `12/12` · Tier-1 UI `17/17` · Tier-2 API `12/12` · Tier-2 UI `11/11` · 诚实边界 `B1–B16` `16/16` · Tier-3 交互与本地 BYOK `4/4` · Tier-4 5断点/视觉一致性 `7/7`） |
-| **SQLite WAL 数据卫生（`--backup-db`）** | **`[DB HYGIENE PASS]`**（`users=3`、`prompts=36`、`prompt_comments=5`、`saved_decks=0`、`[E2E%` 残留 `0`、`sessions_delta=0`） |
 
 ---
 

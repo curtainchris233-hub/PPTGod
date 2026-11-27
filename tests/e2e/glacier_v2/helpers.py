@@ -49,7 +49,7 @@ from .config import (
     DESKTOP_VIEWPORT,
     PLAYWRIGHT_BROWSERS_DEFAULT,
     PPTX_CONTENT_TYPE,
-    SESSION_COOKIE_NAME,
+    SESSION_COOKIE_NAMES,
     SQLITE3_FALLBACK_BIN,
     SeedAccount,
     TINY_PNG_B64,
@@ -166,9 +166,9 @@ class ApiClient:
                 url = f"{url}{sep}{urllib.parse.urlencode(pairs)}"
         return url
 
-    def get_cookie(self, name: str) -> str | None:
+    def get_cookie(self, name: str | None = None) -> str | None:
         for cookie in self.cookie_jar:
-            if cookie.name == name:
+            if cookie.name in (SESSION_COOKIE_NAMES if name is None else (name,)):
                 return cookie.value
         return None
 
@@ -360,25 +360,26 @@ class ApiClient:
         resp = self.post(
             "/api/auth/login",
             json_body={"email": email, "password": password},
+            headers={"Origin": self.base_url},
         )
         resp.assert_status(200, f"Login failed for {email}")
-        if not self.get_cookie(SESSION_COOKIE_NAME):
+        if not self.get_cookie():
             raise AssertionError(
-                f"Login for {email} returned 200 but did not set cookie '{SESSION_COOKIE_NAME}'"
+                f"Login for {email} returned 200 but did not set a Better Auth session cookie"
             )
         return resp
 
     def logout(self) -> ApiResponse:
-        resp = self.post("/api/auth/logout")
+        resp = self.post("/api/auth/logout", headers={"Origin": self.base_url})
         self.clear_cookies()
         return resp
 
     def logout_if_authenticated(self) -> None:
-        """Delete active server session row if this client holds ``pptgod_session``."""
-        if not self.get_cookie(SESSION_COOKIE_NAME):
+        """Revoke the active Better Auth session when the client holds its cookie."""
+        if not self.get_cookie():
             return
         try:
-            resp = self.post("/api/auth/logout", timeout_ms=5000)
+            resp = self.post("/api/auth/logout", headers={"Origin": self.base_url}, timeout_ms=5000)
             if resp.status not in (200, 204):
                 sys.stderr.write(
                     f"[glacier_e2e] Warning: session logout returned HTTP {resp.status}\n"
@@ -588,6 +589,28 @@ class DbHygieneHelper:
     def connect_readonly(db_path: Path) -> sqlite3.Connection:
         encoded = urllib.parse.quote(str(db_path.resolve()))
         return sqlite3.connect(f"file:{encoded}?mode=ro", uri=True, timeout=5.0)
+
+    @staticmethod
+    def postgres_url() -> str | None:
+        """Return ``DATABASE_URL`` when the app runs on PostgreSQL (post-#7 deployments)."""
+        url = os.environ.get("DATABASE_URL", "").strip()
+        return url if url.startswith(("postgres://", "postgresql://")) else None
+
+    @staticmethod
+    def snapshot_counts_postgres(repo_root: Path) -> dict[str, Any]:
+        """Read-only PostgreSQL counts via ``pg_snapshot.mjs`` (reuses the app's ``postgres`` driver)."""
+        script = Path(__file__).resolve().parent / "pg_snapshot.mjs"
+        proc = subprocess.run(
+            ["node", str(script)],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"pg_snapshot.mjs failed (rc={proc.returncode}): {proc.stderr.strip()}")
+        return json.loads(proc.stdout)
 
     @classmethod
     def snapshot_counts(cls, db_path: Path) -> dict[str, Any]:
@@ -2723,6 +2746,7 @@ def login_via_api(
     resp = page.request.post(
         f"{base_url.rstrip('/')}/api/auth/login",
         data={"email": account.email, "password": account.password},
+        headers={"Origin": base_url.rstrip("/")},
     )
     if resp.status != 200:
         raise AssertionError(
@@ -2731,16 +2755,16 @@ def login_via_api(
     # Verify cookie is attached to context and track token for crash-safe teardown
     cookies = page.context.cookies()
     session_cookie = next(
-        (c for c in cookies if c.get("name") == SESSION_COOKIE_NAME and c.get("value")),
+        (c for c in cookies if c.get("name") in SESSION_COOKIE_NAMES and c.get("value")),
         None,
     )
     if not session_cookie:
-        raise AssertionError(
-            f"Browser API login succeeded but cookie '{SESSION_COOKIE_NAME}' not stored in context"
-        )
+        raise AssertionError("Browser API login succeeded but no Better Auth session cookie was stored")
     tracked = getattr(page.context, "_pptgod_session_tokens", None)
     if isinstance(tracked, list):
-        tracked.append((base_url.rstrip("/"), str(session_cookie["value"])))
+        tracked.append(
+            (base_url.rstrip("/"), str(session_cookie["name"]), str(session_cookie["value"]))
+        )
 
 
 def login_via_demo_ui(page: Any, base_url: str, *, timeout_ms: int = 8000) -> None:
@@ -2769,11 +2793,11 @@ def login_via_demo_ui(page: Any, base_url: str, *, timeout_ms: int = 8000) -> No
     deadline = time.monotonic() + (timeout_ms / 1000.0)
     while time.monotonic() < deadline:
         cookies = page.context.cookies()
-        if any(c.get("name") == SESSION_COOKIE_NAME for c in cookies):
+        if any(c.get("name") in SESSION_COOKIE_NAMES for c in cookies):
             page.wait_for_timeout(200)
             return
         time.sleep(0.1)
-    raise AssertionError("Demo UI login did not establish pptgod_session cookie in time")
+    raise AssertionError("Demo UI login did not establish a Better Auth session in time")
 
 
 def ensure_editor_ready(
@@ -3201,8 +3225,12 @@ class PlaywrightSession:
 
     @staticmethod
     def _logout_browser_context_session(context: Any, base_url: str | None) -> None:
-        """If the browser context holds a ``pptgod_session`` cookie, revoke it via API."""
-        tokens_to_revoke: list[tuple[str, str]] = []
+        """Revoke Better Auth sessions held (or previously tracked) by the browser context.
+
+        Tokens captured at login time are tracked on ``context._pptgod_session_tokens`` so
+        sessions are still revoked when the renderer crashed and cookies are unreadable.
+        """
+        tokens_to_revoke: list[tuple[str, str, str]] = []
         tracked = getattr(context, "_pptgod_session_tokens", None)
         if isinstance(tracked, list):
             tokens_to_revoke.extend(tracked)
@@ -3210,27 +3238,28 @@ class PlaywrightSession:
         try:
             cookies = context.cookies()
             for c in cookies:
-                if c.get("name") == SESSION_COOKIE_NAME and c.get("value"):
+                if c.get("name") in SESSION_COOKIE_NAMES and c.get("value"):
                     origin = base_url.rstrip("/") if base_url else ""
                     if not origin:
                         domain = str(c.get("domain", "")).lstrip(".")
                         if domain:
                             origin = f"http://{domain}"
                     if origin:
-                        tokens_to_revoke.append((origin, str(c["value"])))
+                        tokens_to_revoke.append((origin, str(c["name"]), str(c["value"])))
         except Exception as err:  # noqa: BLE001 — context already crashed
             sys.stderr.write(f"[glacier_e2e] Warning reading browser cookies during teardown: {err}\n")
 
-        seen: set[tuple[str, str]] = set()
-        for origin, token in tokens_to_revoke:
-            if not origin or not token or (origin, token) in seen:
+        seen: set[tuple[str, str, str]] = set()
+        for origin, cookie_name, token in tokens_to_revoke:
+            key = (origin, cookie_name, token)
+            if not origin or not token or key in seen:
                 continue
-            seen.add((origin, token))
+            seen.add(key)
             client = ApiClient(origin, timeout_ms=5000)
             try:
                 client.post(
                     "/api/auth/logout",
-                    headers={"Cookie": f"{SESSION_COOKIE_NAME}={token}"},
+                    headers={"Cookie": f"{cookie_name}={token}", "Origin": origin},
                 )
             except ApiConnectionError as err:
                 sys.stderr.write(

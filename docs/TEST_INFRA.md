@@ -80,7 +80,8 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 \
 ### CLI Options & Strict Exit Codes
 - `--base-url <url>`: Target server URL (**default: `http://127.0.0.1:3010`**). **Port `3000` is strictly refused with exit code `2`** and a clear stderr error message.
 - `--tier <1|2|3|4|all>`: Single tier, comma-separated list (`1,2`), or `all` (default: `all`). Tiers 1 & 2 are imported unconditionally; Tiers 3 & 4 are imported unconditionally as soon as their module files exist (never masking real `ImportError`/`SyntaxError`).
-- `--backup-db`: Creates a WAL-safe `sqlite3 .backup` snapshot in an ephemeral temp dir before execution, then asserts all 6 baseline content tables unchanged, `residual_e2e_rows == 0`, and `sessions_delta <= 0`.
+- `--backup-db` (PostgreSQL, when `DATABASE_URL` is set — default since #7): takes read-only row-count snapshots of the `pptgod` schema via `tests/e2e/glacier_v2/pg_snapshot.mjs` (reuses the app's `postgres` driver) before/after the run and asserts zero table drift, `residual_e2e_rows == 0`, and `sessions_delta <= 0` (absolute baselines are skipped because seeds differ per deployment).
+- `--backup-db` (legacy SQLite, no `DATABASE_URL`): Creates a WAL-safe `sqlite3 .backup` snapshot in an ephemeral temp dir before execution, then asserts all 6 baseline content tables unchanged, `residual_e2e_rows == 0`, and `sessions_delta <= 0`.
 - `--screenshots-dir <dir>`: Output folder for Tier 4's 22-shot Glacier UI 2.0 Screenshot Manifest.
 - `--json-report <path>`: Writes structured UTF-8 JSON report (`suite_version`, `started_at`, `finished_at`, `base_url`, `tiers_selected`, `summary`, `tiers`, `db_hygiene`, `tests[]`).
 - `--timeout-ms <ms>`: Positive per-request & Playwright action timeout (default `15000`).
@@ -97,7 +98,7 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 \
 
 ### Tier 1 — Isolated Happy Paths (`tier1_features.py` — 29 Tests)
 - **Tier 1A Core APIs (`G1_API_01..12` — 12 tests):**
-  - `G1_API_01`: `GET /api/health` (`status == "ok"`, `catalogCount == 36`, `dbMode == "wal"`).
+  - `G1_API_01`: `GET /api/health` (`status == "ok"`, `catalogCount == 36`, `dbMode == "postgresql"`).
   - `G1_API_02`: `GET /api/prompts` (36 official slugs + `color=dark` (6), `tool=slidev-marp` (9), `scenario=科研基金` (2), `style=商务咨询` (5), `q=Bento`, `sort=popular|newest|copies`).
   - `G1_API_03`: `POST /api/auth/login` (`HttpOnly` cookie), `GET /api/auth/me` (`stats.{published,likes,favorites,decks}`), `POST /api/auth/logout`.
   - `G1_API_04`: `POST/GET/PUT/PATCH/DELETE /api/prompts` CRUD (slug preservation + `CleanupRegistry`).

@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { and, eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getDb,
   getPromptBySlugOrId,
   listPromptComments,
 } from "@/lib/db";
+import { promptComments } from "@/lib/db/schema";
 import { generateToken } from "@/lib/password";
 import { TOOL_METADATA, type TargetTool } from "@/types/prompt";
 import { parseJsonObject, safeNumber, safeString } from "../../_validation";
@@ -15,11 +17,11 @@ export async function GET(
 ) {
   const { id } = await context.params;
   const viewer = await getCurrentUser();
-  const prompt = getPromptBySlugOrId(id, viewer?.id);
+  const prompt = await getPromptBySlugOrId(id, viewer?.id);
   if (!prompt) {
     return NextResponse.json({ error: "未找到模板" }, { status: 404 });
   }
-  const comments = listPromptComments(prompt.id);
+  const comments = await listPromptComments(prompt.id);
   return NextResponse.json({ comments });
 }
 
@@ -37,7 +39,7 @@ export async function POST(
     }
 
     const { id } = await context.params;
-    const prompt = getPromptBySlugOrId(id, user.id);
+    const prompt = await getPromptBySlugOrId(id, user.id);
     if (!prompt) {
       return NextResponse.json({ error: "未找到模板" }, { status: 404 });
     }
@@ -70,14 +72,18 @@ export async function POST(
 
     const commentId = `cmt_${generateToken(8)}`;
     const now = new Date().toISOString();
-    const db = getDb();
-    db.prepare(
-      `INSERT INTO prompt_comments (id, prompt_id, user_id, tested_tool, rating, content, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(commentId, prompt.id, user.id, testedTool, rating, content, now);
+    await getDb().insert(promptComments).values({
+      id: commentId,
+      promptId: prompt.id,
+      userId: user.id,
+      testedTool,
+      rating,
+      content,
+      createdAt: now,
+    });
 
     return NextResponse.json(
-      { comments: listPromptComments(prompt.id) },
+      { comments: await listPromptComments(prompt.id) },
       { status: 201 }
     );
   } catch (err) {
@@ -95,7 +101,7 @@ export async function DELETE(
     return NextResponse.json({ error: "请先登录" }, { status: 401 });
   }
   const { id } = await context.params;
-  const prompt = getPromptBySlugOrId(id, user.id);
+  const prompt = await getPromptBySlugOrId(id, user.id);
   if (!prompt) {
     return NextResponse.json({ error: "未找到模板" }, { status: 404 });
   }
@@ -106,19 +112,17 @@ export async function DELETE(
   }
 
   const db = getDb();
-  const row = db
-    .prepare(`SELECT user_id FROM prompt_comments WHERE id = ? AND prompt_id = ?`)
-    .get(commentId, prompt.id) as { user_id: string } | undefined;
+  const commentFilter = and(eq(promptComments.id, commentId), eq(promptComments.promptId, prompt.id));
+  const [row] = await db.select({ userId: promptComments.userId })
+    .from(promptComments)
+    .where(commentFilter);
   if (!row) {
     return NextResponse.json({ error: "评价不存在" }, { status: 404 });
   }
-  if (row.user_id !== user.id) {
+  if (row.userId !== user.id) {
     return NextResponse.json({ error: "只能删除自己的评价" }, { status: 403 });
   }
 
-  db.prepare(`DELETE FROM prompt_comments WHERE id = ? AND user_id = ?`).run(
-    commentId,
-    user.id
-  );
-  return NextResponse.json({ comments: listPromptComments(prompt.id) });
+  await db.delete(promptComments).where(and(commentFilter, eq(promptComments.userId, user.id)));
+  return NextResponse.json({ comments: await listPromptComments(prompt.id) });
 }

@@ -9,6 +9,23 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: pptgod
+          POSTGRES_USER: pptgod
+          POSTGRES_PASSWORD: pptgod
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pptgod -d pptgod"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+      MASTRA_TELEMETRY_DISABLED: "true"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,3 +47,20 @@ jobs:
 
       - name: Next.js production build
         run: npm run build
+
+      - name: Check production APIs against PostgreSQL
+        env:
+          DATABASE_URL: postgresql://pptgod:pptgod@127.0.0.1:5432/pptgod
+          BETTER_AUTH_URL: http://127.0.0.1:3010
+          PPTGOD_ENABLE_DEMO_ACCOUNT: "true"
+          PPTGOD_ENABLE_TEST_ACCOUNTS: "true"
+        run: |
+          export BETTER_AUTH_SECRET="$(openssl rand -hex 32)"
+          npm run db:migrate
+          npm run db:seed
+          npm start -- --hostname 127.0.0.1 --port 3010 > /tmp/pptgod-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; cat /tmp/pptgod-server.log' EXIT
+          curl --fail --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:3010/api/health
+          python3 tests/e2e/glacier_v2/run_glacier_e2e.py --tier 1 --filter G1_API_
+          python3 tests/e2e/glacier_v2/run_glacier_e2e.py --tier 2 --filter G2_API_

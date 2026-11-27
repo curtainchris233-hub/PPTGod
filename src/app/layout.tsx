@@ -11,6 +11,7 @@ import CompareDock from "@/components/CompareDock";
 import AppShell from "@/components/layout/AppShell";
 import { AppProvider } from "@/context/AppContext";
 import { LayoutProvider } from "@/context/LayoutContext";
+import { demoAccountEnabled, publicPreviewEnabled } from "@/lib/auth-config";
 import "@/styles/glacier-tokens.css";
 import "@/styles/glacier-layout.css";
 import "@/styles/glacier-ui.css";
@@ -53,7 +54,7 @@ const notoSerifSc = Noto_Serif_SC({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+    process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
   ),
   title: {
     default: "PPTGod · AI 演示文稿创作平台与可视化风格画廊",
@@ -68,6 +69,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const publicPreview = publicPreviewEnabled();
+
   return (
     <html
       lang="zh-CN"
@@ -76,9 +79,12 @@ export default function RootLayout({
       <body>
         <AppProvider>
           <LayoutProvider>
-            <AppShell>{children}</AppShell>
+            <AppShell publicPreview={publicPreview}>{children}</AppShell>
             <CompareDock />
-            <AuthModal />
+            <AuthModal
+              publicPreview={publicPreview}
+              showDemoAccount={!publicPreview && process.env.NODE_ENV !== "production" && demoAccountEnabled()}
+            />
           </LayoutProvider>
         </AppProvider>
       </body>

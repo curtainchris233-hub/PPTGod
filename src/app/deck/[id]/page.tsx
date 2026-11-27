@@ -13,7 +13,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const viewer = await getCurrentUser();
-  const deck = getSavedDeckById(id);
+  const deck = await getSavedDeckById(id);
 
   // Strict privacy guard: never leak private deck titles in <title> or meta tags
   if (!deck || (!deck.isPublic && (!viewer || deck.authorId !== viewer.id))) {
@@ -41,7 +41,7 @@ export default async function DeckSharePage({
   const { id } = await params;
   const sp = await searchParams;
   const viewer = await getCurrentUser();
-  const deck = getSavedDeckById(id);
+  const deck = await getSavedDeckById(id);
 
   if (!deck) {
     notFound();
