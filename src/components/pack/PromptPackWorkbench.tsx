@@ -28,17 +28,21 @@ import { saveDocIntakeHandoff } from "@/lib/docIntakeHandoff";
 import { PACK_SAMPLES } from "@/lib/packSamples";
 import {
   DESIGN_DIRECTIONS,
+  PACK_DENSITIES,
   PACK_DRAFT_KEY,
   consumePackHandoff,
   deletePackHistory,
   isPromptPack,
   outlineDocumentSections,
   packSlideToCanvas,
+  packStyleToVisualSpec,
+  packToDeckSlides,
   parsePackJsonImport,
   pickDefaultLongDocSectionIds,
   readPackHistory,
   upsertPackHistory,
   type DocumentSectionSlice,
+  type PackDensity,
   type PackHistoryEntry,
   type PackLanguage,
   type PackSlide,
@@ -58,6 +62,7 @@ interface Draft {
   pack: PromptPack;
   tool: PackTool;
   language: PackLanguage;
+  density?: PackDensity;
   fallbackReason?: string;
   historyId?: string;
 }
@@ -68,10 +73,15 @@ function readDraft(): Draft | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<Draft>;
     if (!parsed || !isPromptPack(parsed.pack)) return null;
+    const restoredDensity: PackDensity =
+      parsed.density === "reading" || parsed.pack.insight.density === "reading"
+        ? "reading"
+        : "speaker";
     return {
       pack: parsed.pack,
       tool: (parsed.tool as PackTool) || "chatgpt",
       language: (parsed.language as PackLanguage) || "zh",
+      density: restoredDensity,
       fallbackReason: parsed.fallbackReason,
       historyId: typeof parsed.historyId === "string" ? parsed.historyId : undefined,
     };
@@ -109,6 +119,7 @@ export default function PromptPackWorkbench({
   const [audience, setAudience] = useState("");
   const [slideCount, setSlideCount] = useState(10);
   const [language, setLanguage] = useState<PackLanguage>("zh");
+  const [density, setDensity] = useState<PackDensity>("speaker");
   const [directionId, setDirectionId] = useState("auto");
   const [anchorStyle, setAnchorStyle] = useState<PackStyle | null>(initialAnchorStyle);
   const [rulesOnly, setRulesOnly] = useState(false);
@@ -217,6 +228,7 @@ export default function PromptPackWorkbench({
             audience: override?.audience ?? audience,
             slideCount: override?.slideCount ?? slideCount,
             language,
+            density,
             directionId,
             ...(useAnchor ? { anchorStyle: useAnchor } : {}),
             mode: rulesOnly ? "smart" : "auto",
@@ -255,7 +267,7 @@ export default function PromptPackWorkbench({
         }
       }
     },
-    [effectiveSource, fileName, topic, audience, slideCount, language, directionId, anchorStyle, rulesOnly, tool]
+    [effectiveSource, fileName, topic, audience, slideCount, language, density, directionId, anchorStyle, rulesOnly, tool]
   );
 
   // Mount: load local history; handle homepage handoff → auto-generate; otherwise restore last draft.
@@ -279,6 +291,7 @@ export default function PromptPackWorkbench({
         setPack(draft.pack);
         setTool(draft.tool);
         setLanguage(draft.language);
+        if (draft.density) setDensity(draft.density);
         setFallbackReason(draft.fallbackReason);
         setActiveHistoryId(draft.historyId);
       }
@@ -295,7 +308,7 @@ export default function PromptPackWorkbench({
     try {
       window.localStorage.setItem(
         PACK_DRAFT_KEY,
-        JSON.stringify({ pack, tool, language, fallbackReason, historyId: activeHistoryId })
+        JSON.stringify({ pack, tool, language, density, fallbackReason, historyId: activeHistoryId })
       );
     } catch {
       // quota / private mode — ignore
@@ -303,7 +316,7 @@ export default function PromptPackWorkbench({
     if (activeHistoryId) {
       upsertPackHistory({ id: activeHistoryId, pack, tool, language });
     }
-  }, [pack, tool, language, fallbackReason, activeHistoryId]);
+  }, [pack, tool, language, density, fallbackReason, activeHistoryId]);
 
   const loadSample = (id: string) => {
     const s = PACK_SAMPLES.find((x) => x.id === id);
@@ -480,17 +493,20 @@ export default function PromptPackWorkbench({
 
   const sendToGenerate = () => {
     if (!pack) return;
+    const readySlides = packToDeckSlides(pack).slice(0, 20);
     saveDocIntakeHandoff({
       fileName: pack.insight.fileName || fileName || "提示词包资料.txt",
       fileType: "txt",
       charCount: effectiveSource.length || pack.insight.charCount,
       text: effectiveSource || pack.slides.map((s) => [s.title, ...s.points].join("\n")).join("\n\n"),
       topic: pack.insight.topic,
-      subtitle: pack.insight.subtitle,
+      subtitle: pack.slides[0]?.points[0] || pack.insight.subtitle,
       audience: pack.insight.audience,
-      slideCount: Math.min(20, pack.slides.length),
+      slideCount: Math.min(20, readySlides.length),
       styleSlug: pack.style.referenceSlug ?? "",
       autoGenerate: false,
+      customSpec: packStyleToVisualSpec(pack.style),
+      readySlides,
       parsedOutline: pack.slides.slice(0, 20).map((s, i) => ({
         id: `outline_${i + 1}`,
         slideType: packSlideToCanvas(s, pack.insight).slideType,
@@ -499,7 +515,7 @@ export default function PromptPackWorkbench({
         summary: [...s.points, ...s.data.map((d) => `${d.label} ${d.value}`)].join("；").slice(0, 160),
       })),
     });
-    router.push("/generate?intake=1");
+    router.push("/generate?intake=1&mode=editor");
   };
 
   const steps: StepperStep[] = useMemo(() => {
@@ -834,6 +850,26 @@ export default function PromptPackWorkbench({
                 ))}
               </select>
             </label>
+            <label className="gl-pack-field is-wide">
+              <span>用途密度（上屏字数 vs 演讲备注）</span>
+              <select
+                id="pg-pack-density"
+                value={density}
+                onChange={(e) => {
+                  const next = e.target.value as PackDensity;
+                  setDensity(next);
+                  setPack((prev) =>
+                    prev ? { ...prev, insight: { ...prev.insight, density: next } } : prev
+                  );
+                }}
+              >
+                {PACK_DENSITIES.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           <div className="gl-pack-engine">
@@ -908,6 +944,7 @@ export default function PromptPackWorkbench({
                 <ul className="gl-pack-chips">
                   <li>场景 · {pack.insight.scenario}</li>
                   <li>受众 · {pack.insight.audience}</li>
+                  <li>用途 · {density === "reading" ? "书面汇报" : "现场演讲"}</li>
                   <li>{pack.slides.length} 页 · 约 {pack.insight.talkMinutes} 分钟</li>
                   <li>关键数据 {pack.insight.keyFacts.length} 条</li>
                   <li className={`is-engine ${pack.engine === "llm" ? "is-llm" : ""}`} id="pg-pack-result-engine">
@@ -944,6 +981,7 @@ export default function PromptPackWorkbench({
                 pack={pack}
                 tool={tool}
                 language={language}
+                density={density}
                 onToolChange={setTool}
                 onToast={showToast}
                 onSendToGenerate={sendToGenerate}

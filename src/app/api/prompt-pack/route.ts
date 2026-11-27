@@ -7,6 +7,7 @@ import {
   getDesignDirection,
   sanitizePackSlides,
   sanitizePackStyle,
+  type PackDensity,
   type PackLanguage,
   type PackSlide,
   type PackStyle,
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
   const rawCount = safeNumber(body.slideCount);
   const language: PackLanguage =
     body.language === "en" || body.language === "bilingual" ? body.language : "zh";
+  const density: PackDensity = body.density === "reading" ? "reading" : "speaker";
   const anchorStyle: PackStyle | undefined = isPlainObject(body.anchorStyle)
     ? sanitizePackStyle(
         body.anchorStyle,
@@ -90,6 +92,7 @@ export async function POST(request: Request) {
     slideCount:
       Number.isFinite(rawCount) && rawCount > 0 ? Math.max(5, Math.min(24, Math.round(rawCount))) : undefined,
     language,
+    density,
     directionId: safeString(body.directionId).trim().slice(0, 40) || undefined,
     ...(anchorStyle ? { anchorStyle } : {}),
   };
@@ -128,7 +131,7 @@ export async function POST(request: Request) {
   const result = await generatePresentationJson({
     task: "promptpack",
     config: provider.config,
-    instructions: buildPackInstructions(slideCount, language),
+    instructions: buildPackInstructions(slideCount, language, density),
     input: buildPackUserInput(input, rule, slideCount),
     requestSignal: request.signal,
   });
@@ -149,8 +152,9 @@ export async function POST(request: Request) {
     slides,
     insight: {
       ...rule.insight,
+      density,
       slideCount: slides.length,
-      talkMinutes: Math.max(3, Math.round(slides.length * 1.4)),
+      talkMinutes: Math.max(3, Math.round(slides.length * (density === "speaker" ? 1.5 : 1.2))),
     },
   };
   return json(200, { ok: true, pack, engine: "llm" });

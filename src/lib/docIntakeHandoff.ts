@@ -1,8 +1,10 @@
 import type {
+  DeckSlideItem,
   DocumentAnalysisResult,
   EvidenceDensity,
   GenerationRouteMode,
   OutlineDraftItem,
+  VisualSpec,
 } from "@/types/prompt";
 
 const DOC_INTAKE_KEY = "pptgod_doc_intake_v1";
@@ -23,6 +25,9 @@ export interface DocIntakePayload {
   evidenceDensity?: EvidenceDensity;
   parsedOutline?: OutlineDraftItem[];
   analysis?: DocumentAnalysisResult;
+  /** M8: Lossless custom palette/typography spec & pre-built slides from /pack */
+  customSpec?: VisualSpec;
+  readySlides?: DeckSlideItem[];
   savedAt: number;
 }
 

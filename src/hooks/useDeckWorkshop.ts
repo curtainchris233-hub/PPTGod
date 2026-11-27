@@ -454,12 +454,20 @@ export function useDeckWorkshop({
             styles[0];
           const nextSlideCount = Math.max(
             5,
-            Math.min(20, intake.parsedOutline?.length || intake.slideCount || 8)
+            Math.min(
+              20,
+              intake.readySlides?.length ||
+                intake.parsedOutline?.length ||
+                intake.slideCount ||
+                8
+            )
           );
 
           if (matchedStyle) {
             setSelectedSlug(matchedStyle.slug);
-            setDeckSpec(matchedStyle.visualSpec);
+            setDeckSpec(intake.customSpec || matchedStyle.visualSpec);
+          } else if (intake.customSpec) {
+            setDeckSpec(intake.customSpec);
           }
           if (intake.topic) setTopic(intake.topic);
           if (intake.subtitle) setSubtitle(intake.subtitle);
@@ -484,6 +492,22 @@ export function useDeckWorkshop({
             ]);
           }
           if (intake.analysis) setDocAnalysis(intake.analysis);
+
+          // Lossless handoff from /pack: open directly in full-bleed Editor with exact slides & custom palette
+          if (Array.isArray(intake.readySlides) && intake.readySlides.length > 0) {
+            setSlides(intake.readySlides);
+            setActiveIndex(0);
+            setOutlineDraft(null);
+            hasLocalEditsRef.current = true;
+            setHasUnsavedChanges(true);
+            setMode("editor");
+            showToast(
+              `已载入「${intake.topic}」全部 ${intake.readySlides.length} 页幻灯片与定制色板，可直接精修或导出`,
+              "success"
+            );
+            return;
+          }
+
           if (intake.parsedOutline && intake.parsedOutline.length > 0) {
             setOutlineDraft(intake.parsedOutline);
           }

@@ -1350,6 +1350,7 @@ export async function POST(request: Request) {
           }))
         : [];
       const bars = rawBars.length > 0 ? rawBars : DEFAULT_BARS;
+      const isSingleSeries = Boolean(item.singleSeries) && rawBars.length > 0;
 
       addStyledCard(pptx, slide, tokens, {
         x: 0.6,
@@ -1360,26 +1361,34 @@ export async function POST(request: Request) {
       });
       slide.addChart(
         pptx.ChartType.bar,
-        [
-          {
-            name: "基准方案",
-            labels: bars.map((b) => b.label),
-            values: bars.map((b) => b.v1),
-          },
-          {
-            name: "升级方案",
-            labels: bars.map((b) => b.label),
-            values: bars.map((b) => b.v2),
-          },
-        ],
+        isSingleSeries
+          ? [
+              {
+                name: "核心指标",
+                labels: bars.map((b) => b.label),
+                values: bars.map((b) => b.v2),
+              },
+            ]
+          : [
+              {
+                name: "基准方案",
+                labels: bars.map((b) => b.label),
+                values: bars.map((b) => b.v1),
+              },
+              {
+                name: "升级方案",
+                labels: bars.map((b) => b.label),
+                values: bars.map((b) => b.v2),
+              },
+            ],
         {
           x: 0.75,
           y: 1.7,
           w: 5.0,
           h: 3.05,
           barDir: "col",
-          chartColors: [cChart3, cChart1],
-          showLegend: true,
+          chartColors: isSingleSeries ? [cChart1] : [cChart3, cChart1],
+          showLegend: !isSingleSeries,
           legendPos: "t",
           legendColor: cMuted,
           legendFontSize: 9,

@@ -11,7 +11,7 @@
 ![TypeScript 5](https://img.shields.io/badge/TypeScript-5-2563EB?style=flat-square&logo=typescript&logoColor=white)
 ![Vanilla CSS](https://img.shields.io/badge/CSS-100%25%20Vanilla%20Glacier%202.0-2563EB?style=flat-square)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Drizzle%20ORM-0D9488?style=flat-square&logo=postgresql&logoColor=white)
-![E2E 87/87](https://img.shields.io/badge/E2E-87%2F87%20PASS-059669?style=flat-square)
+![E2E 89/89](https://img.shields.io/badge/E2E-89%2F89%20PASS-059669?style=flat-square)
 ![Docker Ready](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)
 
 [项目介绍](#项目介绍) · [产品功能](#产品功能全景) · [核心引擎](#核心引擎深度解析) · [技术路线与架构](#技术路线与系统架构) · [开发进程与路线图](#开发进程与路线图) · [本地运行与部署](#本地运行测试与上线)
@@ -90,7 +90,7 @@
 
 | 路由 | 模块 | 核心功能 |
 | --- | --- | --- |
-| `/pack` | **提示词包工作台（核心）** | 粘贴 / 上传（PDF/DOCX/PPTX/MD/TXT）/ 6 份多学科示例 → >16k 长文档章节筛选 → 11 套设计方向或参考库锚点 + 参考图本地吸色 + WCAG 在线微调 → 11 种版式大纲编辑（含数据/备注/任意页预览/BYOK 单页润色）→ ChatGPT（单轮/两步）、Gamma（①/② 双段复制）、Kimi、Claude、通用 Markdown 一键导出 + 本地 10 份历史与 `.json` 导入导出 |
+| `/pack` | **提示词包工作台（核心）** | 粘贴 / 上传（PDF/DOCX/PPTX/MD/TXT）/ 6 份多学科示例 → >16k 长文档章节筛选 &「现场演讲 / 书面汇报」双密度切换 → 11 套设计方向或参考库锚点 + 参考图本地吸色 + WCAG 在线微调 → 结论式标题大纲编辑（含数据/备注/任意页预览/BYOK 单页润色）→ 5 大工具导出（含 ChatGPT 越界自检、Gamma 双段复制、Claude 1920×1080 舞台）+ **免粘贴一键下载 `.pptx` / `.html` 或无损进全屏编辑器** |
 | `/` | **工作台首页 Dashboard** | 「资料 → 提示词包」直达条、AI 生成 / 资料转 PPT / 从模板新建、文档拖拽上传、同内容 3 风格实时对比、推荐风格、真实最近项目与快速工具 |
 | `/gallery` | **风格参考库** | 36 套全领域 `VisualSpec` 视觉系统、实时统计 5 大人群分类、多维筛选与 URL 双向同步、详情抽屉（12 页型 + HEX 色板 + 一键「以此风格做提示词包」）、30 秒智能选词与资料直通车 |
 | `/generate` | **创作工坊 & 全屏编辑器** | 支持 `?style=`、`?topic=`、`?deck=`、`?handoff=1`、`?intake=1`、`?mode=create\|editor`、`?panel=audit`；内置 100 分设计体检与预览确认型 AI 助手，导出原生 `.pptx` / 离线 `.html` / Marp / 核验清单 `.md` |
@@ -105,15 +105,15 @@
 
 ## 核心引擎深度解析
 
-### 1. 资料 → 提示词包引擎（`/pack` + `/api/prompt-pack` + `/api/prompt-pack/refine`）
+### 1. 资料 → 提示词包与直出引擎（`/pack` + `/api/prompt-pack` + `/api/export/pptx`）
 
 | 引擎环节 | 核心能力 |
 | --- | --- |
-| **① 资料洞察与长文档章节筛选** | 识别中英文文档章节结构、场景、受众与时长，提取带单位的数字事实（支持中文单位及 `BLEU / FLOPs / ms / tokens / params / M / B / K / x / $` 等英文论文指标，自动识别英文后置指标词）。全文超过 `16,000` 字时自动触发 **章节筛选器**，默认取消勾选「参考文献 / 致谢 / 附录」，优先保留摘要、方法、实验结果与结论，避免截尾丢失核心数据 |
-| **② 风格定制、参考锚定与参考图吸色** | 内置 **11 套精调设计方向**（Nature 期刊学术、新课标教材插画、麦肯锡咨询、Apple 发布会、深色路演、新中式东方美学等）按关键词加权匹配；支持从风格参考库带入锚点（`/pack?style=<slug>`）；支持 **浏览器本地参考图吸色**（复用 `paletteExtractor.ts` 5-bit 空间量化，零图片上传）与内联 **WCAG 对比度实时校核与一键修复** |
-| **③ 逐页大纲编辑与 BYOK 单页润色** | 从 11 种版式（封面、目录、章节页、大数字、图表、对比、时间线、流程、金句、图文、总结）交替编排，严禁连续 3 页同版式；每页标题、要点、关键数据、视觉建议与演讲备注均可在线编辑，点击任意页即可联动上方 3 帧 `SlideCanvas` 预览；配置 BYOK 后支持 **单页 AI 润色**（可撤销），且服务端对大模型输出的数据逐条核对原文数字，杜绝编造 |
-| **④ 多工具分步导出与本地历史** | 针对 5 类目标工具分别定制格式：**ChatGPT**（单轮 `python-pptx` 直出 / 两步精修：① 先定风格 → ② 再出大纲）、**Gamma**（拆分为 ① 风格额外指令 与 ② `---` 分卡正文两枚独立复制按钮）、**Kimi PPT**、**Claude**（单文件可打印 HTML 幻灯片）、**通用 Markdown**；另支持「仅复制风格」「仅复制大纲」「导出/导入 `.json`」与浏览器本地最近 10 份历史管理 |
-| **⑤ BYOK 零门槛配置与多模型兼容** | 全局设置内置 **7 组服务商快捷预设**（OpenAI / DeepSeek / Kimi / 通义千问 / 硅基流动 / Gemini / OpenRouter）与 **`POST /api/byok/test` 2 秒连通性检测**；兼容 DeepSeek-R1 / `o1` / `o3` / Claude 中转等模型（自动剥离 `<think>` 推理块、遇 `response_format` HTTP 400 自动降级重试）；无 Key 或调用失败时无痛降级至规则引擎并披露 `fallbackReason` |
+| **① 资料洞察、精准抽数与长文档筛选** | 识别中英文文档章节、场景、受众与时长；精准提取数字事实（完整保留 `Pass@1`、`MATH-500`、`Codeforces`、千分位数字与中文复合量词，自动区分模型参数规模与评测得分）。全文超过 `16,000` 字时自动开启 **章节筛选器**，默认略去参考文献/致谢/附录，防截断尾部核心结论 |
+| **② 结论式标题与演讲/汇报双密度** | 自动将枯燥目录词提炼为 **Assertion-Evidence 一句话结论标题**（杜绝 `(1/2)` 凑页后缀，大纲编辑器对空洞标题实时提示），并按 5 类数据关系（占比/趋势/实验曲线/基线对比/多维指标）推荐图表；支持 **现场演讲（字少大字，细节进备注）** 与 **书面汇报（详实自解释，适合传阅）** 一键切换 |
+| **③ 风格定制、参考锚定与参考图吸色** | 内置 **11 套精调设计方向** 按关键词加权匹配；支持从风格参考库带入锚点（`/pack?style=<slug>`）；支持 **浏览器本地参考图吸色**（零图片上传）与内联 **WCAG 对比度实时校核与一键修复** |
+| **④ 生产级多工具提示词与免粘贴直出** | **ChatGPT**（`13.333in×7.5in` 安全区 + `python-pptx` 越界/重叠自动自检，支持单轮或两步精修）、**Gamma**（① 风格指令 + ② `---` 分卡双段复制）、**Claude**（`1920×1080` 等比缩放舞台 + `N` 键备注抽屉 + `@page` 矢量 PDF 打印）、**Kimi PPT**、**通用 Markdown**；更支持在 `/pack` 页内 **一键直接下载原生 `.pptx`、下载离线 `.html`，或无损带入定制色板进入全屏编辑器精修** |
+| **⑤ BYOK 零门槛配置与多模型兼容** | 全局设置内置 **7 组服务商快捷预设** 与 **`POST /api/byok/test` 2 秒连通性检测**；兼容 DeepSeek-R1 / `o1` / `o3` 等模型（自动剥离 `<think>` 推理块、`response_format` 自动降级）；无 Key 或调用失败时无痛降级至规则引擎并披露 `fallbackReason` |
 
 ### 2. 资料直通车引擎与 36 套风格参考库（`DocIntakeWorkbench` + `/gallery`）
 
@@ -167,7 +167,7 @@
 | **文档解析与多格式导出** | `unpdf`（PDF）、`mammoth`（DOCX）、`jszip`（PPTX 解析）、`pptxgenjs`（原生母版/图表/表格 `.pptx`） | 无外部重型 Python/LibreOffice 依赖，纯 Node.js 完成解析与可编辑 `.pptx` / 离线 `.html` 交付 |
 | **数据库与身份认证** | PostgreSQL（兼容 Supabase / Docker PG）+ `drizzle-orm` + `better-auth` | 强类型 Schema（独立 `pptgod` pgSchema）、完整会话/邮箱找回/访客体验切换 |
 | **限流与对象存储** | `@upstash/redis`（可选分布式限流，本地自动内存兜底）+ `@aws-sdk/client-s3`（Cloudflare R2 可选存储） | 兼顾零配置本地开发与公网生产弹性部署 |
-| **自动化验证体系** | TypeScript + ESLint + Playwright Python 4-Tier 87 项 E2E（含 `--backup-db` 零漂移校验） | 覆盖 API 契约、诚实边界 `B1–B16`、安全隔离 `S1–S22`、核心交互流与 5 断点（`390–1920px`）零溢出 |
+| **自动化验证体系** | TypeScript + ESLint + Playwright Python 4-Tier 89 项 E2E（含 `--backup-db` 零漂移校验） | 覆盖 API 契约、诚实边界 `B1–B16`、安全隔离 `S1–S22`、核心交互流与 5 断点（`390–1920px`）零溢出 |
 
 ### 核心技术路线
 
@@ -185,7 +185,7 @@
 flowchart TB
   subgraph Client["浏览器端 · Glacier UI 2.0（Pure Vanilla CSS + React 19）"]
     Home["首页 / & 资料直通车"]
-    Pack["/pack 提示词包工作台<br/>长文档章节筛选 · 本地吸色 · 10 份本地历史"]
+    Pack["/pack 提示词包工作台<br/>演讲/汇报双密度 · 本地吸色 · 一键直出 .pptx/.html"]
     Gallery["/gallery 风格参考库 (36套)<br/>/compare · /studio/[slug]"]
     Workshop["/generate 创作工坊 & 全屏编辑器<br/>100分体检 · SlideCanvas · AI润色"]
     Tools["/tools 纯本地工具箱<br/>/deck/[id]?rehearsal=1 排练驾驶舱"]
@@ -212,8 +212,9 @@ flowchart TB
   Gallery --> Workshop
   Pack --> Parse
   Pack --> PackAPI
+  Pack --> DeckAPI
   Pack -->|".md / .json / 5 工具一键复制"| External["ChatGPT · Gamma · Kimi · Claude"]
-  Pack -->|"站内继续生成"| Workshop
+  Pack -->|"无损带入定制色板与幻灯片"| Workshop
   ByokStore --> ByokTest
   ByokStore --> PackAPI
   ByokStore --> DeckAPI
@@ -258,7 +259,7 @@ PPTGod/
 │   └── types/                  # 领域与 VisualSpec 强类型定义
 ├── public/brand/               # Glacier 冰川矢量 Logo 与低对比雪峰装饰 SVG
 ├── docs/                       # 架构文档、部署指南、设计规范、测试说明与实机截图
-├── tests/e2e/glacier_v2/       # Glacier 4-Tier 87 项 Playwright 端到端回归测试套件
+├── tests/e2e/glacier_v2/       # Glacier 4-Tier 89 项 Playwright 端到端回归测试套件
 ├── Dockerfile & docker-compose.yml
 └── README.md
 ```
@@ -269,7 +270,7 @@ PPTGod/
 
 ## 开发进程与路线图
 
-### 已完成里程碑（v1 → M7）
+### 已完成里程碑（v1 → M8）
 
 | 阶段 | 对应 PR / 提交 | 核心交付内容 | 质量验证 |
 | --- | --- | --- | --- |
@@ -281,14 +282,14 @@ PPTGod/
 | **文档与示例升级** | PR #5 (`bb6d097`) & PR #6 (`20264a6`) | 清理冗余资产并重构文档体系；将旧参考内容全面替换为 AI 经典论文（Transformer / DeepSeek-R1）与初高中教材公开课 | 全量回归通过 |
 | **云端架构与 M5** | `f2cdbb1` / `fddf5d8` / PR #9 (`bb2694f`) | 数据库升级至 **PostgreSQL + Drizzle ORM**、认证切换为 **Better Auth** 并开放访客试用；完成 URL 双向同步、本地 BYOK 闭环（`sessionStorage` 仅存 Key）、次级页视觉统一、`useDeckWorkshop` 解耦与移动端 390px 编辑器打磨 | **79/79** Glacier E2E + PostgreSQL 零漂移 |
 | **M6** | PR #10 (`214dee6`) | **资料 → 提示词包工作台（`/pack`）首发**：11 套精调设计方向、关键词自动匹配、11 种版式可编辑大纲、3 帧实时风格示意、ChatGPT / Gamma / Kimi / Claude / 通用 5 工具导出、BYOK 自动降级规则引擎与原文数字核对 | **83/83** Glacier E2E + `[DB HYGIENE PASS]` |
-| **M7（当前）** | PR #11 (`5e03527`) | **提示词包深度进化与全站闭环**：① 7 组 BYOK 服务商一键预设 + `POST /api/byok/test` 2 秒连通检测 + 推理模型 `<think>`/`response_format` 兼容；② Gamma 双段独立复制 + ChatGPT 两步精修 + 仅复制风格/大纲 + `.json` 导入导出 + 本地 10 份历史；③ 参考图本地吸色 + WCAG 在线风格微调 + 大纲数据/备注编辑 + 任意页预览 + BYOK 单页 AI 润色 + 6 份示例；④ 顶栏新增 `/pack`、「风格画廊」升级「风格参考库」并打通 `/pack?style=<slug>` 与首页上传弹窗；⑤ >16k 长文档章节筛选器与英文论文指标提取增强 | **87/87** Glacier E2E + `[DB HYGIENE PASS]` |
+| **M7** | PR #11 (`5e03527`) | **提示词包深度进化与全站闭环**：7 组 BYOK 服务商预设 + `POST /api/byok/test` 2 秒连通检测 + 推理模型兼容；Gamma 双段复制 + ChatGPT 两步精修 + 本地 10 份历史 + `.json` 导入导出；参考图本地吸色 + WCAG 在线微调 + BYOK 单页 AI 润色 + 6 份示例；顶栏 `/pack`、「风格参考库」锚点与 >16k 长文档章节筛选器 | **87/87** Glacier E2E + `[DB HYGIENE PASS]` |
+| **M8（当前）** | `feat/m8-workhorse-ux` | **实用输出品质与免粘贴一键直出**：① Assertion-Evidence 一句话结论标题（消除空洞目录词与 `(1/2)` 凑页后缀）+ 词边界安全抽数（保留 `Pass@1`、`MATH-500`、`Codeforces` 与复合量词）；②「现场演讲 / 书面汇报」双密度一键切换；③ ChatGPT `python-pptx` 越界/重叠自动自检与 Claude `1920×1080` 离线舞台增强；④ `/pack` 页内一键直接下载单序列原生 `.pptx`、离线 `.html` 及定制色板无损转入全屏编辑器 | **89/89** Glacier E2E + `[DB HYGIENE PASS]` |
 
-### 后续开发路线图（Planned · M8+）
+### 后续开发路线图（Planned · M9+）
 
 - [ ] **提示词包云端持久化与只读分享**：登录用户可将提示词包保存至 PostgreSQL 并在 `/collections` 管理，支持生成只读分享链接给团队或同学直接复用。
 - [ ] **自定义风格方向库与品牌规范包**：支持把用户在 `/pack` 微调或吸色后的风格保存为可复用的个人设计方向（含一键导入/导出品牌色板规范）。
 - [ ] **多资料联合提炼与引用溯源增强**：支持同时上传多份参考材料（如论文 PDF + 补充实验表格）合并提取，大纲出处精确关联到文件名与具体章节。
-- [ ] **站内原生 `.pptx` 版面精致度升级**：将 `/pack` 的 11 套精调设计方向与多样化图表/对比/流程布局进一步反哺至站内 `pptxgenjs` 导出引擎。
 - [ ] **真实大模型提示词包评测集**：建立覆盖学术、教学、商业三类真实长文档的自动化质量评估脚本，持续打磨各外部工具（ChatGPT / Gamma / Kimi / Claude）的成品还原度。
 
 ---
@@ -313,7 +314,7 @@ npm run dev
 
 生产环境配置 PostgreSQL（如 Supabase）、Cloudflare R2、Upstash Redis、Resend 邮件服务或从旧版 SQLite 迁移历史文稿，详见 **[上线部署指南](./docs/DEPLOYMENT.md)**。
 
-### 静态检查与 87 项端到端验证
+### 静态检查与 89 项端到端验证
 
 ```bash
 # TypeScript 严格检查、ESLint 与生产构建
@@ -321,7 +322,7 @@ npm run typecheck
 npm run lint
 npm run build
 
-# 查看 Glacier UI 2.0 全部 87 项 4-Tier E2E 用例清单
+# 查看 Glacier UI 2.0 全部 89 项 4-Tier E2E 用例清单
 npm run test:e2e:list
 
 # 在独立端口 3010 启动生产构建后运行全量 E2E（请勿对 3000 开发端口运行）
@@ -335,8 +336,8 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_gla
 
 | 文档 | 说明 |
 | --- | --- |
-| [docs/PROJECT.md](./docs/PROJECT.md) | 项目架构、功能清单 `F1–F41`、诚实能力边界 `B1–B16` 与 M1–M7 完整里程碑记录 |
+| [docs/PROJECT.md](./docs/PROJECT.md) | 项目架构、功能清单 `F1–F41`、诚实能力边界 `B1–B16` 与 M1–M8 完整里程碑记录 |
 | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) | 生产环境部署指南（PostgreSQL / Supabase、Cloudflare R2、Upstash Redis、Resend 与数据迁移） |
-| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 87 项 4-Tier E2E 测试基础设施与验收规范 |
+| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 89 项 4-Tier E2E 测试基础设施与验收规范 |
 | [docs/PPTGod_Glacier_UI_2.0_Development_Spec.md](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) | Glacier UI 2.0 视觉与开发执行规范（Tokens、组件、页面、响应式、验收清单） |
 | [docs/PPTGod_UI_Design_Spec.md](./docs/PPTGod_UI_Design_Spec.md) | 冰川白工作台早期设计规范与首页改版对照 |
