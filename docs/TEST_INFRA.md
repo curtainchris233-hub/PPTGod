@@ -35,9 +35,9 @@
 
 ---
 
-## 2. Standalone Package Layout (`tests/e2e/glacier_v2/**`)
+## 2. Authoritative 4-Tier E2E Package Layout (`tests/e2e/glacier_v2/**`)
 
-Strictly isolated from legacy `tests/e2e/{__init__,config,helpers,run_e2e,tier1..tier10}.py` (ZERO legacy imports):
+Obsolete v8 `tests/e2e/{config,helpers,run_e2e,tier1..tier10}.py` have been retired; `tests/e2e/glacier_v2/` is the single authoritative 79-test E2E suite (invocable via `npm run test:e2e` / `npm run test:e2e:list`):
 
 ```text
 tests/e2e/glacier_v2/
@@ -52,12 +52,11 @@ tests/e2e/glacier_v2/
 │                                 # DelayedFetchProbe (non-blocking browser fetch delay + MutationObserver + passive counter),
 │                                 # BrowserPageGuard (console/pageerror/5xx/404-assets/requestfailed), PlaywrightSession (auto
 │                                 # browser logout), Web Vitals (LCP/CLS/INP w/ takeRecords flush), WCAG 2.2 AA & Frosted Topbar
-│                                 # gradient contrast, Glacier CSS/blur/brand-SVG/focus (resting-snapshot + spread ring)/motion
-│                                 # probes, locate_first(require_visible=...) & locate_attached, TestContext/SuiteRunner
+│                                 # gradient contrast, Glacier CSS/blur/brand-SVG/focus/motion probes, TestContext/SuiteRunner
 ├── tier1_features.py             # Tier 1 (29 tests): 12 core API happy paths (G1_API_01..12) + 17 Glacier UI route tests
 ├── tier2_boundaries.py           # Tier 2 (39 tests): 12 API boundaries + 11 UI guards + 16 Honest Boundaries (B1-B16)
-├── tier3_interactions.py         # Tier 3 (E2E-2): Pairwise cross-feature workflows + S1-S22 privacy/security spot checks
-├── tier4_scenarios_rwd_perf.py   # Tier 4 (E2E-2): 5 personas, 5-breakpoint RWD, Glacier visual/perf, WCAG 2.2 AA, Web Vitals, 22 shots
+├── tier3_interactions.py         # Tier 3 (4 tests): Client-side URL query sync, browser-local BYOK loop (S22), Workshop density/routeMode & cross-route journey
+├── tier4_scenarios_rwd_perf.py   # Tier 4 (7 tests): 5 per-breakpoint 9-route zero-overflow gates (1920/1440/1024/768/390px), 390px Editor filmstrip/inspector & Glacier parity
 └── run_glacier_e2e.py            # Unified CLI runner (default http://127.0.0.1:3010; refuses port 3000 with exit code 2)
 ```
 
@@ -81,7 +80,8 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 \
 ### CLI Options & Strict Exit Codes
 - `--base-url <url>`: Target server URL (**default: `http://127.0.0.1:3010`**). **Port `3000` is strictly refused with exit code `2`** and a clear stderr error message.
 - `--tier <1|2|3|4|all>`: Single tier, comma-separated list (`1,2`), or `all` (default: `all`). Tiers 1 & 2 are imported unconditionally; Tiers 3 & 4 are imported unconditionally as soon as their module files exist (never masking real `ImportError`/`SyntaxError`).
-- `--backup-db`: Creates a WAL-safe `sqlite3 .backup` snapshot in an ephemeral temp dir before execution, then asserts all 6 baseline content tables unchanged, `residual_e2e_rows == 0`, and `sessions_delta <= 0`.
+- `--backup-db` (PostgreSQL, when `DATABASE_URL` is set — default since #7): takes read-only row-count snapshots of the `pptgod` schema via `tests/e2e/glacier_v2/pg_snapshot.mjs` (reuses the app's `postgres` driver) before/after the run and asserts zero table drift, `residual_e2e_rows == 0`, and `sessions_delta <= 0` (absolute baselines are skipped because seeds differ per deployment).
+- `--backup-db` (legacy SQLite, no `DATABASE_URL`): Creates a WAL-safe `sqlite3 .backup` snapshot in an ephemeral temp dir before execution, then asserts all 6 baseline content tables unchanged, `residual_e2e_rows == 0`, and `sessions_delta <= 0`.
 - `--screenshots-dir <dir>`: Output folder for Tier 4's 22-shot Glacier UI 2.0 Screenshot Manifest.
 - `--json-report <path>`: Writes structured UTF-8 JSON report (`suite_version`, `started_at`, `finished_at`, `base_url`, `tiers_selected`, `summary`, `tiers`, `db_hygiene`, `tests[]`).
 - `--timeout-ms <ms>`: Positive per-request & Playwright action timeout (default `15000`).
@@ -98,7 +98,7 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 \
 
 ### Tier 1 — Isolated Happy Paths (`tier1_features.py` — 29 Tests)
 - **Tier 1A Core APIs (`G1_API_01..12` — 12 tests):**
-  - `G1_API_01`: `GET /api/health` (`status == "ok"`, `catalogCount == 36`, `dbMode == "wal"`).
+  - `G1_API_01`: `GET /api/health` (`status == "ok"`, `catalogCount == 36`, `dbMode == "postgresql"`).
   - `G1_API_02`: `GET /api/prompts` (36 official slugs + `color=dark` (6), `tool=slidev-marp` (9), `scenario=科研基金` (2), `style=商务咨询` (5), `q=Bento`, `sort=popular|newest|copies`).
   - `G1_API_03`: `POST /api/auth/login` (`HttpOnly` cookie), `GET /api/auth/me` (`stats.{published,likes,favorites,decks}`), `POST /api/auth/logout`.
   - `G1_API_04`: `POST/GET/PUT/PATCH/DELETE /api/prompts` CRUD (slug preservation + `CleanupRegistry`).
@@ -153,18 +153,16 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 \
 | `G2_HONEST_15` | **B15** | Unconditional `#pg-param-lang` (`zh`→`en`→`bilingual`) alters compiled Studio prompt; Smart generation on `/generate` succeeds cleanly |
 | `G2_HONEST_16` | **B16** | Live 36 DOM `SlideCanvas` cards (zero raster slide mockups) & all 6 `#pg-domain-tab-*` badges match real DB counts (`36/11/5/6/9/7`) |
 
-### Tier 3 — Cross-Feature Pairwise Interactions & S1–S22 Privacy (`tier3_interactions.py` — E2E-2)
-- `G3_WF_01`: Full `/` → `/generate` Workshop → Outline → Editor layout-only switch → `/api/polish` + Undo/Redo → 100-pt Audit autofix → Cloud Save → `/collections` Rename (`PUT`) & Duplicate (`POST`) → `/deck/[id]?rehearsal=1` → Verified `.pptx`/`.html` → Cleanup.
-- `G3_WF_02`: `/gallery` URL-synced filters + reload → Detail Drawer → Compare 12-slide sync → `/studio/[slug]` → `/generate?handoff=1`.
-- `G3_WF_03`: Guest local favs → Demo Login auto-sync → `/collections` + `SettingsModal` profile edit & restore.
-- `G3_SEC_01..06`: Complete S1–S22 privacy/ownership spot checks across `/gallery`, `/`, `/collections`, `/studio/[slug]`, `/deck/[id]`, remix redaction, non-destructive clone, and S22 read-only SQLite secret scan.
+### Tier 3 — Cross-Feature Interactions, URL Query Sync & Browser-Local BYOK (`tier3_interactions.py` — 4 Tests)
+- `G3_FLOW_01`: Client-side URL & query sync regressions (`/generate` ↔ Sidebar `设计体检` `/generate?panel=audit` ↔ `返回工坊` ↔ `?mode=editor`/`?mode=create`; Topbar global search while already on `/gallery`; `/tools` ↔ Sidebar `?tab=pacing`; `/collections` `?tab=` sync).
+- `G3_FLOW_02`: Browser-local BYOK closed loop (`SettingsModal` ↔ Full-Bleed Editor reactive state sync, verifying `apiKey` lives strictly in `sessionStorage` and NEVER in `localStorage` or SQLite — `S22`).
+- `G3_FLOW_03`: Workshop Advanced Settings end-to-end parameter forwarding (`evidenceDensity: "high-evidence"` + `.pptx` auto-defaulted `routeMode: "beautify-1to1"` verified on `POST /api/generate`).
+- `G3_FLOW_04`: Full cross-route creator journey (`/generate` → generate deck → Cloud Save → `/collections` verify saved card → `/deck/[id]?rehearsal=1` Rehearsal Cockpit → LIFO cleanup).
 
-### Tier 4 — 5 Personas, 5-Breakpoint RWD, Glacier Visual/Perf, WCAG 2.2 AA, Web Vitals & 22 Screenshots (`tier4_scenarios_rwd_perf.py` — E2E-2)
-- **5 Personas (`G4_PER_01..05`):** Executive Q4 Board Review, Academic Thesis Defense (`来源核验清单`), Existing `.pptx`/`.docx` `beautify-1to1`, Brand Style Creator Remix + Review, Confidential Enterprise Private Deck Lifecycle.
-- **5-Breakpoint RWD Matrix (`G4_RWD_01..05`):** `390×844`, `768×1024`, `1024×768`, `1440×900`, `1920×1080` across `/`, `/gallery`, `/generate`, `/collections`, `/compare`, `/studio/apple-soft-bento-modular`, `/tools` (`scrollWidth <= innerWidth + 2`, `>= 44px` mobile touch targets, drawerized tablet inspector, `max-width: 1600px` at 1920px vs full-bleed Editor).
-- **Glacier Visual & Performance Discipline (`G4_VIS_01..06`):** Zero TailwindCSS/PostCSS, Glacier `--gl-*` tokens (`#F0F6FC`, `#2563EB`, `#14243C`, `--ease-apple`, 5 font vars on `<html>`), `:focus-visible` & `prefers-reduced-motion` + compositor-only `@keyframes`, scoped `backdrop-filter` (zero blur on dense card grids), `public/brand/` SVG non-overlap + 16:9 `SlideCanvas` ratios, zero functional emojis in chrome.
-- **WCAG 2.2 AA & Keyboard (`G4_A11Y_01..04`):** `>= 4.5:1` normal text / `>= 3.0:1` large text & UI borders, **Frosted Topbar composited contrast over BOTH light (`#F0F6FC`) AND dark (`keynote-obsidian-stage` `#090C11`) scrolled `SlideCanvas` cards**, logical Tab order, Dialog/Drawer focus trap + `Esc` + focus restore, 100% icon-button `aria-label` & form `<label>` coverage.
-- **Core Web Vitals (`G4_PERF_01..02`):** Production-measured **`LCP <= 2500ms`**, **`INP <= 200ms`**, **`CLS <= 0.1`**, `0` console/page/404-asset/5xx errors.
+### Tier 4 — 5-Breakpoint RWD Gate, Mobile Editor Ergonomics & Glacier Visual Parity (`tier4_scenarios_rwd_perf.py` — 7 Tests)
+- `G4_RWD_01..05`: Isolated per-breakpoint (`1920`, `1440`, `1024`, `768`, `390px`) zero horizontal overflow (`scrollWidth <= innerWidth + 1`) and zero console/page error checks across all 9 routes (`/`, `/gallery`, `/generate`, `/generate?mode=editor`, `/collections`, `/tools`, `/compare`, `/creator/pptgod_lab`, `/studio/apple-soft-bento-modular`).
+- `G4_RWD_06`: Mobile `390×844` Presentation Editor horizontal filmstrip anti-truncation check (card width `≥165px`, slide type label visible, inactive action bars hidden) + collapsible right inspector toggle (`aria-expanded` & zero overflow).
+- `G4_VISUAL_01`: Glacier UI 2.0 secondary-page visual parity (`/creator/pptgod_lab` & `/studio/apple-soft-bento-modular` sans-serif UI headings, `StyleCard` + `StyleDetailDrawer` on Creator Profile, zero double horizontal padding inside `.gl-main-inner`).
 
 ---
 

@@ -332,7 +332,7 @@ export default function StyleMatcherModal({
                 <div className="pg-matcher-rec-actions">
                   <Link
                     href={`/studio/${prompt.slug}`}
-                    className="pg-btn pg-btn-ink pg-btn-xs pg-btn-flex"
+                    className="pg-btn pg-btn-secondary pg-btn-xs pg-btn-flex"
                     onClick={onClose}
                   >
                     <span>进工作室</span>

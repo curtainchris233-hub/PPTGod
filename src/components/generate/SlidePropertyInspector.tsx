@@ -37,7 +37,9 @@ interface SlidePropertyInspectorProps {
   generatingImg: boolean;
   imgModelName: string;
   imgPromptCopied: boolean;
+  byokReady: boolean;
   onChangeImgModelName: (val: string) => void;
+  onOpenByokSettings: () => void;
   onUploadSlideImage: (file: File) => void;
   onCopySlideImagePrompt: () => void;
   onGenerateAiSlideImage: () => void;
@@ -55,7 +57,9 @@ export default function SlidePropertyInspector({
   generatingImg,
   imgModelName,
   imgPromptCopied,
+  byokReady,
   onChangeImgModelName,
+  onOpenByokSettings,
   onUploadSlideImage,
   onCopySlideImagePrompt,
   onGenerateAiSlideImage,
@@ -213,7 +217,9 @@ export default function SlidePropertyInspector({
             generatingImg={generatingImg}
             imgModelName={imgModelName}
             imgPromptCopied={imgPromptCopied}
+            byokReady={byokReady}
             onChangeImgModelName={onChangeImgModelName}
+            onOpenByokSettings={onOpenByokSettings}
             onUploadSlideImage={onUploadSlideImage}
             onCopySlideImagePrompt={onCopySlideImagePrompt}
             onGenerateAiSlideImage={onGenerateAiSlideImage}

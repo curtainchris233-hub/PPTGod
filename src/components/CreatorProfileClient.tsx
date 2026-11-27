@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Lock, Plus } from "lucide-react";
-import PromptCard from "@/components/PromptCard";
+import StyleCard from "@/components/presentation/StyleCard";
+import StyleDetailDrawer from "@/components/presentation/StyleDetailDrawer";
+import { useApp } from "@/context/AppContext";
 import type { PromptItem, UserPublic } from "@/types/prompt";
+import "@/styles/gallery.css";
 import "@/styles/community.css";
 
 interface CreatorProfileClientProps {
@@ -27,7 +30,17 @@ export default function CreatorProfileClient({
   privateCount,
   isSelf,
 }: CreatorProfileClientProps) {
+  const { globalTopic, setGlobalTopic } = useApp();
   const [prompts, setPrompts] = useState<PromptItem[]>(initialPrompts);
+  const [selectedSlug, setSelectedSlug] = useState<string>(
+    initialPrompts[0]?.slug ?? ""
+  );
+  const [previewSlug, setPreviewSlug] = useState<string | null>(null);
+
+  const previewPrompt = useMemo(
+    () => prompts.find((p) => p.slug === previewSlug) ?? null,
+    [prompts, previewSlug]
+  );
 
   const handleUpdate = (updated: PromptItem) => {
     setPrompts((prev) =>
@@ -120,13 +133,16 @@ export default function CreatorProfileClient({
           </div>
 
           {prompts.length > 0 ? (
-            <div className="pg-gallery-grid">
+            <div className="gl-gallery-grid">
               {prompts.map((prompt) => (
-                <PromptCard
+                <StyleCard
                   key={prompt.id}
                   prompt={prompt}
+                  liveTopic={globalTopic}
+                  selected={selectedSlug === prompt.slug}
+                  onSelect={(slug) => setSelectedSlug(slug)}
+                  onPreview={(p) => setPreviewSlug(p.slug)}
                   onUpdatePrompt={handleUpdate}
-                  showEdit={isSelf}
                 />
               ))}
             </div>
@@ -138,6 +154,14 @@ export default function CreatorProfileClient({
           )}
         </section>
       </div>
+
+      <StyleDetailDrawer
+        prompt={previewPrompt}
+        liveTopic={globalTopic}
+        onLiveTopicChange={setGlobalTopic}
+        onClose={() => setPreviewSlug(null)}
+        onUpdatePrompt={handleUpdate}
+      />
     </main>
   );
 }

@@ -121,6 +121,47 @@ export default function GalleryClient({
       : "popular";
   });
 
+  // Sync external client navigations (e.g. Topbar global search `/gallery?q=...` while already on `/gallery`)
+  const [prevInitialFilters, setPrevInitialFilters] = useState(initialFilters);
+  if (initialFilters !== prevInitialFilters) {
+    setPrevInitialFilters(initialFilters);
+    const nextDomain = initialFilters?.domain;
+    setDomainTab(
+      nextDomain && VALID_DOMAINS.has(nextDomain)
+        ? (nextDomain as DomainTabId)
+        : "all"
+    );
+    setSearchQuery(initialFilters?.q ?? initialSearch ?? "");
+    const nextScenario = initialFilters?.scenario;
+    setScenario(
+      nextScenario && VALID_SCENARIOS.has(nextScenario)
+        ? nextScenario
+        : "全部场景"
+    );
+    const nextStyle = initialFilters?.style;
+    setStyleCategory(
+      nextStyle && VALID_STYLES.has(nextStyle) ? nextStyle : "全部风格"
+    );
+    const nextColor = initialFilters?.color;
+    setColorFamily(
+      nextColor && VALID_COLORS.has(nextColor)
+        ? (nextColor as ColorFamily | "all")
+        : "all"
+    );
+    const nextTool = initialFilters?.tool;
+    setTargetTool(
+      nextTool && VALID_TOOLS.has(nextTool)
+        ? (nextTool as TargetTool | "all")
+        : "all"
+    );
+    const nextSort = initialFilters?.sort;
+    setSortBy(
+      nextSort && VALID_SORTS.has(nextSort)
+        ? (nextSort as "popular" | "copies" | "newest")
+        : "popular"
+    );
+  }
+
   const [selectedSlug, setSelectedSlug] = useState<string>(
     initialPrompts[0]?.slug ?? ""
   );
@@ -150,6 +191,30 @@ export default function GalleryClient({
       cancelled = true;
     };
   }, [user?.id, syncVersion]);
+
+  // Sync browser Back/Forward history navigation back into Gallery filter state
+  useEffect(() => {
+    const onPopState = () => {
+      const sp = new URLSearchParams(window.location.search);
+      const d = sp.get("domain") || "";
+      setDomainTab(VALID_DOMAINS.has(d) ? (d as DomainTabId) : "all");
+      setSearchQuery((sp.get("q") || "").slice(0, 80));
+      const sc = sp.get("scenario") || "";
+      setScenario(VALID_SCENARIOS.has(sc) ? sc : "全部场景");
+      const st = sp.get("style") || "";
+      setStyleCategory(VALID_STYLES.has(st) ? st : "全部风格");
+      const cf = sp.get("color") || "";
+      setColorFamily(VALID_COLORS.has(cf) ? (cf as ColorFamily | "all") : "all");
+      const tl = sp.get("tool") || "";
+      setTargetTool(VALID_TOOLS.has(tl) ? (tl as TargetTool | "all") : "all");
+      const so = sp.get("sort") || "";
+      setSortBy(
+        VALID_SORTS.has(so) ? (so as "popular" | "copies" | "newest") : "popular"
+      );
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   // Bidirectional URL query sync (history.replaceState avoids RSC reload flicker)
   const isFirstUrlSync = useRef(true);

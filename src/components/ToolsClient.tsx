@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Check,
@@ -90,10 +90,37 @@ export default function ToolsClient({
   initialDecks = [],
 }: ToolsClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, showToast } = useApp();
-  const [activeTab, setActiveTab] = useState<ToolTab>(() =>
-    TOOL_TABS.includes(initialTab as ToolTab) ? (initialTab as ToolTab) : "pacing"
-  );
+  const urlTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<ToolTab>(() => {
+    const candidate = urlTab || initialTab;
+    return TOOL_TABS.includes(candidate as ToolTab)
+      ? (candidate as ToolTab)
+      : "pacing";
+  });
+  const [prevUrlTab, setPrevUrlTab] = useState<string | null>(urlTab);
+
+  if (urlTab !== prevUrlTab) {
+    setPrevUrlTab(urlTab);
+    if (urlTab && TOOL_TABS.includes(urlTab as ToolTab)) {
+      setActiveTab(urlTab as ToolTab);
+    } else if (urlTab === null && prevUrlTab === "pacing") {
+      setActiveTab("pptx-inspect");
+    }
+  }
+
+  const handleSelectTab = (next: ToolTab) => {
+    setActiveTab(next);
+    setPrevUrlTab(next);
+    if (typeof window !== "undefined") {
+      const nextUrl = `/tools?tab=${next}`;
+      if (window.location.pathname + window.location.search !== nextUrl) {
+        window.history.replaceState(null, "", nextUrl);
+      }
+    }
+  };
+
   const [savedDecks, setSavedDecks] = useState<SavedDeck[]>(initialDecks);
 
   useEffect(() => {
@@ -386,7 +413,7 @@ export default function ToolsClient({
                 id="pg-tool-tab-pacing"
                 aria-selected={activeTab === "pacing"}
                 className={`pg-tools-tab ${activeTab === "pacing" ? "is-active" : ""}`}
-                onClick={() => setActiveTab("pacing")}
+                onClick={() => handleSelectTab("pacing")}
               >
                 <Clock size={14} />
                 <span>时长节拍</span>
@@ -399,7 +426,7 @@ export default function ToolsClient({
                 className={`pg-tools-tab ${
                   activeTab === "pptx-inspect" ? "is-active" : ""
                 }`}
-                onClick={() => setActiveTab("pptx-inspect")}
+                onClick={() => handleSelectTab("pptx-inspect")}
               >
                 <FileUp size={14} />
                 <span>PPTX 体检</span>
@@ -412,7 +439,7 @@ export default function ToolsClient({
                 className={`pg-tools-tab ${
                   activeTab === "palette-wcag" ? "is-active" : ""
                 }`}
-                onClick={() => setActiveTab("palette-wcag")}
+                onClick={() => handleSelectTab("palette-wcag")}
               >
                 <Palette size={14} />
                 <span>抽色体检</span>
@@ -425,7 +452,7 @@ export default function ToolsClient({
                 className={`pg-tools-tab ${
                   activeTab === "visual-director" ? "is-active" : ""
                 }`}
-                onClick={() => setActiveTab("visual-director")}
+                onClick={() => handleSelectTab("visual-director")}
               >
                 <Wand2 size={14} />
                 <span>生图导演词</span>

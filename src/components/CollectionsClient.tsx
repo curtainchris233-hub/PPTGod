@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Bookmark,
   Clock,
@@ -56,11 +57,21 @@ interface CollectionsClientProps {
   initialTab?: "favorites" | "decks" | "mine" | "liked";
 }
 
+const VALID_WORKSPACE_TABS: readonly WorkspaceTab[] = [
+  "decks",
+  "recent",
+  "public",
+  "favorites",
+  "mine",
+  "liked",
+];
+
 export default function CollectionsClient({
   initialPrompts,
   initialDecks,
   initialTab = "decks",
 }: CollectionsClientProps) {
+  const searchParams = useSearchParams();
   const {
     user,
     syncVersion,
@@ -72,7 +83,35 @@ export default function CollectionsClient({
     showToast,
   } = useApp();
 
-  const [tab, setTab] = useState<WorkspaceTab>(initialTab);
+  const urlTab = searchParams.get("tab");
+  const [tab, setTab] = useState<WorkspaceTab>(() => {
+    if (urlTab && VALID_WORKSPACE_TABS.includes(urlTab as WorkspaceTab)) {
+      return urlTab as WorkspaceTab;
+    }
+    return initialTab;
+  });
+  const [prevUrlTab, setPrevUrlTab] = useState<string | null>(urlTab);
+
+  if (urlTab !== prevUrlTab) {
+    setPrevUrlTab(urlTab);
+    if (urlTab && VALID_WORKSPACE_TABS.includes(urlTab as WorkspaceTab)) {
+      setTab(urlTab as WorkspaceTab);
+    } else if (urlTab === null) {
+      setTab("decks");
+    }
+  }
+
+  const handleSelectTab = (next: WorkspaceTab) => {
+    setTab(next);
+    setPrevUrlTab(next === "decks" ? null : next);
+    if (typeof window !== "undefined") {
+      const nextUrl =
+        next === "decks" ? "/collections" : `/collections?tab=${next}`;
+      if (window.location.pathname + window.location.search !== nextUrl) {
+        window.history.replaceState(null, "", nextUrl);
+      }
+    }
+  };
   const [mineFilter, setMineFilter] = useState<"all" | "public" | "private">(
     "all"
   );
@@ -557,7 +596,7 @@ export default function CollectionsClient({
         <button
           type="button"
           className={`gl-col-stat ${tab === "decks" ? "is-active" : ""}`}
-          onClick={() => setTab("decks")}
+          onClick={() => handleSelectTab("decks")}
         >
           <span className="gl-col-stat-icon" aria-hidden="true">
             <Layers size={20} />
@@ -571,7 +610,7 @@ export default function CollectionsClient({
         <button
           type="button"
           className={`gl-col-stat ${tab === "recent" ? "is-active" : ""}`}
-          onClick={() => setTab("recent")}
+          onClick={() => handleSelectTab("recent")}
         >
           <span
             className="gl-col-stat-icon gl-col-stat-icon--recent"
@@ -588,7 +627,7 @@ export default function CollectionsClient({
         <button
           type="button"
           className={`gl-col-stat ${tab === "public" ? "is-active" : ""}`}
-          onClick={() => setTab("public")}
+          onClick={() => handleSelectTab("public")}
         >
           <span
             className="gl-col-stat-icon gl-col-stat-icon--public"
@@ -605,7 +644,7 @@ export default function CollectionsClient({
         <button
           type="button"
           className={`gl-col-stat ${tab === "favorites" ? "is-active" : ""}`}
-          onClick={() => setTab("favorites")}
+          onClick={() => handleSelectTab("favorites")}
         >
           <span
             className="gl-col-stat-icon gl-col-stat-icon--fav"
@@ -631,7 +670,7 @@ export default function CollectionsClient({
             id="pg-tab-decks"
             aria-selected={tab === "decks"}
             className={`gl-col-tab ${tab === "decks" ? "is-active" : ""}`}
-            onClick={() => setTab("decks")}
+            onClick={() => handleSelectTab("decks")}
           >
             <span>全部项目</span>
             <span className="gl-col-tab-count">{decks.length}</span>
@@ -642,7 +681,7 @@ export default function CollectionsClient({
             role="tab"
             aria-selected={tab === "recent"}
             className={`gl-col-tab ${tab === "recent" ? "is-active" : ""}`}
-            onClick={() => setTab("recent")}
+            onClick={() => handleSelectTab("recent")}
           >
             <span>最近编辑</span>
             <span className="gl-col-tab-count">{recentDecksCount}</span>
@@ -653,7 +692,7 @@ export default function CollectionsClient({
             role="tab"
             aria-selected={tab === "public"}
             className={`gl-col-tab ${tab === "public" ? "is-active" : ""}`}
-            onClick={() => setTab("public")}
+            onClick={() => handleSelectTab("public")}
           >
             <span>公开分享</span>
             <span className="gl-col-tab-count">{publicDecksCount}</span>
@@ -665,7 +704,7 @@ export default function CollectionsClient({
             id="pg-tab-favorites"
             aria-selected={tab === "favorites"}
             className={`gl-col-tab ${tab === "favorites" ? "is-active" : ""}`}
-            onClick={() => setTab("favorites")}
+            onClick={() => handleSelectTab("favorites")}
           >
             <span>我收藏的</span>
             <span className="gl-col-tab-count">{favoritePrompts.length}</span>
@@ -677,7 +716,7 @@ export default function CollectionsClient({
             id="pg-tab-mine"
             aria-selected={tab === "mine"}
             className={`gl-col-tab ${tab === "mine" ? "is-active" : ""}`}
-            onClick={() => setTab("mine")}
+            onClick={() => handleSelectTab("mine")}
           >
             <span>我发布的</span>
             <span className="gl-col-tab-count">{myPrompts.length}</span>
@@ -689,7 +728,7 @@ export default function CollectionsClient({
             id="pg-tab-liked"
             aria-selected={tab === "liked"}
             className={`gl-col-tab ${tab === "liked" ? "is-active" : ""}`}
-            onClick={() => setTab("liked")}
+            onClick={() => handleSelectTab("liked")}
           >
             <span>我点赞的</span>
             <span className="gl-col-tab-count">{likedPrompts.length}</span>

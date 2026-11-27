@@ -5,13 +5,16 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Cloud,
   Download,
   FileCode,
   FileCode2,
   Globe,
+  KeyRound,
   Layers,
   Link2,
   Lock,
@@ -92,9 +95,12 @@ export interface PresentationEditorViewProps {
   generatingImg: boolean;
   imgModelName: string;
   imgPromptCopied: boolean;
+  engineMode: "smart" | "llm";
+  byokReady: boolean;
   polishingAction: PolishAction | null;
   pendingPolish: PendingPolishProposal | null;
   onBackToWorkshop: () => void;
+  onOpenByokSettings: () => void;
   onTitleChange: (val: string) => void;
   onSelectStyle: (slug: string) => void;
   onChangeSpec: (next: VisualSpec) => void;
@@ -154,9 +160,12 @@ export default function PresentationEditorView({
   generatingImg,
   imgModelName,
   imgPromptCopied,
+  engineMode,
+  byokReady,
   polishingAction,
   pendingPolish,
   onBackToWorkshop,
+  onOpenByokSettings,
   onTitleChange,
   onSelectStyle,
   onChangeSpec,
@@ -190,6 +199,7 @@ export default function PresentationEditorView({
   onDiscardPolish,
 }: PresentationEditorViewProps) {
   const [rightTab, setRightTab] = useState<"slide" | "theme">("slide");
+  const [mobileInspectorOpen, setMobileInspectorOpen] = useState(true);
   const [zoom, setZoom] = useState<number>(100);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreWrapRef = useRef<HTMLDivElement | null>(null);
@@ -650,7 +660,25 @@ export default function PresentationEditorView({
 
         {/* Right: 2 Real Inspector Tabs + Honest AI Assistant Card */}
         <aside className="gl-ed-right" aria-label="属性与主题面板">
-          <div className="gl-ed-right-card">
+          <div
+            className={`gl-ed-right-card ${
+              mobileInspectorOpen ? "" : "is-mobile-collapsed"
+            }`}
+          >
+            <button
+              type="button"
+              className="gl-ed-right-mobile-toggle"
+              aria-expanded={mobileInspectorOpen}
+              onClick={() => setMobileInspectorOpen((v) => !v)}
+            >
+              <span>属性与主题检查器</span>
+              {mobileInspectorOpen ? (
+                <ChevronUp size={15} aria-hidden="true" />
+              ) : (
+                <ChevronDown size={15} aria-hidden="true" />
+              )}
+            </button>
+
             <div
               className="gl-ed-right-tabs"
               role="tablist"
@@ -693,7 +721,9 @@ export default function PresentationEditorView({
                   generatingImg={generatingImg}
                   imgModelName={imgModelName}
                   imgPromptCopied={imgPromptCopied}
+                  byokReady={byokReady}
                   onChangeImgModelName={onChangeImgModelName}
+                  onOpenByokSettings={onOpenByokSettings}
                   onUploadSlideImage={onUploadSlideImage}
                   onCopySlideImagePrompt={onCopySlideImagePrompt}
                   onGenerateAiSlideImage={onGenerateAiSlideImage}
@@ -742,7 +772,22 @@ export default function PresentationEditorView({
                 <Sparkles size={15} aria-hidden="true" />
                 <strong>AI 助手</strong>
               </span>
-              <span className="gl-ed-ai-badge">预览后确认应用</span>
+              <button
+                type="button"
+                id="pg-ed-byok-config-btn"
+                className={`gl-ed-byok-btn ${byokReady ? "is-ready" : ""}`}
+                onClick={onOpenByokSettings}
+                title="配置本地浏览器 BYOK 大模型与生图 API Key（不上传服务器）"
+              >
+                <KeyRound size={11} aria-hidden="true" />
+                <span>
+                  {byokReady
+                    ? engineMode === "llm"
+                      ? "BYOK 已启用"
+                      : "BYOK Key 就绪"
+                    : "配置本地 BYOK"}
+                </span>
+              </button>
             </div>
 
             <div className="gl-ed-ai-actions">

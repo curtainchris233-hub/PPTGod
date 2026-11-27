@@ -1,7 +1,14 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { Check, Copy, Image as ImageIcon, Sparkles, Upload } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Image as ImageIcon,
+  KeyRound,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import {
   pickDefaultArtworkForArchetype,
   SLIDE_ARTWORK_PRESETS,
@@ -14,7 +21,9 @@ interface ImageSlotManagerProps {
   generatingImg: boolean;
   imgModelName: string;
   imgPromptCopied: boolean;
+  byokReady: boolean;
   onChangeImgModelName: (val: string) => void;
+  onOpenByokSettings: () => void;
   onUploadSlideImage: (file: File) => void;
   onCopySlideImagePrompt: () => void;
   onGenerateAiSlideImage: () => void;
@@ -27,7 +36,9 @@ export default function ImageSlotManager({
   generatingImg,
   imgModelName,
   imgPromptCopied,
+  byokReady,
   onChangeImgModelName,
+  onOpenByokSettings,
   onUploadSlideImage,
   onCopySlideImagePrompt,
   onGenerateAiSlideImage,
@@ -256,13 +267,27 @@ export default function ImageSlotManager({
             />
             <button
               type="button"
-              className="pg-btn pg-btn-ink pg-btn-xs"
+              className="pg-btn pg-btn-primary pg-btn-xs"
               disabled={generatingImg}
               onClick={onGenerateAiSlideImage}
               id="pg-gen-ai-img-btn"
             >
               <Sparkles size={12} />
               <span>{generatingImg ? "生图中..." : "BYOK 生图"}</span>
+            </button>
+          </div>
+          <div className="gl-img-byok-row">
+            <span className={`gl-img-byok-state ${byokReady ? "is-ready" : ""}`}>
+              <KeyRound size={11} aria-hidden="true" />
+              <span>{byokReady ? "本地会话 Key 已就绪" : "未配置 BYOK API Key"}</span>
+            </span>
+            <button
+              type="button"
+              id="pg-img-byok-config-btn"
+              className="gl-img-byok-link"
+              onClick={onOpenByokSettings}
+            >
+              {byokReady ? "管理 Key" : "去配置 Key"}
             </button>
           </div>
         </div>

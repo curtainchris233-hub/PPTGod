@@ -3,8 +3,8 @@
    ========================================================================== */
 
 .pg-tools-page {
-  padding-top: 28px;
-  padding-bottom: 56px;
+  padding-top: 4px;
+  padding-bottom: 32px;
 }
 
 .pg-tools-header {
@@ -19,7 +19,7 @@
 .pg-tools-sub {
   margin: 6px 0 0;
   font-size: 13.5px;
-  color: var(--ink-secondary);
+  color: var(--gl-text-secondary, #475569);
 }
 
 .pg-tools-tabs {
@@ -106,10 +106,9 @@
 }
 
 .pg-tools-kpi-hero {
-  background: var(--bg-inset);
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--radius-md);
-  box-shadow: var(--neu-inset-soft);
+  background: var(--gl-bg-subtle, #f8fafc);
+  border: 1px solid var(--gl-border, #e2e8f0);
+  border-radius: var(--gl-radius-lg, 12px);
   padding: 22px 20px;
   display: flex;
   flex-direction: column;
@@ -119,20 +118,20 @@
 .pg-tools-kpi-eyebrow {
   font-size: 12px;
   font-weight: 600;
-  color: var(--ink-muted);
+  color: var(--gl-muted, #64748b);
 }
 
 .pg-tools-kpi-num {
   font-size: clamp(28px, 3vw, 38px);
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: var(--ink-primary);
+  color: var(--gl-text, #0f172a);
   font-variant-numeric: tabular-nums;
 }
 
 .pg-tools-kpi-note {
   font-size: 12.5px;
-  color: var(--ink-secondary);
+  color: var(--gl-text-secondary, #475569);
   font-variant-numeric: tabular-nums;
 }
 
@@ -143,25 +142,25 @@
 }
 
 .pg-tools-stat-card {
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--radius-sm);
+  background: var(--gl-surface, #ffffff);
+  border: 1px solid var(--gl-border, #e2e8f0);
+  border-radius: var(--gl-radius-md, 10px);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--gl-shadow-xs);
 }
 
 .pg-tools-stat-card span {
   font-size: 11.5px;
-  color: var(--ink-muted);
+  color: var(--gl-muted, #64748b);
 }
 
 .pg-tools-stat-card strong {
   font-size: 15px;
   font-weight: 700;
-  color: var(--ink-primary);
+  color: var(--gl-text, #0f172a);
   font-variant-numeric: tabular-nums;
 }
 
@@ -170,7 +169,7 @@
   align-items: center;
   gap: 8px;
   padding: 11px 14px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--gl-radius-md, 10px);
   font-size: 12.5px;
   line-height: 1.45;
 }
@@ -188,9 +187,8 @@
 .pg-tools-dropzone {
   position: relative;
   border: 1.5px dashed rgba(37, 99, 235, 0.34);
-  border-radius: var(--radius-md);
-  background: rgba(240, 246, 255, 0.56);
-  box-shadow: var(--neu-inset-soft);
+  border-radius: var(--gl-radius-lg, 12px);
+  background: rgba(240, 246, 255, 0.62);
   padding: 20px 22px;
   display: flex;
   align-items: center;

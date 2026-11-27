@@ -22,6 +22,7 @@ export default async function GeneratePage({
     handoff?: string;
     intake?: string;
     panel?: string;
+    mode?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -46,6 +47,13 @@ export default async function GeneratePage({
     }
   }
 
+  const initialMode: "workshop" | "editor" | undefined =
+    sp.mode === "editor"
+      ? "editor"
+      : sp.mode === "create" || sp.mode === "workshop"
+        ? "workshop"
+        : undefined;
+
   return (
     <GenerateClient
       styles={styles}
@@ -56,6 +64,7 @@ export default async function GeneratePage({
       initialHandoff={sp.handoff === "1"}
       initialIntake={sp.intake === "1"}
       initialPanel={sp.panel === "audit" ? "audit" : undefined}
+      initialMode={initialMode}
     />
   );
 }

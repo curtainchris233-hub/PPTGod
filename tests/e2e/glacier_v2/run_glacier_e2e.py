@@ -322,12 +322,27 @@ def main(argv: list[str] | None = None) -> int:
 
     temp_backup_cm = (
         tempfile.TemporaryDirectory(prefix="pptgod_glacier_e2e_")
-        if args.backup_db
+        if args.backup_db and DbHygieneHelper.postgres_url() is None
         else None
     )
 
+    pg_mode = DbHygieneHelper.postgres_url() is not None
+
+    def _snapshot() -> dict[str, Any]:
+        if pg_mode:
+            return DbHygieneHelper.snapshot_counts_postgres(_REPO_ROOT)
+        return DbHygieneHelper.snapshot_counts(db_path)
+
     try:
-        if args.backup_db and temp_backup_cm is not None:
+        if args.backup_db and pg_mode:
+            pre_snapshot = _snapshot()
+            print(
+                "PostgreSQL read-only snapshot (DATABASE_URL) | "
+                f"Pre-run counts: prompts={pre_snapshot['prompts']}, "
+                f"saved_decks={pre_snapshot['saved_decks']}, "
+                f"sessions={pre_snapshot['sessions']}"
+            )
+        elif args.backup_db and temp_backup_cm is not None:
             backup_file = Path(temp_backup_cm.name) / "pre_e2e_backup.db"
             DbHygieneHelper.backup_wal(db_path, backup_file)
             pre_snapshot = DbHygieneHelper.snapshot_counts(db_path)
@@ -348,11 +363,12 @@ def main(argv: list[str] | None = None) -> int:
         results = runner.run(specs)
 
         if args.backup_db and pre_snapshot is not None:
-            post_snapshot = DbHygieneHelper.snapshot_counts(db_path)
+            post_snapshot = _snapshot()
+            # PostgreSQL seeds differ per deployment, so only drift/residual/session checks apply.
             ok, issues = DbHygieneHelper.verify_hygiene(
                 pre_snapshot,
                 post_snapshot,
-                enforce_baseline=True,
+                enforce_baseline=not pg_mode,
             )
             db_hygiene_report = {
                 "ok": ok,
@@ -363,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
             }
             if ok:
                 print(
-                    f"[DB HYGIENE PASS] baseline intact, residual [E2E%=0, "
+                    f"[DB HYGIENE PASS] {'no drift' if pg_mode else 'baseline intact'}, residual [E2E%=0, "
                     f"sessions_delta={db_hygiene_report['sessions_delta']}"
                 )
             else:

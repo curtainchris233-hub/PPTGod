@@ -40,7 +40,7 @@ jobs:
         run: npm ci
 
       - name: TypeScript type check
-        run: npx tsc --noEmit --incremental false
+        run: npm run typecheck
 
       - name: ESLint static check
         run: npm run lint

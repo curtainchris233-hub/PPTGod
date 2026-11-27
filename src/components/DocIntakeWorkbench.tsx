@@ -998,7 +998,7 @@ export default function DocIntakeWorkbench({
                         <button
                           type="button"
                           className={`pg-btn pg-btn-xs pg-btn-flex ${
-                            isSelected ? "pg-btn-ink" : "pg-btn-secondary"
+                            isSelected ? "pg-btn-primary" : "pg-btn-secondary"
                           }`}
                           onClick={(e) => {
                             e.stopPropagation();

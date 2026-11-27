@@ -212,10 +212,16 @@ npm run dev
 配置 PostgreSQL、Cloudflare R2、Upstash 和 Resend，或迁移历史文稿，见[上线指南](./docs/DEPLOYMENT.md)。
 
 ```bash
+npm run typecheck
 npm run lint
-npx tsc --noEmit --incremental false
 npm run build
-python3 tests/e2e/glacier_v2/run_glacier_e2e.py --list
+
+# 列出 Glacier UI 2.0 全部 79 项 4-Tier 用例
+npm run test:e2e:list
+
+# 在独立端口 3010 启动生产构建后运行全量端到端验证（勿对 3000 端口运行）
+npm start -- --hostname 127.0.0.1 --port 3010
+PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_glacier_e2e.py --tier all
 ```
 
 ---
@@ -226,5 +232,5 @@ python3 tests/e2e/glacier_v2/run_glacier_e2e.py --list
 | --- | --- |
 | [docs/PPTGod_Glacier_UI_2.0_Development_Spec.md](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) | Glacier UI 2.0 视觉与开发执行规范（Tokens、组件、页面、响应式、验收清单） |
 | [docs/PROJECT.md](./docs/PROJECT.md) | Glacier UI 2.0 架构、功能清单 `F1–F41`、能力边界 `B1–B16` 与里程碑记录 |
-| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 68 项 E2E 测试基础设施说明 |
+| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 79 项 4-Tier E2E 测试基础设施说明 |
 | [docs/PPTGod_UI_Design_Spec.md](./docs/PPTGod_UI_Design_Spec.md) | 冰川白工作台早期设计规范与首页改版对照图 |

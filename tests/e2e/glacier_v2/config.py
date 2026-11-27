@@ -19,8 +19,6 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 from xml.sax.saxutils import escape as xml_escape
 
-from tests.e2e.config import SESSION_COOKIE_NAMES
-
 # ---------------------------------------------------------------------------
 # Runtime Defaults, Port Safety & Browser Storage Keys
 # ---------------------------------------------------------------------------
@@ -36,6 +34,7 @@ DEFAULT_SCREENSHOTS_ARCHIVE = (
     "screenshots/glacier_v2"
 )
 
+SESSION_COOKIE_NAMES: tuple[str, ...] = ("pptgod.session_token", "__Secure-pptgod.session_token")
 COMPARE_STORAGE_KEY = "pptgod_compare_ids_v1"
 GUEST_FAVS_STORAGE_KEY = "pptgod_guest_favs_v1"
 UNSAVED_DRAFT_STORAGE_KEY = "pptgod_unsaved_draft_v4"
