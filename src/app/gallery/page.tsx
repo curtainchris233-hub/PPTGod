@@ -40,11 +40,8 @@ export default async function GalleryPage({
     viewerId: viewer?.id,
   });
 
-  // Key on the top-bar search string so a fresh top-bar submission re-seeds state.
-  const searchKey = `${initialFilters.q ?? ""}|${initialFilters.domain ?? ""}`;
   return (
     <GalleryClient
-      key={searchKey}
       initialPrompts={initialPrompts}
       initialSearch={initialFilters.q}
       initialFilters={initialFilters}

@@ -32,6 +32,8 @@ import {
   type DeckSlideItem,
   type DocumentAnalysisResult,
   type DomainTabId,
+  type EvidenceDensity,
+  type GenerationRouteMode,
   type OutlineDraftItem,
   type PromptItem,
   type SlideType,
@@ -79,6 +81,8 @@ export interface WorkshopWizardViewProps {
   audience: string;
   slideCount: number;
   sourceText: string;
+  evidenceDensity: EvidenceDensity;
+  routeMode: GenerationRouteMode;
   engineMode: "smart" | "llm";
   apiBase: string;
   apiKey: string;
@@ -99,6 +103,8 @@ export interface WorkshopWizardViewProps {
   onAudienceChange: (val: string) => void;
   onSlideCountChange: (count: number) => void;
   onSourceTextChange: (val: string) => void;
+  onEvidenceDensityChange: (density: EvidenceDensity) => void;
+  onRouteModeChange: (routeMode: GenerationRouteMode) => void;
   onEngineModeChange: (m: "smart" | "llm") => void;
   onApiBaseChange: (val: string) => void;
   onApiKeyChange: (val: string) => void;
@@ -135,6 +141,8 @@ export default function WorkshopWizardView({
   audience,
   slideCount,
   sourceText,
+  evidenceDensity,
+  routeMode,
   engineMode,
   apiBase,
   apiKey,
@@ -155,6 +163,8 @@ export default function WorkshopWizardView({
   onAudienceChange,
   onSlideCountChange,
   onSourceTextChange,
+  onEvidenceDensityChange,
+  onRouteModeChange,
   onEngineModeChange,
   onApiBaseChange,
   onApiKeyChange,
@@ -737,6 +747,59 @@ export default function WorkshopWizardView({
 
                 <div className="gl-ws-adv-col">
                   <div className="gl-ws-field">
+                    <span>内容证据密度</span>
+                    <div
+                      className="gl-ws-engine-seg gl-ws-engine-seg--3"
+                      role="group"
+                      aria-label="内容证据密度"
+                    >
+                      {(
+                        [
+                          { id: "light", label: "精炼提纲" },
+                          { id: "balanced", label: "均衡论证" },
+                          { id: "high-evidence", label: "高密度原文" },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          id={`pg-density-${opt.id}-btn`}
+                          className={evidenceDensity === opt.id ? "is-active" : ""}
+                          onClick={() => onEvidenceDensityChange(opt.id)}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="gl-ws-field">
+                    <span>文档整理路由（适配 .pptx 与长文档）</span>
+                    <div
+                      className="gl-ws-engine-seg"
+                      role="group"
+                      aria-label="文档整理路由"
+                    >
+                      <button
+                        type="button"
+                        id="pg-route-restructure-btn"
+                        className={routeMode === "restructure" ? "is-active" : ""}
+                        onClick={() => onRouteModeChange("restructure")}
+                      >
+                        重构故事线
+                      </button>
+                      <button
+                        type="button"
+                        id="pg-route-beautify-btn"
+                        className={routeMode === "beautify-1to1" ? "is-active" : ""}
+                        onClick={() => onRouteModeChange("beautify-1to1")}
+                      >
+                        1:1 保词换肤
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="gl-ws-field">
                     <span>生成引擎</span>
                     <div className="gl-ws-engine-seg">
                       <button
@@ -760,7 +823,7 @@ export default function WorkshopWizardView({
 
                   {engineMode === "smart" ? (
                     <p className="gl-ws-engine-note">
-                      内置语义结构引擎开箱即用，支持 5–20 页全 12 种商业与学术页型编排；需要多语言或深度改写时可切换 BYOK 自定义模型。
+                      内置语义结构引擎开箱即用，支持 5–20 页全 12 种商业与学术页型编排；需要多语言或深度改写时可切换 BYOK 自定义模型（与全局设置弹窗实时同步）。
                     </p>
                   ) : (
                     <>
@@ -785,7 +848,7 @@ export default function WorkshopWizardView({
                         />
                       </label>
                       <label className="gl-ws-field">
-                        <span>API Key（仅本次请求转发，不留存服务端）</span>
+                        <span>API Key（仅存本地标签页会话，不留存服务端）</span>
                         <input
                           id="pg-llm-key"
                           type="password"

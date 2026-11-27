@@ -1,21 +1,30 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Check,
   FileText,
+  KeyRound,
   Keyboard,
   Layers,
   LogOut,
   Search,
   ShieldCheck,
+  Trash2,
   User as UserIcon,
 } from "lucide-react";
 import { Button, Dialog, TextInput } from "@/components/ui";
 import { useApp } from "@/context/AppContext";
 import { useLayout } from "@/context/LayoutContext";
+import {
+  clearByokSessionKey,
+  readByokPrefs,
+  subscribeByokPrefs,
+  writeByokPrefs,
+  type ByokLocalPrefs,
+} from "@/lib/byokLocalStore";
 import type { UserPublic } from "@/types/prompt";
 import MobileNavDrawer from "./MobileNavDrawer";
 import Sidebar from "./Sidebar";
@@ -312,6 +321,142 @@ function SettingsProfileForm({
   );
 }
 
+function SettingsByokForm() {
+  const { showToast } = useApp();
+  const [prefs, setPrefs] = useState<ByokLocalPrefs>(() => readByokPrefs());
+
+  useEffect(() => {
+    return subscribeByokPrefs((next) => {
+      setPrefs(next);
+    });
+  }, []);
+
+  const handleSave = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const saved = writeByokPrefs({
+      engineMode: prefs.engineMode,
+      apiBase: prefs.apiBase.trim() || "https://api.openai.com/v1",
+      modelName: prefs.modelName.trim() || "gpt-4o-mini",
+      imgModelName: prefs.imgModelName.trim() || "dall-e-3",
+      apiKey: prefs.apiKey.trim(),
+    });
+    setPrefs(saved);
+    showToast("本地 BYOK 模型配置已同步至工坊与编辑器", "success");
+  };
+
+  const handleClearKey = () => {
+    const cleared = clearByokSessionKey();
+    setPrefs(cleared);
+    showToast("已清除当前浏览器会话的 API Key", "default");
+  };
+
+  const hasKey = prefs.apiKey.trim().length > 0;
+
+  return (
+    <form className="gl-settings-form" onSubmit={handleSave}>
+      <div className="gl-byok-header-row">
+        <div className="gl-byok-engine-seg" role="group" aria-label="默认生成引擎">
+          <button
+            type="button"
+            id="gl-settings-byok-smart"
+            className={`gl-byok-seg-btn ${prefs.engineMode === "smart" ? "is-active" : ""}`}
+            onClick={() => {
+              const next = writeByokPrefs({ engineMode: "smart" });
+              setPrefs(next);
+            }}
+          >
+            内置引擎（免 Key）
+          </button>
+          <button
+            type="button"
+            id="gl-settings-byok-llm"
+            className={`gl-byok-seg-btn ${prefs.engineMode === "llm" ? "is-active" : ""}`}
+            onClick={() => {
+              const next = writeByokPrefs({ engineMode: "llm" });
+              setPrefs(next);
+            }}
+          >
+            BYOK 大模型
+          </button>
+        </div>
+
+        <span
+          className={`gl-byok-status-pill ${hasKey ? "is-ready" : ""}`}
+          id="gl-settings-byok-status"
+        >
+          <KeyRound size={12} aria-hidden="true" />
+          <span>{hasKey ? "会话 Key 已就绪" : "未配置 Key"}</span>
+        </span>
+      </div>
+
+      <TextInput
+        id="gl-settings-byok-base"
+        label="API Base URL（OpenAI / DeepSeek 兼容）"
+        value={prefs.apiBase}
+        onChange={(event) =>
+          setPrefs((prev) => ({ ...prev, apiBase: event.target.value }))
+        }
+        placeholder="https://api.openai.com/v1"
+      />
+
+      <div className="gl-byok-two-col">
+        <TextInput
+          id="gl-settings-byok-model"
+          label="文本模型名称"
+          value={prefs.modelName}
+          onChange={(event) =>
+            setPrefs((prev) => ({ ...prev, modelName: event.target.value }))
+          }
+          placeholder="gpt-4o-mini / deepseek-chat"
+        />
+        <TextInput
+          id="gl-settings-byok-img-model"
+          label="配图生图模型"
+          value={prefs.imgModelName}
+          onChange={(event) =>
+            setPrefs((prev) => ({ ...prev, imgModelName: event.target.value }))
+          }
+          placeholder="dall-e-3 / gpt-image-1"
+        />
+      </div>
+
+      <TextInput
+        id="gl-settings-byok-key"
+        label="会话 API Key（仅存 sessionStorage，关闭标签页自动清除）"
+        type="password"
+        autoComplete="off"
+        value={prefs.apiKey}
+        onChange={(event) =>
+          setPrefs((prev) => ({ ...prev, apiKey: event.target.value }))
+        }
+        placeholder="sk-..."
+      />
+
+      <div className="gl-settings-form-actions">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          id="gl-settings-byok-clear-btn"
+          disabled={!hasKey}
+          leftIcon={<Trash2 size={13} />}
+          onClick={handleClearKey}
+        >
+          清除会话 Key
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          size="sm"
+          id="gl-settings-byok-save-btn"
+        >
+          保存本地配置
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function GlacierSettingsDialog() {
   const { user, openAuthModal, logout } = useApp();
   const {
@@ -326,7 +471,7 @@ function GlacierSettingsDialog() {
       open={settingsModalOpen}
       onClose={closeSettingsModal}
       title="工作台与账户设置"
-      description="管理界面偏好与个人资料，偏好会自动保存在当前浏览器"
+      description="管理界面偏好、本地 BYOK 模型配置与个人资料"
       size="md"
       id="gl-settings-dialog"
     >
@@ -386,13 +531,20 @@ function GlacierSettingsDialog() {
           )}
         </section>
 
+        <section className="gl-modal-section" aria-label="本地 BYOK 模型配置">
+          <h3 className="gl-settings-section-title">
+            本地 BYOK 模型配置（工坊与编辑器通用）
+          </h3>
+          {settingsModalOpen && <SettingsByokForm key="open" />}
+        </section>
+
         <section className="gl-modal-section gl-modal-section--subtle">
           <div className="gl-modal-section-head">
             <ShieldCheck size={15} strokeWidth={2} aria-hidden="true" />
             <h3>安全与隐私说明</h3>
           </div>
           <p className="gl-modal-section-text">
-            BYOK 自定义模型 API Key 仅存储在本地浏览器内存/会话中，绝不会持久化至服务端数据库。
+            BYOK 自定义模型 API Key 仅存储在本地浏览器当前标签页会话（sessionStorage）中，绝不会发送给账户接口或持久化至服务端数据库。
           </p>
         </section>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import SlideCanvas from "@/components/SlideCanvas";
 import ExportPromptModal from "@/components/generate/ExportPromptModal";
@@ -12,6 +13,12 @@ import WorkshopWizardView, {
 } from "@/components/generate/WorkshopWizardView";
 import { useApp } from "@/context/AppContext";
 import { useLayout } from "@/context/LayoutContext";
+import {
+  DEFAULT_BYOK_PREFS,
+  readByokPrefs,
+  subscribeByokPrefs,
+  writeByokPrefs,
+} from "@/lib/byokLocalStore";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import {
   createDefaultSlideOfType,
@@ -31,6 +38,8 @@ import {
   SLIDE_TYPE_LABELS,
   type DeckSlideItem,
   type DocumentAnalysisResult,
+  type EvidenceDensity,
+  type GenerationRouteMode,
   type OutlineDraftItem,
   type PromptItem,
   type SavedDeck,
@@ -50,6 +59,8 @@ interface GenerateClientProps {
   initialIntake?: boolean;
   /** Deep-linked panel to open on arrival (`/generate?panel=audit`). */
   initialPanel?: "audit";
+  /** Explicit view mode from `/generate?mode=create|editor`. */
+  initialMode?: "workshop" | "editor";
 }
 
 const MAX_HISTORY_SNAPSHOTS = 40;
@@ -185,9 +196,11 @@ export default function GenerateClient({
   initialHandoff = false,
   initialIntake = false,
   initialPanel,
+  initialMode,
 }: GenerateClientProps) {
+  const searchParams = useSearchParams();
   const { user, openAuthModal, showToast, refreshAuth } = useApp();
-  const { setEditorFullBleed } = useLayout();
+  const { setEditorFullBleed, openSettingsModal } = useLayout();
 
   const initialStyle = useMemo(
     () => styles.find((s) => s.slug === initialStyleSlug) || styles[0],
@@ -195,9 +208,11 @@ export default function GenerateClient({
   );
 
   // Two-stage flow: Workshop Wizard (PNG-3) vs Full-Bleed Presentation Editor (PNG-4)
-  const [mode, setMode] = useState<"workshop" | "editor">(() =>
-    initialDeck || initialPanel === "audit" ? "editor" : "workshop"
-  );
+  const [mode, setMode] = useState<"workshop" | "editor">(() => {
+    if (initialPanel === "audit") return "editor";
+    if (initialMode) return initialMode;
+    return initialDeck ? "editor" : "workshop";
+  });
   const [auditOpen, setAuditOpen] = useState<boolean>(
     initialPanel === "audit"
   );
@@ -238,10 +253,53 @@ export default function GenerateClient({
     Math.max(5, Math.min(20, initialDeck?.slides?.length || 8))
   );
   const [sourceText, setSourceText] = useState("");
-  const [engineMode, setEngineMode] = useState<"smart" | "llm">("smart");
-  const [apiBase, setApiBase] = useState("https://api.openai.com/v1");
-  const [apiKey, setApiKey] = useState("");
-  const [modelName, setModelName] = useState("gpt-4o-mini");
+  const [evidenceDensity, setEvidenceDensity] =
+    useState<EvidenceDensity>("balanced");
+  const [routeMode, setRouteMode] =
+    useState<GenerationRouteMode>("restructure");
+  const [engineMode, setEngineMode] = useState<"smart" | "llm">(
+    DEFAULT_BYOK_PREFS.engineMode
+  );
+  const [apiBase, setApiBase] = useState(DEFAULT_BYOK_PREFS.apiBase);
+  const [apiKey, setApiKey] = useState(DEFAULT_BYOK_PREFS.apiKey);
+  const [modelName, setModelName] = useState(DEFAULT_BYOK_PREFS.modelName);
+
+  // React to client-side URL query transitions (e.g. Sidebar `/generate` <-> `/generate?panel=audit` or `?mode=create|editor`)
+  const urlPanel = searchParams.get("panel");
+  const urlMode = searchParams.get("mode");
+  const urlStyle = searchParams.get("style");
+  const urlTopic = searchParams.get("topic");
+  const urlDeck = searchParams.get("deck");
+  const urlNavSig = `${urlPanel ?? ""}|${urlMode ?? ""}|${urlStyle ?? ""}|${urlTopic ?? ""}|${urlDeck ?? ""}`;
+  const [prevUrlNavSig, setPrevUrlNavSig] = useState(urlNavSig);
+
+  if (urlNavSig !== prevUrlNavSig) {
+    setPrevUrlNavSig(urlNavSig);
+    if (urlPanel === "audit") {
+      setMode("editor");
+      setAuditOpen(true);
+    } else if (urlMode === "editor" || urlDeck) {
+      setMode("editor");
+      setAuditOpen(false);
+    } else if (urlMode === "create" || urlMode === "workshop") {
+      setMode("workshop");
+      setAuditOpen(false);
+    } else if (!urlPanel && !urlDeck) {
+      setMode("workshop");
+      setAuditOpen(false);
+    }
+
+    if (urlStyle) {
+      const matched = styles.find((s) => s.slug === urlStyle);
+      if (matched && matched.slug !== selectedSlug) {
+        setSelectedSlug(matched.slug);
+        setDeckSpec(matched.visualSpec);
+      }
+    }
+    if (urlTopic && urlTopic !== topic) {
+      setTopic(urlTopic);
+    }
+  }
 
   // Document Upload State
   const [parsingDoc, setParsingDoc] = useState(false);
@@ -328,6 +386,67 @@ export default function GenerateClient({
   const currentSlide = slides[safeIndex];
   const title = topic.trim() || activeStyle?.sampleTopic || "PPTGod Deck";
 
+  // Sync browser-local BYOK preferences across SettingsModal, Workshop, and Editor (S22: never sent to server DB)
+  useEffect(() => {
+    let active = true;
+    const applyPrefs = (prefs: ReturnType<typeof readByokPrefs>) => {
+      if (!active) return;
+      setEngineMode(prefs.engineMode);
+      setApiBase(prefs.apiBase);
+      setApiKey(prefs.apiKey);
+      setModelName(prefs.modelName);
+      setImgModelName(prefs.imgModelName);
+    };
+    Promise.resolve().then(() => applyPrefs(readByokPrefs()));
+    const unsubscribe = subscribeByokPrefs(applyPrefs);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const handleEngineModeChange = useCallback((next: "smart" | "llm") => {
+    setEngineMode(next);
+    writeByokPrefs({ engineMode: next });
+  }, []);
+
+  const handleApiBaseChange = useCallback((next: string) => {
+    setApiBase(next);
+    writeByokPrefs({ apiBase: next });
+  }, []);
+
+  const handleApiKeyChange = useCallback((next: string) => {
+    setApiKey(next);
+    writeByokPrefs({ apiKey: next });
+  }, []);
+
+  const handleModelNameChange = useCallback((next: string) => {
+    setModelName(next);
+    writeByokPrefs({ modelName: next });
+  }, []);
+
+  const handleImgModelNameChange = useCallback((next: string) => {
+    setImgModelName(next);
+    writeByokPrefs({ imgModelName: next });
+  }, []);
+
+  const handleBackToWorkshop = useCallback(() => {
+    setMode("workshop");
+    setAuditOpen(false);
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.has("panel") || sp.get("mode") === "editor") {
+        sp.delete("panel");
+        if (sp.get("mode") === "editor") sp.delete("mode");
+        const qs = sp.toString();
+        const nextUrl = qs ? `/generate?${qs}` : "/generate";
+        const nextSig = `${sp.get("panel") ?? ""}|${sp.get("mode") ?? ""}|${sp.get("style") ?? ""}|${sp.get("topic") ?? ""}|${sp.get("deck") ?? ""}`;
+        setPrevUrlNavSig(nextSig);
+        window.history.replaceState(null, "", nextUrl);
+      }
+    }
+  }, []);
+
   // Mount effect: consume Doc Intake OR Studio handoff OR check local auto-save draft
   useEffect(() => {
     let active = true;
@@ -356,6 +475,12 @@ export default function GenerateClient({
           if (intake.audience) setAudience(intake.audience);
           setSlideCount(nextSlideCount);
           if (intake.text) setSourceText(intake.text);
+          if (intake.evidenceDensity) {
+            setEvidenceDensity(intake.evidenceDensity);
+          }
+          if (intake.routeMode) {
+            setRouteMode(intake.routeMode);
+          }
 
           const isPromptIntake = intake.fileType === "prompt";
           if (!isPromptIntake && intake.fileName) {
@@ -791,8 +916,9 @@ export default function GenerateClient({
       if (Array.isArray(data.parsedOutline) && data.parsedOutline.length > 0) {
         setOutlineDraft(data.parsedOutline);
         setSlideCount(Math.max(5, Math.min(20, data.parsedOutline.length)));
+        setRouteMode("beautify-1to1");
         showToast(
-          `已反解 .pptx「${data.fileName}」共 ${data.parsedOutline.length} 页大纲，调整后即可生成！`,
+          `已反解 .pptx「${data.fileName}」共 ${data.parsedOutline.length} 页大纲（默认 1:1 保词换肤），调整后即可生成！`,
           "success"
         );
         return;
@@ -823,6 +949,7 @@ export default function GenerateClient({
       if (next.length === 0) {
         setDocAnalysis(null);
         setSourceText("");
+        setRouteMode("restructure");
       }
       return next;
     });
@@ -852,6 +979,8 @@ export default function GenerateClient({
           sourceText,
           slideCount,
           scenario: activeStyle?.scenario,
+          routeMode,
+          evidenceDensity,
           mode: engineMode,
           ...(engineMode === "llm"
             ? { apiBase, apiKey, model: modelName }
@@ -905,6 +1034,8 @@ export default function GenerateClient({
           scenario: activeStyle?.scenario,
           archetype: deckSpec.layout.archetype,
           outline: customOutline,
+          routeMode,
+          evidenceDensity,
           mode: engineMode,
           ...(engineMode === "llm"
             ? { apiBase, apiKey, model: modelName }
@@ -1331,6 +1462,8 @@ export default function GenerateClient({
           audience={audience}
           slideCount={slideCount}
           sourceText={sourceText}
+          evidenceDensity={evidenceDensity}
+          routeMode={routeMode}
           engineMode={engineMode}
           apiBase={apiBase}
           apiKey={apiKey}
@@ -1361,10 +1494,12 @@ export default function GenerateClient({
           }}
           onSlideCountChange={setSlideCount}
           onSourceTextChange={setSourceText}
-          onEngineModeChange={setEngineMode}
-          onApiBaseChange={setApiBase}
-          onApiKeyChange={setApiKey}
-          onModelNameChange={setModelName}
+          onEvidenceDensityChange={setEvidenceDensity}
+          onRouteModeChange={setRouteMode}
+          onEngineModeChange={handleEngineModeChange}
+          onApiBaseChange={handleApiBaseChange}
+          onApiKeyChange={handleApiKeyChange}
+          onModelNameChange={handleModelNameChange}
           onSelectStyle={handleSelectStyle}
           onUploadFile={handleDocumentFile}
           onRemoveUploadedFile={handleRemoveUploadedFile}
@@ -1405,9 +1540,12 @@ export default function GenerateClient({
           generatingImg={generatingImg}
           imgModelName={imgModelName}
           imgPromptCopied={imgPromptCopied}
+          engineMode={engineMode}
+          byokReady={apiKey.trim().length > 0}
           polishingAction={polishingAction}
           pendingPolish={pendingPolish}
-          onBackToWorkshop={() => setMode("workshop")}
+          onBackToWorkshop={handleBackToWorkshop}
+          onOpenByokSettings={openSettingsModal}
           onTitleChange={handleTopicChange}
           onSelectStyle={handleSelectStyle}
           onChangeSpec={(next) => {
@@ -1454,7 +1592,7 @@ export default function GenerateClient({
           onDropReorder={handleDropReorder}
           onAddSlide={handleAddSlide}
           onUpdateSlide={updateCurrentSlide}
-          onChangeImgModelName={setImgModelName}
+          onChangeImgModelName={handleImgModelNameChange}
           onUploadSlideImage={handleUploadSlideImage}
           onCopySlideImagePrompt={handleCopySlideImagePrompt}
           onGenerateAiSlideImage={handleGenerateAiSlideImage}
