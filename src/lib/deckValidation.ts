@@ -1,5 +1,6 @@
 import {
   ALL_SLIDE_TYPES,
+  type DataDisplayMode,
   type DeckSlideBar,
   type DeckSlideFunnelStage,
   type DeckSlideImageSlot,
@@ -9,6 +10,8 @@ import {
   type DeckSlideSwot,
   type DeckSlideTeamMember,
   type OutlineDraftItem,
+  type SlideChartSeries,
+  type SlideTableData,
   type SlideType,
 } from "@/types/prompt";
 import { safeNumber, safeString } from "@/app/api/prompts/_validation";
@@ -467,13 +470,18 @@ export function sanitizeLlmSlide(
         : raw.imageSlot.layout === "left"
         ? ("left" as const)
         : undefined;
+    const kind: DeckSlideImageSlot["kind"] =
+      raw.imageSlot.kind === "data-url" &&
+      isValidImageDataUrl(raw.imageSlot.dataUrl)
+        ? "data-url"
+        : raw.imageSlot.kind === "placeholder"
+        ? "placeholder"
+        : "svg-preset";
     const slot: DeckSlideImageSlot = {
-      kind:
-        raw.imageSlot.kind === "data-url" &&
-        isValidImageDataUrl(raw.imageSlot.dataUrl)
-          ? "data-url"
-          : "svg-preset",
-      presetId: toSafeString(raw.imageSlot.presetId) || "swiss-geometry",
+      kind,
+      ...(kind === "svg-preset"
+        ? { presetId: toSafeString(raw.imageSlot.presetId) || "swiss-geometry" }
+        : {}),
       ...(layout ? { layout } : {}),
       ...(caption ? { caption } : {}),
       ...(promptHint ? { promptHint } : {}),
@@ -482,6 +490,85 @@ export function sanitizeLlmSlide(
       slot.dataUrl = raw.imageSlot.dataUrl.trim();
     }
     slide.imageSlot = slot;
+  }
+
+  if (typeof raw.singleSeries === "boolean") {
+    slide.singleSeries = raw.singleSeries;
+  }
+
+  const validDisplays: DataDisplayMode[] = [
+    "col",
+    "bar",
+    "line",
+    "doughnut",
+    "kpi-only",
+    "data-matrix",
+  ];
+  if (
+    typeof raw.dataDisplay === "string" &&
+    validDisplays.includes(raw.dataDisplay as DataDisplayMode)
+  ) {
+    slide.dataDisplay = raw.dataDisplay as DataDisplayMode;
+  }
+
+  const chartCategories = toSafeStringList(raw.chartCategories, 16);
+  if (chartCategories && chartCategories.length > 0) {
+    slide.chartCategories = chartCategories;
+  }
+
+  if (Array.isArray(raw.chartSeries)) {
+    const series: SlideChartSeries[] = raw.chartSeries
+      .filter(isPlainObject)
+      .slice(0, 4)
+      .map((s, sIdx) => ({
+        name: toSafeString(s.name) || `序列 ${sIdx + 1}`,
+        values: Array.isArray(s.values)
+          ? s.values.slice(0, 16).map((v) => {
+              const n = safeNumber(v);
+              return n !== null ? n : 0;
+            })
+          : [],
+        ...(toSafeString(s.unit) ? { unit: toSafeString(s.unit) } : {}),
+      }))
+      .filter((s) => s.values.length > 0);
+    if (series.length > 0) slide.chartSeries = series;
+  }
+
+  if (isPlainObject(raw.tableData)) {
+    const headers = toSafeStringList(raw.tableData.headers, 10);
+    const rows = Array.isArray(raw.tableData.rows)
+      ? raw.tableData.rows
+          .filter(Array.isArray)
+          .slice(0, 30)
+          .map((r) =>
+            r.slice(0, 10).map((cell) => safeString(cell).trim().slice(0, 80))
+          )
+      : [];
+    if (headers && headers.length > 0 && rows.length > 0) {
+      const highlightCoords: [number, number][] = Array.isArray(
+        raw.tableData.highlightCoords
+      )
+        ? raw.tableData.highlightCoords
+            .filter(
+              (pair): pair is [number, number] =>
+                Array.isArray(pair) &&
+                pair.length === 2 &&
+                typeof pair[0] === "number" &&
+                typeof pair[1] === "number" &&
+                pair[0] >= 0 &&
+                pair[0] < rows.length &&
+                pair[1] >= 0 &&
+                pair[1] < headers.length
+            )
+            .slice(0, 12)
+        : [];
+      const td: SlideTableData = {
+        headers,
+        rows,
+        ...(highlightCoords.length > 0 ? { highlightCoords } : {}),
+      };
+      slide.tableData = td;
+    }
   }
 
   const speakerNotes = toSafeString(raw.speakerNotes);

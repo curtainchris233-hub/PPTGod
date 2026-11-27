@@ -14,10 +14,14 @@ import {
   type PaletteContrastReport,
 } from "@/lib/paletteExtractor";
 import type {
+  ChartVariant,
+  DataDisplayMode,
   DecorativeMotif,
   DeckSlideItem,
   LayoutArchetype,
   PromptItem,
+  SlideChartSeries,
+  SlideTableData,
   SlideType,
   TypographyMood,
   VisualSpec,
@@ -33,6 +37,7 @@ export type PackLayout =
   | "section"
   | "big-number"
   | "chart"
+  | "table"
   | "comparison"
   | "timeline"
   | "process"
@@ -48,15 +53,30 @@ export const PACK_LAYOUTS: readonly {
   { id: "cover", label: "封面", hint: "大标题 + 副标题 + 主视觉，留白充足" },
   { id: "agenda", label: "目录", hint: "3–5 个章节编号，横向或纵向排列" },
   { id: "section", label: "章节页", hint: "大号章节编号 + 一句话主旨，满版色块" },
-  { id: "big-number", label: "大数字", hint: "1–3 个关键数字超大展示，配一句解读" },
-  { id: "chart", label: "图表", hint: "原生柱状/折线/环形图，突出结论数据" },
+  { id: "big-number", label: "大数字", hint: "1–3 个关键数字超大英雄卡，不塞冗余柱图" },
+  { id: "chart", label: "图表", hint: "原生柱状/横向条形/折线/环形图，突出结论数据" },
+  { id: "table", label: "数据表", hint: "原生学术三线表 / 商务评分表，跨量纲对比并高亮最优值" },
   { id: "comparison", label: "对比", hint: "左右两栏对照，差异用强调色标出" },
   { id: "timeline", label: "时间线", hint: "按时间/阶段横向排布的节点" },
   { id: "process", label: "流程", hint: "3–5 步带编号的箭头流程或循环" },
   { id: "quote", label: "金句", hint: "居中大号引言 + 出处，极简" },
-  { id: "image-text", label: "图文", hint: "一侧大图/示意图，一侧 3–4 条要点" },
+  { id: "image-text", label: "图文", hint: "一侧真图或干净虚线配图框，一侧 3–4 条要点" },
   { id: "summary", label: "总结", hint: "3–4 条核心结论 + 行动/致谢" },
 ];
+
+export const CHART_VARIANT_OPTIONS: readonly {
+  id: ChartVariant;
+  label: string;
+}[] = [
+  { id: "col", label: "竖向柱状图" },
+  { id: "bar", label: "横向对比条" },
+  { id: "line", label: "趋势折线图" },
+  { id: "doughnut", label: "占比环形图" },
+];
+
+export function chartVariantLabel(variant?: ChartVariant): string {
+  return CHART_VARIANT_OPTIONS.find((c) => c.id === variant)?.label ?? "竖向柱状图";
+}
 
 export const PACK_LAYOUT_IDS = PACK_LAYOUTS.map((l) => l.id);
 
@@ -171,6 +191,15 @@ export interface PackSlide {
   visual: string;
   note: string;
   source: string;
+  /** M9: Chart variant for `chart` slides (col | bar | line | doughnut) */
+  chartVariant?: ChartVariant;
+  /** M9: Multi-series chart categories & series from uploaded spreadsheets */
+  chartCategories?: string[];
+  chartSeries?: SlideChartSeries[];
+  /** M9: Structured multi-column table data for `table` slides */
+  tableData?: SlideTableData;
+  /** M9: Optional client-compressed real figure image data URL for `image-text` slides */
+  imageDataUrl?: string;
 }
 
 export interface PackInsight {
@@ -644,6 +673,9 @@ export function newPackSlideId(): string {
   return `ps_${Date.now().toString(36)}_${slideSeq}`;
 }
 
+const SAFE_PACK_IMAGE_RE = /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=\s]+$/i;
+const VALID_CHART_VARIANTS: ChartVariant[] = ["col", "bar", "line", "doughnut"];
+
 export function sanitizePackSlides(raw: unknown, fallback: PackSlide[]): PackSlide[] {
   if (!Array.isArray(raw)) return fallback;
   const slides = raw
@@ -663,6 +695,67 @@ export function sanitizePackSlides(raw: unknown, fallback: PackSlide[]): PackSli
             .filter((d) => d.label && d.value)
             .slice(0, 6)
         : [];
+      const cvRaw = str(s.chartVariant, 16) as ChartVariant;
+      const chartVariant = VALID_CHART_VARIANTS.includes(cvRaw) ? cvRaw : undefined;
+      const chartCategories = strList(s.chartCategories, 16, 32);
+      const chartSeries: SlideChartSeries[] = Array.isArray(s.chartSeries)
+        ? s.chartSeries
+            .filter(isObj)
+            .slice(0, 4)
+            .map((ser, sIdx) => ({
+              name: str(ser.name, 28, `序列 ${sIdx + 1}`),
+              values: Array.isArray(ser.values)
+                ? ser.values
+                    .slice(0, 16)
+                    .map((v) => {
+                      const n = Number(v);
+                      return Number.isFinite(n) ? n : 0;
+                    })
+                : [],
+              ...(str(ser.unit, 12) ? { unit: str(ser.unit, 12) } : {}),
+            }))
+            .filter((ser) => ser.values.length > 0)
+        : [];
+
+      let tableData: SlideTableData | undefined;
+      if (isObj(s.tableData)) {
+        const headers = strList(s.tableData.headers, 10, 32);
+        const rows = Array.isArray(s.tableData.rows)
+          ? s.tableData.rows
+              .filter(Array.isArray)
+              .slice(0, 30)
+              .map((r) => r.slice(0, 10).map((cell) => str(cell, 60)))
+          : [];
+        if (headers.length > 0 && rows.length > 0) {
+          const highlightCoords: [number, number][] = Array.isArray(s.tableData.highlightCoords)
+            ? s.tableData.highlightCoords
+                .filter(
+                  (p): p is [number, number] =>
+                    Array.isArray(p) &&
+                    p.length === 2 &&
+                    typeof p[0] === "number" &&
+                    typeof p[1] === "number" &&
+                    p[0] >= 0 &&
+                    p[0] < rows.length &&
+                    p[1] >= 0 &&
+                    p[1] < headers.length
+                )
+                .slice(0, 12)
+            : [];
+          tableData = {
+            headers,
+            rows,
+            ...(highlightCoords.length > 0 ? { highlightCoords } : {}),
+          };
+        }
+      }
+
+      const rawImg = typeof s.imageDataUrl === "string" ? s.imageDataUrl.trim() : "";
+      const imageDataUrl =
+        rawImg && rawImg.length <= 580_000 && SAFE_PACK_IMAGE_RE.test(rawImg)
+          ? rawImg
+          : undefined;
+
       return {
         id: newPackSlideId(),
         layout,
@@ -672,6 +765,11 @@ export function sanitizePackSlides(raw: unknown, fallback: PackSlide[]): PackSli
         visual: str(s.visual, 200),
         note: str(s.note, 400),
         source: str(s.source, 80),
+        ...(chartVariant ? { chartVariant } : {}),
+        ...(chartCategories.length > 0 ? { chartCategories } : {}),
+        ...(chartSeries.length > 0 ? { chartSeries } : {}),
+        ...(tableData ? { tableData } : {}),
+        ...(imageDataUrl ? { imageDataUrl } : {}),
       };
     })
     .filter((s) => s.title);
@@ -783,6 +881,7 @@ const LAYOUT_TO_SLIDE: Record<PackLayout, SlideType> = {
   section: "quote",
   "big-number": "data",
   chart: "data",
+  table: "data",
   comparison: "comparison",
   timeline: "timeline",
   process: "process",
@@ -794,6 +893,50 @@ const LAYOUT_TO_SLIDE: Record<PackLayout, SlideType> = {
 function parseNumeric(value: string): number {
   const m = value.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
   return m ? Number(m[0]) : 0;
+}
+
+export function inferPackChartVariant(slide: PackSlide): ChartVariant {
+  if (slide.chartVariant && VALID_CHART_VARIANTS.includes(slide.chartVariant)) {
+    return slide.chartVariant;
+  }
+  const signal = `${slide.visual} ${slide.title}`;
+  if (/环形|饼图|占比|构成|份额|分布|doughnut/i.test(signal) && (slide.data.length <= 6 || (slide.chartCategories?.length ?? 0) <= 6)) {
+    return "doughnut";
+  }
+  if (/折线|曲线|趋势|走势|依次为|拉力|加速度|Q[1-4]|月度|历年/i.test(signal)) {
+    return "line";
+  }
+  if (/横向|水平|条形|基准|评测|排行|榜单|BLEU|AIME|MATH|Codeforces|Pass@/i.test(signal)) {
+    return "bar";
+  }
+  return "col";
+}
+
+function buildFallbackTableData(slide: PackSlide, fallbackData: PackDatum[]): SlideTableData {
+  if (slide.tableData && slide.tableData.headers.length > 0 && slide.tableData.rows.length > 0) {
+    return slide.tableData;
+  }
+  if (slide.chartCategories?.length && slide.chartSeries?.length) {
+    const headers = [
+      "维度",
+      ...slide.chartSeries.map((s) =>
+        s.unit && !s.name.includes(s.unit) ? `${s.name} (${s.unit})` : s.name
+      ),
+    ];
+    const rows = slide.chartCategories.map((cat, rIdx) => [
+      cat,
+      ...slide.chartSeries!.map((s) => {
+        const v = s.values[rIdx] ?? 0;
+        return s.unit && !String(v).endsWith(s.unit) ? `${v}${s.unit}` : String(v);
+      }),
+    ]);
+    return { headers, rows };
+  }
+  const rows = fallbackData.map((d) => [d.label, d.value]);
+  return {
+    headers: ["关键指标", "实证数值"],
+    rows: rows.length > 0 ? rows : [["核心要点", slide.points[0] || slide.title]],
+  };
 }
 
 const WEAK_TOPIC_TITLE_RE =
@@ -866,36 +1009,98 @@ export function packSlideToCanvas(
         },
       };
     case "big-number":
-    case "chart": {
+    case "chart":
+    case "table": {
       const data = slide.data.length
         ? slide.data
-        : pts.slice(0, 3).map((p, i) => ({ label: p.slice(0, 10), value: String(i + 1) }));
-      const rawVals = data.slice(0, 5).map((d) => Math.abs(parseNumeric(d.value)));
+        : pts.slice(0, 3).map((p, i) => ({ label: p.slice(0, 12), value: String(i + 1) }));
+      const hasMultiSeries =
+        Boolean(slide.chartCategories?.length) && Boolean(slide.chartSeries?.length);
+      const rawVals = data.slice(0, 6).map((d) => Math.abs(parseNumeric(d.value)));
       const nonZero = rawVals.filter((n) => n > 0);
       const max = Math.max(1, ...rawVals);
       const minPos = nonZero.length ? Math.min(...nonZero) : 1;
-      // Preserve literal numbers when comparable in magnitude; normalize only across huge mixed scales.
       const keepRawScale = nonZero.length > 0 && max <= 1000 && max / Math.max(0.01, minPos) <= 25;
+
+      const resolvedDisplay: DataDisplayMode =
+        slide.layout === "big-number"
+          ? "kpi-only"
+          : slide.layout === "table"
+            ? "data-matrix"
+            : inferPackChartVariant(slide);
+
+      const categories = hasMultiSeries
+        ? slide.chartCategories!.slice(0, 16)
+        : data.slice(0, 6).map((d) => d.label.slice(0, 16));
+
+      const series: SlideChartSeries[] = hasMultiSeries
+        ? slide.chartSeries!.slice(0, 4)
+        : [
+            {
+              name: slide.title.slice(0, 18) || "实证数值",
+              values: data.slice(0, 6).map((d) => {
+                const raw = Math.abs(parseNumeric(d.value));
+                return keepRawScale
+                  ? Number(raw.toFixed(raw < 10 && !Number.isInteger(raw) ? 1 : 0))
+                  : Math.max(4, Math.round((raw / max) * 100));
+              }),
+            },
+          ];
+
+      const bars = categories.slice(0, 10).map((cat, idx) => ({
+        label: cat.slice(0, 14),
+        v1: series[0]?.values[idx] ?? 0,
+        v2: series[1]?.values[idx] ?? series[0]?.values[idx] ?? 0,
+      }));
+
+      const tableData = buildFallbackTableData(slide, data);
+
       return {
         slideType,
         slideData: {
           ...base,
-          singleSeries: true,
+          dataDisplay: resolvedDisplay,
+          singleSeries: series.length <= 1,
+          chartCategories: categories,
+          chartSeries: series,
+          tableData,
           kpis: data.slice(0, 3).map((d, idx) => ({
             label: d.label,
             value: d.value,
             note: idx === 0 && pts[0] ? pts[0].slice(0, 36) : slide.source || "",
           })),
-          bars: data.slice(0, 5).map((d) => {
-            const raw = Math.abs(parseNumeric(d.value));
-            const v = keepRawScale
-              ? Number(raw.toFixed(raw < 10 && !Number.isInteger(raw) ? 1 : 0))
-              : Math.max(4, Math.round((raw / max) * 100));
-            return { label: d.label.slice(0, 12), v1: v, v2: v };
-          }),
+          bars,
         },
       };
     }
+    case "image-text":
+      return {
+        slideType,
+        slideData: {
+          ...base,
+          kpis: slide.data.slice(0, 2).map((d) => ({
+            label: d.label,
+            value: d.value,
+            note: slide.source || "",
+          })),
+          imageSlot: slide.imageDataUrl
+            ? {
+                kind: "data-url",
+                dataUrl: slide.imageDataUrl,
+                layout: "left",
+                caption: slide.source || slide.title,
+                promptHint: slide.visual,
+              }
+            : {
+                kind: "placeholder",
+                layout: "left",
+                caption: slide.source || "",
+                promptHint:
+                  slide.visual ||
+                  `建议在此粘贴「${slide.title.slice(0, 18)}」相关架构图、实验截图或业务配图`,
+              },
+        },
+      };
     case "comparison": {
       const half = Math.max(1, Math.ceil(pts.length / 2));
       const { leftTitle, rightTitle } = inferComparisonHeadings(slide);
@@ -961,7 +1166,7 @@ export function pickPreviewSlides(slides: PackSlide[], activeSlideId?: string | 
   const picked: PackSlide[] = [];
   const want: PackLayout[][] = [
     ["cover"],
-    ["big-number", "chart"],
+    ["table", "chart", "big-number"],
     ["comparison", "process", "timeline", "image-text", "summary"],
   ];
   for (const group of want) {
@@ -1022,9 +1227,25 @@ function styleBlock(style: PackStyle): string {
 }
 
 function slideBlock(slide: PackSlide, index: number, total: number, withNotes = true): string {
-  const lines = [`### 第 ${index + 1}/${total} 页 · 【${packLayoutLabel(slide.layout)}】${slide.title}`];
+  const layoutBadge =
+    slide.layout === "chart"
+      ? `${packLayoutLabel(slide.layout)} · ${chartVariantLabel(inferPackChartVariant(slide))}`
+      : packLayoutLabel(slide.layout);
+  const lines = [`### 第 ${index + 1}/${total} 页 · 【${layoutBadge}】${slide.title}`];
   if (slide.points.length) lines.push(slide.points.map((p) => `- ${p}`).join("\n"));
-  if (slide.data.length) lines.push(`数据：${slide.data.map((d) => `${d.label} = ${d.value}`).join("；")}`);
+  if (slide.layout === "table" && slide.tableData) {
+    const head = `| ${slide.tableData.headers.join(" | ")} |`;
+    const sep = `| ${slide.tableData.headers.map(() => "---").join(" | ")} |`;
+    const body = slide.tableData.rows.map((r) => `| ${r.join(" | ")} |`).join("\n");
+    lines.push(`原生数据表（请用三线表/评分表排版并加粗极值）：\n${head}\n${sep}\n${body}`);
+  } else if (slide.chartSeries && slide.chartSeries.length > 1 && slide.chartCategories?.length) {
+    const seriesTxt = slide.chartSeries
+      .map((ser) => `${ser.name}=[${ser.values.map((v, idx) => `${slide.chartCategories![idx]}:${v}${ser.unit || ""}`).join(", ")}]`)
+      .join("；");
+    lines.push(`多序列图表数据：${seriesTxt}`);
+  } else if (slide.data.length) {
+    lines.push(`数据：${slide.data.map((d) => `${d.label} = ${d.value}`).join("；")}`);
+  }
   if (slide.visual) lines.push(`视觉：${slide.visual}`);
   if (withNotes && slide.note) lines.push(`演讲备注：${slide.note}`);
   if (slide.source) lines.push(`资料出处：${slide.source}`);
@@ -1204,12 +1425,15 @@ export const PACK_DRAFT_KEY = "pptgod_prompt_pack_v1";
 export const PACK_HISTORY_KEY = "pptgod_prompt_pack_history_v1";
 const MAX_HISTORY_ITEMS = 10;
 
+import type { ParsedDataTable } from "@/lib/spreadsheetParser";
+
 export interface PackHandoff {
   text: string;
   fileName: string;
   topic?: string;
   audience?: string;
   slideCount?: number;
+  tables?: ParsedDataTable[];
   savedAt: number;
 }
 
@@ -1297,7 +1521,25 @@ export function upsertPackHistory(entry: {
     try {
       window.localStorage.setItem(PACK_HISTORY_KEY, JSON.stringify(items));
     } catch {
-      // ignore quota errors
+      try {
+        const slimmed = items.map((it, idx) =>
+          idx === 0
+            ? it
+            : {
+                ...it,
+                pack: {
+                  ...it.pack,
+                  slides: it.pack.slides.map(({ imageDataUrl: _drop, ...rest }) => {
+                    void _drop;
+                    return rest;
+                  }),
+                },
+              }
+        );
+        window.localStorage.setItem(PACK_HISTORY_KEY, JSON.stringify(slimmed));
+      } catch {
+        // ignore quota errors
+      }
     }
   }
   return { id, items };

@@ -493,6 +493,7 @@ export function PackOutlineEditor({
   undoMap,
   onRefineSlide,
   onUndoRefine,
+  onToast,
 }: {
   pack: PromptPack;
   onChange: (next: PromptPack) => void;
@@ -503,9 +504,13 @@ export function PackOutlineEditor({
   undoMap?: Record<string, PackSlide>;
   onRefineSlide?: (slide: PackSlide, instruction: string) => void;
   onUndoRefine?: (id: string) => void;
+  onToast?: (msg: string, tone?: "default" | "success" | "error") => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [refineHint, setRefineHint] = useState("");
+  const slideImgInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingImgSlideId, setUploadingImgSlideId] = useState<string | null>(null);
+
   const update = (slides: PackSlide[]) =>
     onChange({ ...pack, slides, insight: { ...pack.insight, slideCount: slides.length } });
   const patch = (id: string, p: Partial<PackSlide>) =>
@@ -537,6 +542,60 @@ export function PackOutlineEditor({
     update(next);
     setOpenId(slide.id);
     onPreviewSlide?.(slide.id);
+  };
+
+  const handleSlideFigureFile = (slideId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      onToast?.("请选择 PNG / JPG / WebP 格式配图", "error");
+      return;
+    }
+    setUploadingImgSlideId(slideId);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        try {
+          const maxSide = 960;
+          const scale = Math.min(1, maxSide / Math.max(img.width || 1, img.height || 1));
+          const w = Math.max(16, Math.round((img.width || 16) * scale));
+          const h = Math.max(16, Math.round((img.height || 16) * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas unavailable");
+          ctx.drawImage(img, 0, 0, w, h);
+
+          let dataUrl =
+            file.type === "image/png" && file.size <= 240_000
+              ? canvas.toDataURL("image/png")
+              : canvas.toDataURL("image/jpeg", 0.84);
+          if (dataUrl.length > 520_000) {
+            dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+          }
+          patch(slideId, { imageDataUrl: dataUrl });
+          onPreviewSlide?.(slideId);
+          onToast?.("已内嵌本页配图（预览、HTML 与 PPTX 三端同步）", "success");
+        } catch {
+          onToast?.("配图压缩失败，请换一张 PNG / JPG 图片重试", "error");
+        } finally {
+          setUploadingImgSlideId(null);
+        }
+      };
+      img.onerror = () => {
+        setUploadingImgSlideId(null);
+        onToast?.("无法读取该图片文件", "error");
+      };
+      img.src = String(reader.result || "");
+    };
+    reader.onerror = () => {
+      setUploadingImgSlideId(null);
+      onToast?.("读取图片失败", "error");
+    };
+    reader.readAsDataURL(file);
   };
 
   const updateDatum = (slide: PackSlide, idx: number, field: keyof PackDatum, val: string) => {
@@ -573,6 +632,15 @@ export function PackOutlineEditor({
           const isRefining = refiningSlideId === s.id;
           const canUndo = Boolean(undoMap?.[s.id]);
           const weakTitle = isWeakTopicTitle(s.title, s.layout);
+          const isDataSlide =
+            s.layout === "chart" || s.layout === "big-number" || s.layout === "table";
+          const currentChartModeValue =
+            s.layout === "big-number"
+              ? "kpi-only"
+              : s.layout === "table"
+                ? "table"
+                : s.chartVariant || "col";
+
           return (
             <li
               key={s.id}
@@ -599,12 +667,14 @@ export function PackOutlineEditor({
                   <span>
                     {s.layout === "agenda"
                       ? s.points.join(" / ")
-                      : s.data.length
-                        ? s.data
-                            .slice(0, 3)
-                            .map((d) => `${d.label} ${d.value}`.trim())
-                            .join(" · ")
-                        : (s.points[0] ?? s.visual)}
+                      : s.layout === "table" && s.tableData
+                        ? `${s.tableData.rows.length} 行 × ${s.tableData.headers.length} 列原生数据表 · ${s.tableData.headers.slice(0, 4).join(" / ")}`
+                        : s.data.length
+                          ? s.data
+                              .slice(0, 3)
+                              .map((d) => `${d.label} ${d.value}`.trim())
+                              .join(" · ")
+                          : (s.points[0] ?? s.visual)}
                   </span>
                 </button>
                 <div className="gl-pack-slide-actions">
@@ -661,6 +731,91 @@ export function PackOutlineEditor({
                       </small>
                     ) : null}
                   </label>
+
+                  {isDataSlide ? (
+                    <label className="is-wide">
+                      <span>图表 / 数据呈现形态（预览、HTML 与 PPTX 三端同步）</span>
+                      <select
+                        id="pg-pack-chart-variant-select"
+                        value={currentChartModeValue}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "kpi-only") {
+                            patch(s.id, { layout: "big-number" });
+                          } else if (val === "table") {
+                            patch(s.id, { layout: "table" });
+                          } else {
+                            patch(s.id, {
+                              layout: "chart",
+                              chartVariant: val as "col" | "bar" | "line" | "doughnut",
+                            });
+                          }
+                          onPreviewSlide?.(s.id);
+                        }}
+                      >
+                        <option value="col">竖向柱状图（适合 2–5 项规模对比）</option>
+                        <option value="bar">横向对比条形图（适合基准评测 / 长名称排名）</option>
+                        <option value="line">趋势折线图（适合时间序列 / 定量曲线）</option>
+                        <option value="doughnut">占比环形图（适合份额构成分布）</option>
+                        <option value="kpi-only">纯大数字英雄卡（放大核心数字，不塞柱图）</option>
+                        <option value="table">原生三线数据表（保留跨单位多列指标）</option>
+                      </select>
+                    </label>
+                  ) : null}
+
+                  {s.layout === "image-text" ? (
+                    <div className="gl-pack-slide-img-bar is-wide">
+                      <input
+                        ref={slideImgInputRef}
+                        id="pg-pack-slide-image-input"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="gl-sr-only"
+                        onChange={(ev) => handleSlideFigureFile(s.id, ev)}
+                      />
+                      <div className="gl-pack-slide-img-main">
+                        {s.imageDataUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={s.imageDataUrl} alt="" className="gl-pack-slide-img-thumb" />
+                        ) : null}
+                        <div>
+                          <strong>本页配图（论文架构图 / 实验截图 / 业务图）</strong>
+                          <p>
+                            {s.imageDataUrl
+                              ? "已添加本地真图（仅存浏览器，导出 .pptx 与 .html 时自动高清内嵌）"
+                              : "未添加真图时，导出 .pptx 自动绘制干净虚线占位框并附上配图建议，方便直接粘贴截图"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="gl-pack-slide-img-btns">
+                        <button
+                          type="button"
+                          id="pg-pack-slide-image-btn"
+                          className="gl-pack-mini-btn"
+                          disabled={uploadingImgSlideId === s.id}
+                          onClick={() => slideImgInputRef.current?.click()}
+                        >
+                          <ImagePlus size={13} aria-hidden="true" />
+                          {uploadingImgSlideId === s.id
+                            ? "压缩中…"
+                            : s.imageDataUrl
+                              ? "更换配图"
+                              : "上传本页配图"}
+                        </button>
+                        {s.imageDataUrl ? (
+                          <button
+                            type="button"
+                            id="pg-pack-slide-image-clear"
+                            className="gl-pack-mini-btn"
+                            onClick={() => patch(s.id, { imageDataUrl: undefined })}
+                          >
+                            恢复虚线占位框 <X size={12} aria-hidden="true" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+
                   <label className="is-wide">
                     <span>要点（每行一条）</span>
                     <textarea

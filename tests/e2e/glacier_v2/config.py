@@ -42,7 +42,7 @@ STUDIO_HANDOFF_STORAGE_KEY = "pptgod_studio_handoff_v4"
 DOC_INTAKE_STORAGE_KEY = "pptgod_doc_intake_v1"
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10,485,760 bytes
-ALLOWED_UPLOAD_EXTENSIONS: tuple[str, ...] = ("pdf", "docx", "pptx", "md", "txt")
+ALLOWED_UPLOAD_EXTENSIONS: tuple[str, ...] = ("pdf", "docx", "pptx", "xlsx", "csv", "md", "txt")
 
 PPTX_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.presentationml.presentation"
@@ -1680,12 +1680,165 @@ def build_empty_bytes() -> bytes:
     return b""
 
 
+def build_valid_xlsx_bytes(
+    sheets: Sequence[tuple[str, Sequence[Sequence[Any]]]],
+    *,
+    include_hidden_sheet: bool = False,
+) -> bytes:
+    """Build a valid multi-sheet OOXML ``.xlsx`` workbook in memory using stdlib only.
+
+    Cell values:
+      * ``int`` / ``float`` -> numeric ``<v>`` cell
+      * ``("pct", float_val)`` -> numeric cell styled with ``s="1"`` (``numFmtId="10"`` percentage)
+      * ``str`` -> sharedString ``t="s"`` (first shared string also embeds ``<rPh>`` ruby noise to test stripping)
+    """
+    shared_strings: list[str] = []
+    shared_index: dict[str, int] = {}
+
+    def intern_str(s: str) -> int:
+        if s not in shared_index:
+            shared_index[s] = len(shared_strings)
+            shared_strings.append(s)
+        return shared_index[s]
+
+    def col_letter(idx0: int) -> str:
+        res = ""
+        n = idx0 + 1
+        while n > 0:
+            n, rem = divmod(n - 1, 26)
+            res = chr(65 + rem) + res
+        return res
+
+    all_sheets = list(sheets)
+    if include_hidden_sheet:
+        all_sheets.append(("HiddenRawDump", [["ID", "Val"]] + [[f"R{i}", i] for i in range(45)]))
+
+    sheet_xmls: list[str] = []
+    for _sheet_name, rows in all_sheets:
+        row_xml_parts: list[str] = []
+        for r_idx, row in enumerate(rows, start=1):
+            cell_parts: list[str] = []
+            for c_idx, cell in enumerate(row):
+                ref = f"{col_letter(c_idx)}{r_idx}"
+                if cell is None or cell == "":
+                    continue
+                if isinstance(cell, tuple) and len(cell) == 2 and cell[0] == "pct":
+                    cell_parts.append(f'<c r="{ref}" s="1"><v>{float(cell[1])}</v></c>')
+                elif isinstance(cell, (int, float)) and not isinstance(cell, bool):
+                    cell_parts.append(f'<c r="{ref}"><v>{cell}</v></c>')
+                else:
+                    s_idx = intern_str(str(cell))
+                    cell_parts.append(f'<c r="{ref}" t="s"><v>{s_idx}</v></c>')
+            row_xml_parts.append(f'<row r="{r_idx}">{"".join(cell_parts)}</row>')
+        sheet_xmls.append(
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            f'<sheetData>{"".join(row_xml_parts)}</sheetData>'
+            "</worksheet>"
+        )
+
+    si_parts: list[str] = []
+    for idx, s in enumerate(shared_strings):
+        rph = '<rPh sb="0" eb="1"><t>PY</t></rPh>' if idx == 0 else ""
+        si_parts.append(f"<si><t>{xml_escape(s)}</t>{rph}</si>")
+    sst_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        f'<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="{len(shared_strings)}" uniqueCount="{len(shared_strings)}">'
+        f'{"".join(si_parts)}</sst>'
+    )
+
+    styles_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        '<cellXfs count="2">'
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'
+        '<xf numFmtId="10" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/>'
+        "</cellXfs>"
+        "</styleSheet>"
+    )
+
+    wb_sheet_nodes: list[str] = []
+    wb_rel_nodes: list[str] = []
+    ct_overrides: list[str] = []
+    for i, (sheet_name, _rows) in enumerate(all_sheets, start=1):
+        hidden_attr = ' state="hidden"' if (include_hidden_sheet and i == len(all_sheets)) else ""
+        wb_sheet_nodes.append(
+            f'<sheet name="{xml_escape(sheet_name)}" sheetId="{i}"{hidden_attr} r:id="rId{i}"/>'
+        )
+        wb_rel_nodes.append(
+            f'<Relationship Id="rId{i}" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+            f'Target="worksheets/sheet{i}.xml"/>'
+        )
+        ct_overrides.append(
+            f'<Override PartName="/xl/worksheets/sheet{i}.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        )
+
+    s_rel_id = len(all_sheets) + 1
+    st_rel_id = len(all_sheets) + 2
+    wb_rel_nodes.append(
+        f'<Relationship Id="rId{s_rel_id}" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" '
+        'Target="sharedStrings.xml"/>'
+    )
+    wb_rel_nodes.append(
+        f'<Relationship Id="rId{st_rel_id}" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" '
+        'Target="styles.xml"/>'
+    )
+
+    workbook_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        f'<sheets>{"".join(wb_sheet_nodes)}</sheets>'
+        "</workbook>"
+    )
+    wb_rels_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        f'{"".join(wb_rel_nodes)}</Relationships>'
+    )
+    root_rels_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        'Target="xl/workbook.xml"/>'
+        "</Relationships>"
+    )
+    content_types_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>'
+        '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+        f'{"".join(ct_overrides)}</Types>'
+    )
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", content_types_xml)
+        zf.writestr("_rels/.rels", root_rels_xml)
+        zf.writestr("xl/workbook.xml", workbook_xml)
+        zf.writestr("xl/_rels/workbook.xml.rels", wb_rels_xml)
+        zf.writestr("xl/sharedStrings.xml", sst_xml)
+        zf.writestr("xl/styles.xml", styles_xml)
+        for i, s_xml in enumerate(sheet_xmls, start=1):
+            zf.writestr(f"xl/worksheets/sheet{i}.xml", s_xml)
+    return buf.getvalue()
+
+
 CORRUPT_PPTX_BYTES = b"NOT_A_VALID_ZIP_ARCHIVE_FOR_PPTX_PARSE_CHECK"
 MALWARE_EXE_BYTES = b"MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff"
 
 # Convenient short aliases matching blueprint documentation
 make_minimal_docx = build_valid_docx_bytes
 make_minimal_pptx = build_valid_pptx_bytes
+make_minimal_xlsx = build_valid_xlsx_bytes
 make_minimal_pdf = build_valid_pdf_bytes
 make_scanned_pdf = build_scanned_pdf_bytes
 make_oversized_file = build_oversized_bytes

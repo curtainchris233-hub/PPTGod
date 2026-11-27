@@ -120,12 +120,15 @@ JSON 格式：
 1. 只能使用用户原始资料或本页已有的事实与数字，绝不编造任何新数字、引用或人名。
 2. ${langRule}`;
 
+  const origSanitized = sanitizePackSlides([rawSlide, rawSlide, rawSlide], [fallbackSlide, fallbackSlide, fallbackSlide])[0] ?? fallbackSlide;
+  const { imageDataUrl: origImg, ...slideForPrompt } = origSanitized;
+
   const input = [
     topic ? `整份演示主题：${topic}` : "",
     audience ? `受众：${audience}` : "",
     styleName ? `设计风格：${styleName}` : "",
     instruction ? `用户额外要求：${instruction}` : "",
-    `当前页面 JSON：\n${JSON.stringify(rawSlide)}`,
+    `当前页面 JSON：\n${JSON.stringify(slideForPrompt)}`,
     sourceText ? `原始资料节选（核对数据依据）：\n${sourceText}` : "",
   ]
     .filter(Boolean)
@@ -152,6 +155,11 @@ JSON 格式：
     ...padded[0],
     id: fallbackSlide.id,
     source: padded[0].source || fallbackSlide.source,
+    ...(origSanitized.chartVariant ? { chartVariant: padded[0].chartVariant ?? origSanitized.chartVariant } : {}),
+    ...(origSanitized.chartCategories ? { chartCategories: origSanitized.chartCategories } : {}),
+    ...(origSanitized.chartSeries ? { chartSeries: origSanitized.chartSeries } : {}),
+    ...(origSanitized.tableData ? { tableData: origSanitized.tableData } : {}),
+    ...(origImg ? { imageDataUrl: origImg } : {}),
   };
   const grounded = groundSingleSlide(cleaned, `${sourceText}\n${JSON.stringify(fallbackSlide.data)}`);
   return json(200, { ok: true, slide: grounded, model: provider.config.model });

@@ -4,12 +4,13 @@ import { extractText } from "unpdf";
 import { listPrompts } from "@/lib/db";
 import { analyzeDocumentAndRecommendStyles } from "@/lib/documentAnalyzer";
 import { parsePptxBuffer } from "@/lib/pptxParser";
+import { parseCsvBuffer, parseXlsxBuffer } from "@/lib/spreadsheetParser";
 import { limitToolRequest } from "@/lib/toolRateLimit";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
 // Leave room to receive moderate oversize uploads and return the file-size message.
 const MAX_MULTIPART_BYTES = MAX_UPLOAD_BYTES + 1024 * 1024;
-const ALLOWED_EXTS = new Set(["pdf", "docx", "pptx", "md", "txt"]);
+const ALLOWED_EXTS = new Set(["pdf", "docx", "pptx", "xlsx", "csv", "md", "txt"]);
 
 function getExtension(fileName: string): string {
   const idx = fileName.lastIndexOf(".");
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
   const fileEntry = formData.get("file");
   if (!fileEntry || !(fileEntry instanceof File)) {
     return NextResponse.json(
-      { error: "未检测到上传文件，请选择 .pdf / .docx / .pptx / .md / .txt 文件" },
+      { error: "未检测到上传文件，请选择 .pdf / .docx / .pptx / .xlsx / .csv / .md / .txt 文件" },
       { status: 400 }
     );
   }
@@ -108,10 +109,20 @@ export async function POST(request: Request) {
     );
   }
 
+  if (ext === "xls") {
+    return NextResponse.json(
+      {
+        error:
+          "检测到旧版二进制 .xls 格式，请先在 Excel / WPS 中另存为标准 .xlsx 或 .csv 格式后再上传",
+      },
+      { status: 400 }
+    );
+  }
+
   if (!ALLOWED_EXTS.has(ext)) {
     return NextResponse.json(
       {
-        error: `不支持的文件类型「.${ext || "未知"}」，仅支持上传 .pdf、.docx、.pptx、.md、.txt 文档`,
+        error: `不支持的文件类型「.${ext || "未知"}」，仅支持上传 .pdf、.docx、.pptx、.xlsx、.csv、.md、.txt 文档`,
       },
       { status: 400 }
     );
@@ -132,6 +143,47 @@ export async function POST(request: Request) {
     const arrayBuffer = await fileEntry.arrayBuffer();
     const uint8 = new Uint8Array(arrayBuffer);
     const catalogStyles = await listPrompts({});
+
+    if (ext === "xlsx" || ext === "csv") {
+      try {
+        const parsed =
+          ext === "xlsx"
+            ? parseXlsxBuffer(uint8, fileName)
+            : parseCsvBuffer(uint8, fileName);
+        const analysis = analyzeDocumentAndRecommendStyles({
+          text: parsed.textDigest,
+          fileName,
+          fileType: ext,
+          suggestedTopic: parsed.suggestedTopic,
+          suggestedSubtitle: parsed.suggestedSubtitle,
+          styles: catalogStyles,
+        });
+        return NextResponse.json({
+          ok: true,
+          fileName,
+          fileType: ext,
+          charCount: parsed.textDigest.length,
+          sheetCount: parsed.tables.length,
+          tables: parsed.tables,
+          isScannedPdf: false,
+          warning: parsed.warning,
+          text: parsed.textDigest,
+          suggestedTopic: parsed.suggestedTopic,
+          suggestedSubtitle: parsed.suggestedSubtitle,
+          analysis,
+        });
+      } catch (err) {
+        return NextResponse.json(
+          {
+            error:
+              err instanceof Error
+                ? err.message
+                : "数据表解析失败，请确认文件为已整理好的汇总表（≤30 行）",
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     if (ext === "pptx") {
       try {

@@ -25,19 +25,26 @@ export function renderImageSplit(ctx: SlideRenderContext) {
   } = ctx;
   const slot = slideData?.imageSlot;
   const isRight = slot?.layout === "right";
-  const presetId =
-    slot?.presetId || pickDefaultArtworkForArchetype(layout.archetype);
   const hasCustomDataUrl =
     slot?.kind === "data-url" &&
     typeof slot.dataUrl === "string" &&
     slot.dataUrl.startsWith("data:image/");
-  const artworkSvgMarkup = hasCustomDataUrl
-    ? ""
-    : renderArtworkSvgString(presetId, palette).replace(
-        "<svg ",
-        '<svg style="width:100%;height:100%;display:block" '
-      );
-  const caption = slot?.caption || `${topic.slice(0, 18)} · 核心视觉构成`;
+  const isPlaceholder = !hasCustomDataUrl && slot?.kind === "placeholder";
+  const presetId =
+    slot?.presetId || pickDefaultArtworkForArchetype(layout.archetype);
+  const artworkSvgMarkup =
+    hasCustomDataUrl || isPlaceholder
+      ? ""
+      : renderArtworkSvgString(presetId, palette).replace(
+          "<svg ",
+          '<svg style="width:100%;height:100%;display:block" '
+        );
+  const placeholderHint =
+    slot?.promptHint ||
+    `在此粘贴「${(slideData?.title || topic).slice(0, 18)}」相关架构图、实验截图或业务配图`;
+  const caption =
+    slot?.caption ||
+    (isPlaceholder ? "配图留白占位框 · 导出 PPTX 可直接贴图" : `${topic.slice(0, 18)} · 核心视觉构成`);
   const bullets =
     slideData?.bullets && slideData.bullets.length > 0
       ? slideData.bullets
@@ -66,10 +73,13 @@ export function renderImageSplit(ctx: SlideRenderContext) {
           borderRadius: `${Math.max(0, radius - 3)}px`,
           overflow: "hidden",
           background: palette.bg,
-          border: `1px solid ${palette.border}`,
+          border: isPlaceholder
+            ? `1.5px dashed ${palette.accent}`
+            : `1px solid ${palette.border}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          padding: isPlaceholder ? "18px" : 0,
         }}
       >
         {hasCustomDataUrl ? (
@@ -80,10 +90,73 @@ export function renderImageSplit(ctx: SlideRenderContext) {
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "cover",
+              objectFit: "contain",
               display: "block",
             }}
           />
+        ) : isPlaceholder ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              textAlign: "center",
+              gap: "10px",
+              maxWidth: "88%",
+            }}
+          >
+            <svg
+              width="34"
+              height="34"
+              viewBox="0 0 36 36"
+              fill="none"
+              aria-hidden="true"
+            >
+              <rect
+                x="4"
+                y="6"
+                width="28"
+                height="24"
+                rx="3"
+                stroke={palette.accent}
+                strokeWidth="1.6"
+                strokeDasharray="3 2.5"
+              />
+              <circle cx="13" cy="14" r="2.5" stroke={palette.muted} strokeWidth="1.4" />
+              <path
+                d="M8 26L15.5 18.5L21 23.5L25 19.5L29 26"
+                stroke={palette.muted}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span
+              style={{
+                fontFamily: monoFont,
+                fontSize: "10.5px",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                color: palette.accent,
+                background: palette.accentSoft,
+                padding: "2px 8px",
+                borderRadius: "999px",
+              }}
+            >
+              配图占位建议
+            </span>
+            <p
+              style={{
+                margin: 0,
+                fontSize: "11.5px",
+                lineHeight: 1.55,
+                color: palette.muted,
+              }}
+            >
+              {placeholderHint.slice(0, 84)}
+            </p>
+          </div>
         ) : (
           <div
             aria-label={caption}

@@ -2938,7 +2938,7 @@ class BrowserPageGuard:
         if self._suppress_console_errors or self._allowed_statuses:
             return
         failure = str(req.failure or "")
-        if "ERR_ABORTED" in failure:
+        if "ERR_ABORTED" in failure or "NS_BINDING_ABORTED" in failure:
             return
         self.request_failures.append(f"{req.method} {req.url} ({failure})")
 
@@ -3165,7 +3165,7 @@ class PlaywrightSession:
         self,
         *,
         timeout_ms: int = DEFAULT_TIMEOUT_MS,
-        recycle_every: int = 6,
+        recycle_every: int = 5,
     ) -> None:
         self.timeout_ms = timeout_ms
         self.recycle_every = max(1, recycle_every)
@@ -3179,6 +3179,15 @@ class PlaywrightSession:
             self.restart_browser()
 
         if self._browser is None:
+            try:
+                import resource
+
+                soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+                if soft < hard:
+                    resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
+            except Exception:  # noqa: BLE001
+                pass
+
             os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", PLAYWRIGHT_BROWSERS_DEFAULT)
             from playwright.sync_api import sync_playwright
 

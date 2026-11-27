@@ -215,5 +215,19 @@ All agents MUST strictly enforce these verified boundaries (see `.agents/teamwor
    - E2E Execution: `PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 <runner> --base-url http://127.0.0.1:3010 --backup-db`
 4. **SQLite WAL Cleanliness**: `data/pptgod.db` is shared with port `3000` in WAL mode. Any backup MUST use `/opt/android-sdk/platform-tools/sqlite3 data/pptgod.db ".backup '<tmp>'"`. All mutating tests MUST clean up via LIFO `CleanupRegistry` leaving `0` residual `[E2E%` rows (`users: 3`, `prompts: 36`, `prompt_comments: 5`, `saved_decks: 0`).
 5. **Screenshot Archive Path**: Save all phase and final acceptance screenshots in `/home/antigravity/.gemini/jetski/brain/v1/default/jetski_remote_agents_3p_devbox/d4652d5e-bd2b-44e6-9b6d-5ebd3aabd750/screenshots/glacier_v2/`.
-6. **Clean Scoped Git Commits**: Always verify `git branch --show-current` is `feat/glacier-ui-2.0`. Stage ONLY milestone-owned files (`git add <paths>`) — NEVER `git add -A` when another track has in-progress files!
+6. **Clean Scoped Git Commits**: Always verify `git branch --show-current` is the active feature branch. Stage ONLY milestone-owned files (`git add <paths>`).
 7. **No Scratch Files in `.agents/teamwork/`**: `.agents/teamwork/` holds ONLY agent metadata `.md` files. Temporary verifier scripts/probes MUST use `mktemp -d -- "${TMPDIR:-/tmp}/teamwork_probe.XXXXXX"` (`chmod 700`) and remove it before reporting.
+
+---
+
+## Post-Glacier Milestones (M5–M9)
+
+- **M5 (PR #9 · `bb2694f`)**: Cloud PostgreSQL (`drizzle-orm`) + `better-auth` migration, URL bidirectional sync, browser-local BYOK (`sessionStorage` key isolation), `useDeckWorkshop` extraction, and `390px` mobile Editor polish (`79/79` E2E).
+- **M6 (PR #10 · `214dee6`)**: `/pack` Prompt Pack Workbench launch — 11 design directions, 11 slide layouts, 3-frame `SlideCanvas` preview strip, 5-tool export (`ChatGPT` / `Gamma` / `Kimi` / `Claude` / `Universal`), source-grounded numeric verification, and automatic BYOK → rule-engine fallback (`83/83` E2E).
+- **M7 (PR #11 · `5e03527`)**: 7 BYOK provider presets + `POST /api/byok/test` SSRF-safe connectivity probe, reasoning-model `<think>` stripping, Gamma 2-part & ChatGPT 2-step export, local 10-item history + `.json` import/export, client-side reference image palette extraction + WCAG inline editor, BYOK single-slide refine, `?style=<slug>` anchor, and `>16k` long-document section picker (`87/87` E2E).
+- **M8 (PR #13 · `51bd649`)**: Assertion-Evidence conclusion headlines (zero `(1/2)` suffixes), token-safe metric extraction (`Pass@1`, `MATH-500`, compound Chinese quantifiers), `speaker`/`reading` density toggle, `python-pptx` bounds self-check & `1920×1080` Claude stage prompts, and 1-click `.pptx`/`.html` download + lossless `/generate` Editor handoff (`89/89` E2E).
+- **M9 (`feat/m9-pptx-tables-multisource`)**: Production-grade native `.pptx` deliverable engine & multi-source `.xlsx`/`.csv` summary table pipeline:
+  1. Zero-dependency `src/lib/spreadsheetParser.ts` supporting multi-sheet `.xlsx` (`numFmtId` percentage formatting, `<rPh>` stripping, hidden-sheet filtering) and UTF-8 / GB18030 `.csv`, enforcing a clean `≤ 30` data rows summary-table boundary (`Q6`) while keeping paste textarea 100% plain-text (`Q5`).
+  2. Multi-file upload (`≤ 5` files) in `/pack` with per-file enable/remove, `.xlsx` sheet toggle chips, and per-slide `文件名 · Sheet名` attribution.
+  3. 4 genuinely distinct `.pptx` `SlideMaster` skeletons (`consulting`, `academic`, `keynote`, `classroom`), dedicated Hero KPI (`big-number` / `kpi-only`) layout without forced charts, 4 native chart variants (`col | bar | line | doughnut`), and native `<a:tbl>` Academic 3-Line / Executive Data Tables (`table` / `data-matrix`) with optimal-cell highlighting synced 1:1 across `SlideCanvas`, `.html`, and `.pptx`.
+  4. Per-slide local figure upload (`<canvas>` client compression) on `image-text` slides, and clean dashed placeholder frames (`dashType: "dash"`) with concrete figure suggestions when no image is uploaded (`91/91` E2E).

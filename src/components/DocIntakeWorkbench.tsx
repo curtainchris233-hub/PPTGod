@@ -41,6 +41,7 @@ import {
   type SourceDocumentDigest,
   type TargetTool,
 } from "@/types/prompt";
+import type { ParsedDataTable } from "@/lib/spreadsheetParser";
 import "@/styles/doc-intake.css";
 
 export interface DocIntakeParsedState {
@@ -53,6 +54,7 @@ export interface DocIntakeParsedState {
   isScannedPdf?: boolean;
   warning?: string;
   parsedOutline?: OutlineDraftItem[];
+  tables?: ParsedDataTable[];
   analysis: DocumentAnalysisResult;
 }
 
@@ -499,6 +501,7 @@ export default function DocIntakeWorkbench({
       topic: finalTopic,
       audience: finalAudience,
       slideCount,
+      ...(parsed.tables && parsed.tables.length > 0 ? { tables: parsed.tables } : {}),
     });
     const styleQuery = selectedPrompt?.slug
       ? `?style=${encodeURIComponent(selectedPrompt.slug)}`
