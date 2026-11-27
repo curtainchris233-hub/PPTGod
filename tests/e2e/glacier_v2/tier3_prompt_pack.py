@@ -11,15 +11,25 @@
 
 from __future__ import annotations
 
+import io
 import re
+import zipfile
 from typing import Any
 
-from .config import MOBILE_390
+from .config import (
+    MOBILE_390,
+    PPTX_CONTENT_TYPE,
+    build_png_bytes,
+    build_valid_xlsx_bytes,
+    make_valid_visual_spec,
+)
 from .helpers import (
+    HtmlDeckVerifier,
     PptxVerifier,
     TestContext,
     TestSpec,
     click_resilient,
+    locate_attached,
     locate_first,
 )
 
@@ -29,6 +39,7 @@ _LAYOUTS = {
     "section",
     "big-number",
     "chart",
+    "table",
     "comparison",
     "timeline",
     "process",
@@ -560,6 +571,389 @@ def g3_pack_10_direct_pptx_html_and_lossless_editor_handoff(ctx: TestContext) ->
         guard.assert_no_browser_errors("G3_PACK_10")
 
 
+def g3_pack_11_multisource_xlsx_csv_and_table_guard(ctx: TestContext) -> None:
+    api = ctx.api()
+    xlsx_mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    # 1. Q6 strict scope boundary: >30 data rows raw detail dump rejected with HTTP 400 & clear guidance
+    raw_detail_csv = "订单号,客户,金额(元)\n" + "\n".join(
+        f"ORD-{i:03d},客户{i},{100 + i * 5}元" for i in range(1, 36)
+    )
+    resp_long = api.post_multipart(
+        "/api/parse-document",
+        filename="明细流水_35行.csv",
+        content=raw_detail_csv.encode("utf-8"),
+        content_type="text/csv",
+    )
+    resp_long.assert_status(400, "35-row raw detail CSV must be rejected")
+    err_long = str((resp_long.json_data or {}).get("error") or "")
+    assert "30" in err_long, f"Expected 30-row summary table guidance, got: {err_long!r}"
+
+    # Legacy binary .xls rejected with friendly resave guidance
+    resp_xls = api.post_multipart(
+        "/api/parse-document",
+        filename="legacy_sheet.xls",
+        content=b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1LEGACY_XLS",
+        content_type="application/vnd.ms-excel",
+    )
+    resp_xls.assert_status(400, "Legacy .xls must be rejected")
+    assert "另存为" in str((resp_xls.json_data or {}).get("error") or "")
+
+    # 2. Multi-sheet .xlsx (with numFmtId=10 percentage, <rPh> ruby noise, and hidden >30-row sheet skipped)
+    xlsx_bytes = build_valid_xlsx_bytes(
+        [
+            (
+                "季度趋势",
+                [
+                    ["季度", "华东营收(万元)", "华南营收(万元)"],
+                    ["2024Q1", 120, 95],
+                    ["2024Q2", 145, 110],
+                    ["2024Q3", 168, 128],
+                    ["2024Q4", 210, 156],
+                ],
+            ),
+            (
+                "模型评测",
+                [
+                    ["模型", "准确率(%)", "首字延迟(ms)", "单次成本(元)"],
+                    ["Model-A", ("pct", 0.812), "68ms", "0.08元"],
+                    ["Model-B", ("pct", 0.864), "42ms", "0.04元"],
+                    ["Model-C", ("pct", 0.790), "95ms", "0.12元"],
+                ],
+            ),
+        ],
+        include_hidden_sheet=True,
+    )
+    resp_xlsx = api.post_multipart(
+        "/api/parse-document",
+        filename="02_核心数据.xlsx",
+        content=xlsx_bytes,
+        content_type=xlsx_mime,
+    )
+    resp_xlsx.assert_status(200, "Valid 2-sheet .xlsx parse")
+    xlsx_json = resp_xlsx.require_json("parse .xlsx")
+    assert xlsx_json.get("sheetCount") == 2, f"Expected 2 visible sheets, got {xlsx_json!r}"
+    tables = xlsx_json.get("tables") or []
+    assert len(tables) == 2
+    assert "PY" not in str(xlsx_json.get("text") or ""), "<rPh> phonetic ruby text leaked into sharedStrings"
+    t_trend, t_eval = tables[0], tables[1]
+    assert t_trend["mode"] == "chart" and t_trend["inferredChartVariant"] == "line"
+    assert len(t_trend["series"]) == 2
+    assert t_eval["mode"] == "table"
+    assert "86.4%" in t_eval["rows"][1], f"Percentage numFmtId=10 failed: {t_eval['rows']!r}"
+    # Lower-is-better latency ("42ms" at row 1, col 2) & higher-is-better accuracy ("86.4%" at row 1, col 1)
+    hl_tuples = {tuple(pair) for pair in (t_eval.get("highlightCoords") or [])}
+    assert (1, 1) in hl_tuples and (1, 2) in hl_tuples, f"Optimal highlightCoords wrong: {hl_tuples!r}"
+
+    # 3. Browser /pack: Q5 strict paste boundary + 3-file mix (.md + .xlsx + GB18030 .csv) + native .pptx
+    md_notes = (
+        "# 大模型推理服务季度复盘\n"
+        "## 业务背景与目标\n"
+        "围绕高并发推理网关开展算子融合与 KV-Cache 量化升级，兼顾吞吐扩张与延迟收敛。\n"
+        "## 下一步演进计划\n"
+        "推广投机解码管线并在核心集群完成灰度切换。\n"
+    ).encode("utf-8")
+    gb_csv_bytes = "渠道,营收占比\n直销团队,48%\n生态伙伴,32%\n线上自助,20%\n".encode("gb18030")
+
+    with ctx.browser_page() as guard:
+        page = guard.page
+        guard.goto_ok(f"{ctx.base_url}/pack")
+        page.evaluate("() => { try { localStorage.removeItem('pptgod_prompt_pack_v1'); } catch (e) {} }")
+        page.reload()
+        page.wait_for_load_state("networkidle")
+
+        # Q5: Paste textarea never triggers spreadsheet chip auto-detection
+        page.locator("#pg-pack-text").fill("项目\tQ1\tQ2\n营收\t120\t160\n利润\t30\t45")
+        assert page.locator(".gl-pack-sheet-chip").count() == 0, "Paste tab must stay pure plain-text (Q5)"
+        page.locator("#pg-pack-text").fill("")
+
+        click_resilient(page, ["#pg-pack-tab-upload"], description="Switch to Upload tab")
+        file_input = locate_attached(page, ["#pg-pack-file-input"], description="Pack multi-file input")
+        file_input.set_input_files(
+            [
+                {"name": "01_项目纪要.md", "mimeType": "text/markdown", "buffer": md_notes},
+                {"name": "02_核心数据.xlsx", "mimeType": xlsx_mime, "buffer": xlsx_bytes},
+                {"name": "03_渠道占比.csv", "mimeType": "text/csv", "buffer": gb_csv_bytes},
+            ]
+        )
+        page.wait_for_function(
+            "() => document.querySelectorAll('#pg-pack-multi-files li[data-doc-status=\"success\"]').length === 3",
+            timeout=15_000,
+        )
+        assert page.locator('[data-sheet-chip="季度趋势"]').is_visible(), "Missing sheet chip 季度趋势"
+        assert page.locator('[data-sheet-chip="模型评测"]').is_visible(), "Missing sheet chip 模型评测"
+        assert page.locator('[data-sheet-chip="03 渠道占比"]').is_visible(), "Missing CSV sheet chip 03 渠道占比"
+
+        click_resilient(page, ["#pg-pack-generate-btn"], description="Generate multi-source pack")
+        page.wait_for_selector("#pg-pack-outline", timeout=30_000)
+
+        assert page.locator('#pg-pack-outline li[data-layout="table"]').count() >= 1, (
+            "Mixed-unit sheet '模型评测' should produce a dedicated native 'table' slide"
+        )
+        prompt_text = page.locator("#pg-pack-prompt-preview").inner_text()
+        assert "| --- |" in prompt_text, "Expected Markdown table in prompt preview"
+        assert "86.4%" in prompt_text, "Expected formatted 86.4% in prompt preview"
+        assert "02_核心数据.xlsx · 模型评测" in prompt_text, "Expected exact file+sheet attribution in prompt preview"
+
+        with page.expect_download(timeout=30_000) as dl_pptx_info:
+            click_resilient(page, ["#pg-pack-download-pptx-btn"], description="Download multi-source .pptx")
+        pptx_path = dl_pptx_info.value.path()
+        assert pptx_path is not None, "Playwright did not materialize multi-source .pptx"
+        with open(pptx_path, "rb") as fh:
+            pptx_bytes = fh.read()
+
+        PptxVerifier.verify(
+            pptx_bytes,
+            min_size=24_000,
+            require_slide_master=True,
+            require_notes=True,
+            require_native_table=True,
+            require_chart_types=("lineChart",),
+            expected_slide_texts=("86.4%", "42ms", "210"),
+        )
+        guard.assert_no_browser_errors("G3_PACK_11")
+
+
+def g3_pack_12_four_skeletons_chart_variants_and_figure_slot(ctx: TestContext) -> None:
+    api = ctx.api()
+
+    # 1. Verify all 4 .pptx layout skeletons (consulting, academic, keynote dark, classroom dark)
+    #    + Hero KPI (kpi-only without chart XML) + 3-line table + bar/line/doughnut + dashed placeholder
+    skeleton_cases = [
+        ("consulting-mbb", False, "consulting"),
+        ("scientific-figure", False, "academic"),
+        ("linear-dark", True, "keynote"),
+        ("chalkboard-class", True, "classroom"),
+    ]
+    for archetype, is_dark, skel_label in skeleton_cases:
+        spec = make_valid_visual_spec(dark=is_dark, brand_footer=f"M9 {skel_label}")
+        spec["layout"]["archetype"] = archetype
+        slides_payload = [
+            {
+                "id": "s1",
+                "slideType": "cover",
+                "sectionTag": "01",
+                "title": f"{skel_label} 旗舰架构汇报",
+                "subtitle": "四套原生骨架与数据呈现验证",
+                "bullets": ["核心假设与实验结论"],
+                "notes": "封面开场备注",
+            },
+            {
+                "id": "s2",
+                "slideType": "data",
+                "dataDisplay": "kpi-only",
+                "sectionTag": "02",
+                "title": "核心吞吐提升至 3.4 倍且显存开销下降 45%",
+                "bullets": ["算子融合消除冗余访存开销"],
+                "kpis": [
+                    {"value": "3.4x", "label": "峰值吞吐倍数", "note": "实测峰值"},
+                    {"value": "-45%", "label": "显存占用降幅", "note": "KV量化"},
+                ],
+                "notes": "大数字英雄卡备注",
+            },
+            {
+                "id": "s3",
+                "slideType": "data",
+                "dataDisplay": "data-matrix",
+                "sectionTag": "03",
+                "title": "蒸馏版模型在三项跨单位指标上取得最优平衡",
+                "bullets": ["兼顾准确率与线上首字响应"],
+                "kpis": [{"value": "92.8%", "label": "MATH-500", "note": "最优"}],
+                "tableData": {
+                    "headers": ["模型方案", "准确率(%)", "P99延迟(ms)", "千次成本(元)"],
+                    "rows": [
+                        ["Baseline-7B", "78.5%", "64ms", "0.09元"],
+                        ["Distill-7B", "92.8%", "38ms", "0.05元"],
+                    ],
+                    "highlightCoords": [[1, 1], [1, 2], [1, 3]],
+                },
+                "notes": "三线表备注",
+            },
+            {
+                "id": "s4",
+                "slideType": "data",
+                "dataDisplay": "bar",
+                "sectionTag": "04",
+                "title": "横向基准排名中自研引擎领先主流方案",
+                "bullets": ["长名称基准采用横向条形图不截断"],
+                "kpis": [{"value": "92.8", "label": "Distill-Engine", "note": "Top 1"}],
+                "chartCategories": ["Distill-Engine", "Baseline-v1"],
+                "chartSeries": [{"name": "得分", "values": [92.8, 81.4], "unit": ""}],
+                "notes": "横向条形图备注",
+            },
+            {
+                "id": "s5",
+                "slideType": "data",
+                "dataDisplay": "line",
+                "sectionTag": "05",
+                "title": "四个季度推理请求量持续攀升",
+                "bullets": ["Q4 峰值较 Q1 翻倍"],
+                "kpis": [{"value": "240M", "label": "Q4 日均调用", "note": "峰值"}],
+                "chartCategories": ["Q1", "Q2", "Q3", "Q4"],
+                "chartSeries": [
+                    {"name": "国内集群", "values": [90, 135, 180, 240], "unit": "M"},
+                    {"name": "海外集群", "values": [40, 62, 88, 125], "unit": "M"},
+                ],
+                "notes": "折线图备注",
+            },
+            {
+                "id": "s6",
+                "slideType": "data",
+                "dataDisplay": "doughnut",
+                "singleSeries": True,
+                "sectionTag": "06",
+                "title": "推理算力构成以在线对话与代码补全为主",
+                "bullets": ["核心场景合计占比 82%"],
+                "kpis": [
+                    {"value": "52%", "label": "在线对话", "note": "主力"},
+                    {"value": "30%", "label": "代码补全", "note": "高频"},
+                ],
+                "bars": [
+                    {"label": "在线对话", "v1": 52, "v2": 52},
+                    {"label": "代码补全", "v1": 30, "v2": 30},
+                    {"label": "批量离线", "v1": 18, "v2": 18},
+                ],
+                "notes": "环形图备注",
+            },
+            {
+                "id": "s7",
+                "slideType": "image-split",
+                "sectionTag": "07",
+                "title": "投机解码双阶段架构解耦草稿与验证",
+                "bullets": ["小模型并行起草 Token", "大模型单步批量校验"],
+                "imageSlot": {
+                    "kind": "placeholder",
+                    "promptHint": "建议放入投机解码双模型流水线架构图",
+                    "caption": "投机解码流水线示意",
+                },
+                "notes": "图文页占位框备注",
+            },
+        ]
+        resp = api.post(
+            "/api/export/pptx",
+            json_body={
+                "title": f"{skel_label} Deck",
+                "subtitle": "M9 Verification",
+                "audience": "技术委员会",
+                "styleName": skel_label,
+                "visualSpec": spec,
+                "slides": slides_payload,
+            },
+        )
+        resp.assert_status(200, f"Export .pptx for skeleton {skel_label}")
+        assert PPTX_CONTENT_TYPE in resp.header("content-type")
+        inspected = PptxVerifier.verify(
+            resp.body,
+            min_size=26_000,
+            expected_slide_count=7,
+            require_slide_master=True,
+            require_notes=True,
+            require_native_table=True,
+            require_chart_types=("barChart", "lineChart", "doughnutChart"),
+            disallow_pure_white_borders=is_dark,
+            expected_slide_texts=("3.4x", "92.8%", "配图占位框"),
+        )
+        assert len(inspected.media_members) == 0, "Placeholder image-split must not embed fake raster media"
+        with zipfile.ZipFile(io.BytesIO(resp.body), "r") as zf:
+            # Slide 2 is kpi-only -> must NOT reference any chart relationship
+            s2_rels = (
+                zf.read("ppt/slides/_rels/slide2.xml.rels").decode("utf-8", errors="ignore")
+                if "ppt/slides/_rels/slide2.xml.rels" in zf.namelist()
+                else ""
+            )
+            assert "relationships/chart" not in s2_rels, (
+                f"kpi-only slide2 unexpectedly embedded a chart in {skel_label}: {s2_rels}"
+            )
+            # Slide 4 is horizontal bar -> its chart XML must specify <c:barDir val="bar"/>
+            bar_dirs = [
+                zf.read(cm).decode("utf-8", errors="ignore")
+                for cm in inspected.chart_members
+                if 'val="bar"' in zf.read(cm).decode("utf-8", errors="ignore")
+            ]
+            assert bar_dirs, f"Expected horizontal <c:barDir val=\"bar\"/> in {skel_label} charts"
+            # Slide 7 placeholder must use dashed line <a:prstDash val="dash"/>
+            s7_xml = zf.read("ppt/slides/slide7.xml").decode("utf-8", errors="ignore")
+            assert 'val="dash"' in s7_xml, f"Expected dashed placeholder frame on slide7 in {skel_label}"
+            if skel_label == "academic":
+                s2_txt = inspected.slide_texts.get("ppt/slides/slide2.xml", "")
+                s3_xml = zf.read("ppt/slides/slide3.xml").decode("utf-8", errors="ignore")
+                assert "academic Deck  ·  02" in s2_txt and "02 / 07" in s2_txt, (
+                    f"Academic skeleton missing running head or 02 / 07 numbering: {s2_txt!r}"
+                )
+                assert "lnL" in s3_xml and "noFill" in s3_xml, (
+                    "Academic 3-line table must suppress vertical cell borders via <a:lnL><a:noFill/>"
+                )
+
+    # 2. Browser /pack UI: manual chart variant switcher + per-slide local PNG upload + 390px RWD
+    with ctx.browser_page() as guard:
+        page = guard.page
+        guard.goto_ok(f"{ctx.base_url}/pack")
+        page.evaluate("() => { try { localStorage.removeItem('pptgod_prompt_pack_v1'); } catch (e) {} }")
+        page.reload()
+        page.wait_for_load_state("networkidle")
+
+        click_resilient(page, ["#pg-pack-tab-sample"], description="Sample tab")
+        click_resilient(page, ["#pg-pack-sample-transformer"], description="Transformer sample")
+        page.wait_for_selector("#pg-pack-outline", timeout=30_000)
+
+        # Open a data slide (big-number or chart) and switch to doughnut
+        data_slide_btn = page.locator(
+            '#pg-pack-outline li[data-layout="big-number"] .gl-pack-slide-title, '
+            '#pg-pack-outline li[data-layout="chart"] .gl-pack-slide-title'
+        ).first
+        data_slide_btn.click()
+        variant_sel = locate_first(page, ["#pg-pack-chart-variant-select"], description="Chart variant select")
+        variant_sel.select_option("doughnut")
+        page.wait_for_timeout(150)
+
+        # Add/open an image-text slide & upload a real local PNG figure
+        click_resilient(page, ["#pg-pack-add-slide-btn"], description="Add image-text slide")
+        fig_input = locate_attached(page, ["#pg-pack-slide-image-input"], description="Per-slide figure input")
+        fig_input.set_input_files(
+            {
+                "name": "transformer_arch.png",
+                "mimeType": "image/png",
+                "buffer": build_png_bytes(64, 48, palette_mode=True),
+            }
+        )
+        locate_first(page, ["#pg-pack-slide-image-clear"], timeout_ms=10_000, description="Clear uploaded figure btn")
+
+        # Verify offline .html has embedded data:image and zero SVG NaN geometry
+        with page.expect_download(timeout=15_000) as dl_html_info:
+            click_resilient(page, ["#pg-pack-download-html-btn"], description="Download .html with figure & doughnut")
+        html_path = dl_html_info.value.path()
+        assert html_path is not None
+        with open(html_path, "r", encoding="utf-8") as fh:
+            html_text = fh.read()
+        HtmlDeckVerifier.verify(html_text, expected_min_slides=8)
+        assert "data:image/" in html_text, "Uploaded per-slide figure must embed into offline .html"
+
+        # Verify .pptx embeds ppt/media/* AND doughnutChart
+        with page.expect_download(timeout=30_000) as dl_pptx_info:
+            click_resilient(page, ["#pg-pack-download-pptx-btn"], description="Download .pptx with figure & doughnut")
+        pptx_path = dl_pptx_info.value.path()
+        assert pptx_path is not None
+        with open(pptx_path, "rb") as fh:
+            pptx_bytes = fh.read()
+        PptxVerifier.verify(
+            pptx_bytes,
+            min_size=24_000,
+            require_slide_master=True,
+            require_notes=True,
+            require_media=True,
+            require_chart_types=("doughnutChart",),
+        )
+
+        # Check 390px mobile zero horizontal overflow with figure bar open
+        page.set_viewport_size({"width": MOBILE_390[0], "height": MOBILE_390[1]})
+        page.wait_for_timeout(200)
+        overflow = page.evaluate(
+            "() => document.documentElement.scrollWidth - window.innerWidth"
+        )
+        assert overflow <= 1, f"/pack overflowed horizontally at 390px by {overflow}px"
+        guard.assert_no_browser_errors("G3_PACK_12")
+
+
 def get_specs() -> list[TestSpec]:
     return [
         TestSpec(
@@ -640,6 +1034,22 @@ def get_specs() -> list[TestSpec]:
             "/pack 1-click .pptx & .html downloads + lossless full-screen /generate editor handoff",
             g3_pack_10_direct_pptx_html_and_lossless_editor_handoff,
             ("ui", "pack", "export", "pptx"),
+            True,
+        ),
+        TestSpec(
+            "G3_PACK_11",
+            3,
+            "Multi-source .xlsx/.csv upload, <=30-row summary guard, sheet chips & native 3-line table .pptx",
+            g3_pack_11_multisource_xlsx_csv_and_table_guard,
+            ("api", "ui", "pack", "xlsx", "pptx"),
+            True,
+        ),
+        TestSpec(
+            "G3_PACK_12",
+            3,
+            "4 .pptx skeletons, Hero KPI, chart variant switcher (col/bar/line/doughnut) & per-slide figure upload",
+            g3_pack_12_four_skeletons_chart_variants_and_figure_slot,
+            ("api", "ui", "pack", "pptx", "rwd"),
             True,
         ),
     ]

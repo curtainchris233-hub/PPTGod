@@ -19,6 +19,8 @@ import {
   buildRuleBasedPack,
   type PackRequestInput,
 } from "@/lib/promptPackEngine";
+import type { ParsedDataTable } from "@/lib/spreadsheetParser";
+import type { ChartVariant } from "@/types/prompt";
 import { limitSiteProvider, limitToolRequest } from "@/lib/toolRateLimit";
 import { safeNumber, safeString } from "../prompts/_validation";
 
@@ -26,9 +28,83 @@ export const maxDuration = 75;
 
 const MIN_CHARS = 20;
 const MAX_CHARS = 16000;
+const VALID_VARIANTS: ChartVariant[] = ["col", "bar", "line", "doughnut"];
 
 function normalizeNumber(value: string): string {
   return value.replace(/[,\s，]/g, "");
+}
+
+function clipStr(val: unknown, max: number): string {
+  return safeString(val).trim().slice(0, max);
+}
+
+function sanitizeIncomingTables(raw: unknown): ParsedDataTable[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ParsedDataTable[] = [];
+  for (const item of raw.slice(0, 8)) {
+    if (!isPlainObject(item)) continue;
+    const headers = Array.isArray(item.headers)
+      ? item.headers.slice(0, 10).map((h) => clipStr(h, 40)).filter(Boolean)
+      : [];
+    const rows = Array.isArray(item.rows)
+      ? item.rows
+          .filter(Array.isArray)
+          .slice(0, 30)
+          .map((r) => r.slice(0, 10).map((c) => clipStr(c, 60)))
+      : [];
+    if (headers.length < 2 || rows.length < 1) continue;
+    const categories = Array.isArray(item.categories)
+      ? item.categories.slice(0, 30).map((c) => clipStr(c, 40))
+      : rows.map((r, idx) => r[0] || `项 ${idx + 1}`);
+    const series = Array.isArray(item.series)
+      ? item.series
+          .filter(isPlainObject)
+          .slice(0, 4)
+          .map((s, sIdx) => ({
+            name: clipStr(s.name, 32) || `序列 ${sIdx + 1}`,
+            values: Array.isArray(s.values)
+              ? s.values.slice(0, 30).map((v) => {
+                  const n = safeNumber(v);
+                  return n !== null ? n : 0;
+                })
+              : [],
+            unit: clipStr(s.unit, 12),
+          }))
+          .filter((s) => s.values.length > 0)
+      : [];
+    const highlightCoords: [number, number][] = Array.isArray(item.highlightCoords)
+      ? item.highlightCoords
+          .filter(
+            (p): p is [number, number] =>
+              Array.isArray(p) &&
+              p.length === 2 &&
+              typeof p[0] === "number" &&
+              typeof p[1] === "number" &&
+              p[0] >= 0 &&
+              p[0] < rows.length &&
+              p[1] >= 0 &&
+              p[1] < headers.length
+          )
+          .slice(0, 12)
+      : [];
+    const cv = clipStr(item.inferredChartVariant, 16) as ChartVariant;
+    out.push({
+      id: clipStr(item.id, 48) || `tbl_${out.length + 1}`,
+      fileName: clipStr(item.fileName, 120) || "数据表.xlsx",
+      sheetName: clipStr(item.sheetName, 48) || `Sheet${out.length + 1}`,
+      rowCount: rows.length,
+      colCount: headers.length,
+      headers,
+      rows,
+      mode: item.mode === "chart" && series.length > 0 ? "chart" : "table",
+      inferredChartVariant: VALID_VARIANTS.includes(cv) ? cv : "col",
+      categories,
+      series,
+      highlightCoords,
+      summaryLine: clipStr(item.summaryLine, 80) || clipStr(item.sheetName, 48),
+    });
+  }
+  return out;
 }
 
 /**
@@ -70,8 +146,13 @@ export async function POST(request: Request) {
     }
   }
 
-  const text = safeString(body.text).trim();
-  if (text.length < MIN_CHARS) {
+  const tables = sanitizeIncomingTables(body.tables);
+  const rawText = safeString(body.text).trim();
+  const text =
+    rawText.length >= MIN_CHARS || tables.length === 0
+      ? rawText
+      : `${rawText}\n${tables.map((t) => `${t.fileName} · ${t.sheetName}：${t.summaryLine}`).join("\n")}`.trim();
+  if (text.length < MIN_CHARS && tables.length === 0) {
     return json(400, { error: `资料内容太少（至少 ${MIN_CHARS} 个字），请粘贴更完整的文字或上传文档` });
   }
   const rawCount = safeNumber(body.slideCount);
@@ -95,6 +176,7 @@ export async function POST(request: Request) {
     density,
     directionId: safeString(body.directionId).trim().slice(0, 40) || undefined,
     ...(anchorStyle ? { anchorStyle } : {}),
+    ...(tables.length > 0 ? { tables } : {}),
   };
   const mode = body.mode === "smart" ? "smart" : "auto";
 
@@ -143,7 +225,32 @@ export async function POST(request: Request) {
   if (sanitized === rule.slides) {
     return ruleResponse("大模型未返回有效的逐页大纲，已使用内置规则引擎");
   }
-  const slides = groundSlides(sanitized, input.text);
+  let slides = groundSlides(sanitized, input.text);
+  // Ensure structured spreadsheet slides keep their exact numeric matrices even when LLM generates prose copy
+  if (tables.length > 0) {
+    const ruleTableSlides = rule.slides.filter(
+      (rs) => Boolean(rs.tableData) || Boolean(rs.chartSeries && rs.chartSeries.length > 0)
+    );
+    if (ruleTableSlides.length > 0) {
+      let cursor = 0;
+      slides = slides.map((s) => {
+        if ((s.layout === "table" || s.layout === "chart") && cursor < ruleTableSlides.length) {
+          const ref = ruleTableSlides[cursor++];
+          return {
+            ...s,
+            layout: ref.layout,
+            chartVariant: s.chartVariant ?? ref.chartVariant,
+            chartCategories: ref.chartCategories,
+            chartSeries: ref.chartSeries,
+            tableData: ref.tableData,
+            data: s.data.length > 0 ? s.data : ref.data,
+            source: ref.source,
+          };
+        }
+        return s;
+      });
+    }
+  }
   const pack: PromptPack = {
     ...rule,
     engine: "llm",

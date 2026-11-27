@@ -11,6 +11,7 @@ import { analyzeDocumentAndRecommendStyles } from "@/lib/documentAnalyzer";
 import {
   DESIGN_DIRECTIONS,
   PACK_LAYOUTS,
+  chartVariantLabel,
   defaultAudienceFor,
   directionToStyle,
   getDesignDirection,
@@ -27,7 +28,8 @@ import {
   type PackStyle,
   type PromptPack,
 } from "@/lib/promptPack";
-import type { DocumentAnalysisResult } from "@/types/prompt";
+import type { ParsedDataTable } from "@/lib/spreadsheetParser";
+import type { ChartVariant, DocumentAnalysisResult } from "@/types/prompt";
 
 export interface PackRequestInput {
   text: string;
@@ -39,10 +41,12 @@ export interface PackRequestInput {
   density?: PackDensity;
   directionId?: string;
   anchorStyle?: PackStyle;
+  tables?: ParsedDataTable[];
 }
 
 interface SourceSection {
   heading: string;
+  sourceFile?: string;
   sentences: string[];
   facts: PackDatum[];
   raw: string;
@@ -341,34 +345,66 @@ function shortenClause(s: string, max: number): string {
   return `${balanceQuotes(clean.slice(0, cutEnd).trim())}…`;
 }
 
-function parseSections(text: string): { title: string; sections: SourceSection[] } {
+function parseSections(
+  text: string,
+  stripTableDigests = false
+): { title: string; sections: SourceSection[] } {
   const lines = text.split(/\r?\n/).map(cleanLine).filter(Boolean);
   let title = "";
-  const sections: { heading: string; body: string[] }[] = [];
-  let current: { heading: string; body: string[] } | null = null;
+  let activeSourceFile: string | undefined;
+  let skippingTableBlock = false;
+  const sections: { heading: string; sourceFile?: string; body: string[] }[] = [];
+  let current: { heading: string; sourceFile?: string; body: string[] } | null = null;
+
   lines.forEach((line, idx) => {
-    if (idx === 0 && line.length <= 42 && !/[。；;]$/.test(line)) {
+    const fileMarker = line.match(/^#{0,3}\s*【资料来源：(.+?)】$/);
+    if (fileMarker) {
+      activeSourceFile = fileMarker[1].trim();
+      skippingTableBlock = false;
+      current = null;
+      return;
+    }
+
+    if (/^#{0,3}\s*【数据表：.+?】$/.test(line)) {
+      if (stripTableDigests) {
+        skippingTableBlock = true;
+        current = null;
+        return;
+      }
+    }
+
+    if (skippingTableBlock) {
+      const maybeHead = detectHeading(line, lines[idx + 1]);
+      if (maybeHead && !/^核心结论/.test(maybeHead)) {
+        skippingTableBlock = false;
+      } else {
+        return;
+      }
+    }
+
+    if (!title && idx <= 1 && line.length <= 42 && !/[。；;|]$/.test(line) && !line.includes(" | ")) {
       title = line.replace(/^#+\s*/, "");
       return;
     }
     const heading = detectHeading(line, lines[idx + 1]);
     if (heading) {
-      current = { heading, body: [] };
+      current = { heading, sourceFile: activeSourceFile, body: [] };
       sections.push(current);
       return;
     }
     if (!current) {
-      current = { heading: "核心背景", body: [] };
+      current = { heading: "核心背景", sourceFile: activeSourceFile, body: [] };
       sections.push(current);
     }
     current.body.push(line);
   });
 
-  const parsed = sections
+  const parsed: SourceSection[] = sections
     .map((s) => {
       const raw = s.body.join("\n");
       return {
         heading: s.heading.slice(0, 28),
+        ...(s.sourceFile ? { sourceFile: s.sourceFile } : {}),
         sentences: splitSentences(raw),
         facts: extractFacts(raw),
         raw,
@@ -376,7 +412,7 @@ function parseSections(text: string): { title: string; sections: SourceSection[]
     })
     .filter((s) => s.sentences.length > 0 || s.facts.length > 0);
 
-  if (parsed.length <= 1) {
+  if (parsed.length <= 1 && !stripTableDigests) {
     const all = splitSentences(text);
     const chunkSize = Math.max(3, Math.ceil(all.length / 6));
     const chunks: SourceSection[] = [];
@@ -385,6 +421,7 @@ function parseSections(text: string): { title: string; sections: SourceSection[]
       const raw = sents.join("");
       chunks.push({
         heading: shortenClause(sents[0] ?? "要点", 18),
+        ...(activeSourceFile ? { sourceFile: activeSourceFile } : {}),
         sentences: sents,
         facts: extractFacts(raw),
         raw,
@@ -559,6 +596,8 @@ function visualFor(
       }
       return `精简柱状图（${labels}）：去除多余网格线，最大值用强调色突出，柱顶直接标数值`;
     }
+    case "table":
+      return `原生可编辑三线表 / 评分矩阵：表头加粗分隔、去除竖向杂线，按列主色加粗高亮最优指标值`;
     case "comparison":
       return "左右双栏对照矩阵（或原生对比表格）：左侧现状/基线用浅灰底，右侧本方案用主色描边高亮核心差异";
     case "timeline":
@@ -570,8 +609,121 @@ function visualFor(
     case "summary":
       return "3 张核心结论行动卡并列排布 + 底部问答交流引导";
     default:
-      return `左图右文（5:7 栅格）：左侧绘制「${sec?.heading ?? topic}」结构示意图，右侧分卡片陈列核心论据`;
+      return `左图右文（5:7 栅格）：左侧放置「${sec?.heading ?? topic}」真实架构图/实验图或干净虚线配图框，右侧分卡片陈列核心论据`;
   }
+}
+
+function inferProseChartVariant(raw: string, data: PackDatum[]): ChartVariant {
+  if (/占比|贡献|份额|渗透率|分布|结构/.test(raw) && data.length <= 6) {
+    return "doughnut";
+  }
+  if (/成正比|成反比|随.*增长|依次为|拉力|加速度|曲线|趋势|走势|Q[1-4]|月度|历年/.test(raw)) {
+    return "line";
+  }
+  if (/高出|优于|相比|基线|baseline|BLEU|AIME|MATH|Codeforces|Pass@|排行/i.test(raw)) {
+    return "bar";
+  }
+  return "col";
+}
+
+function tableToPackSlide(tbl: ParsedDataTable, density: PackDensity): PackSlide {
+  const sourceLabel = `${tbl.fileName} · ${tbl.sheetName}`.slice(0, 80);
+  const maxBulletLen = density === "speaker" ? 42 : 68;
+  const maxBullets = density === "speaker" ? 3 : 4;
+
+  // Build grounded analytical bullets from highlightCoords & series
+  const points: string[] = [];
+  for (const [rIdx, cIdx] of tbl.highlightCoords.slice(0, maxBullets)) {
+    const rowLabel = tbl.categories[rIdx] || tbl.rows[rIdx]?.[0] || `第 ${rIdx + 1} 项`;
+    const colLabel = tbl.headers[cIdx] || `指标 ${cIdx}`;
+    const cellVal = tbl.rows[rIdx]?.[cIdx] || "";
+    if (cellVal) {
+      points.push(shortenClause(`${colLabel}最优表现：${rowLabel}达 ${cellVal}`, maxBulletLen));
+    }
+  }
+  if (points.length < 2) {
+    tbl.rows.slice(0, maxBullets - points.length).forEach((r) => {
+      const head = r[0] || "样本";
+      const metrics = r
+        .slice(1, 4)
+        .map((val, idx) => (val ? `${tbl.headers[idx + 1]} ${val}` : ""))
+        .filter(Boolean)
+        .join("，");
+      if (metrics) {
+        points.push(shortenClause(`${head}：${metrics}`, maxBulletLen));
+      }
+    });
+  }
+
+  const tableData = {
+    headers: tbl.headers,
+    rows: tbl.rows,
+    ...(tbl.highlightCoords.length > 0 ? { highlightCoords: tbl.highlightCoords } : {}),
+  };
+
+  if (tbl.mode === "chart" && tbl.series.length > 0) {
+    const primary = tbl.series[0];
+    const unit = primary.unit || "";
+    const datumList: PackDatum[] = tbl.categories.slice(0, 6).map((cat, idx) => {
+      const v = primary.values[idx] ?? 0;
+      const valStr = unit && !String(v).endsWith(unit) ? `${v}${unit}` : String(v);
+      return { label: cat.slice(0, 22), value: valStr.slice(0, 24) };
+    });
+    const variant = tbl.inferredChartVariant;
+    const seriesNames = tbl.series.map((s) => s.name).join(" / ");
+    return {
+      id: newPackSlideId(),
+      layout: "chart",
+      chartVariant: variant,
+      chartCategories: tbl.categories.slice(0, 16),
+      chartSeries: tbl.series.slice(0, 4).map((s) => ({
+        name: s.name,
+        values: s.values.slice(0, 16),
+        ...(s.unit ? { unit: s.unit } : {}),
+      })),
+      tableData,
+      title: shortenClause(tbl.summaryLine || `${tbl.sheetName}关键指标对比`, 28),
+      points: points.slice(0, maxBullets),
+      data: datumList,
+      visual: `原生${chartVariantLabel(variant)}（${seriesNames}，共 ${tbl.rowCount} 组样本）：直接显示数值标签并突出极值`,
+      note: `展示数据表「${tbl.sheetName}」（来源：${tbl.fileName}），涵盖 ${seriesNames} 共 ${tbl.rowCount} 行汇总数据。${tbl.summaryLine}。`,
+      source: sourceLabel,
+    };
+  }
+
+  const datumList: PackDatum[] =
+    tbl.highlightCoords.length > 0
+      ? tbl.highlightCoords.slice(0, 4).map(([rIdx, cIdx]) => ({
+          label: `${tbl.categories[rIdx] || ""} ${tbl.headers[cIdx] || ""}`.trim().slice(0, 22),
+          value: (tbl.rows[rIdx]?.[cIdx] || "—").slice(0, 24),
+        }))
+      : tbl.rows.slice(0, 4).map((r) => ({
+          label: (r[0] || tbl.headers[0] || "指标").slice(0, 22),
+          value: (r[1] || "—").slice(0, 24),
+        }));
+
+  return {
+    id: newPackSlideId(),
+    layout: "table",
+    chartVariant: tbl.inferredChartVariant,
+    ...(tbl.categories.length > 0 ? { chartCategories: tbl.categories.slice(0, 16) } : {}),
+    ...(tbl.series.length > 0
+      ? {
+          chartSeries: tbl.series.slice(0, 4).map((s) => ({
+            name: s.name,
+            values: s.values.slice(0, 16),
+            ...(s.unit ? { unit: s.unit } : {}),
+          })),
+        }
+      : {}),
+    tableData,
+    title: shortenClause(tbl.summaryLine || `${tbl.sheetName}多维指标汇总对比`, 28),
+    points: points.slice(0, maxBullets),
+    data: datumList.filter((d) => d.label && d.value),
+    visual: `原生可编辑三线数据表（${tbl.rowCount} 行 × ${tbl.colCount} 列）：跨量纲保留精确原始单位，按列加粗高亮最优指标`,
+    note: `逐列解读「${tbl.sheetName}」（来源：${tbl.fileName}）中的跨维度对比结果：${points.slice(0, 2).join("；")}。`,
+    source: sourceLabel,
+  };
 }
 
 function pointsFor(layout: PackLayout, sents: string[], density: PackDensity): string[] {
@@ -608,10 +760,12 @@ export function buildRuleBasedPack(input: PackRequestInput): {
 } {
   const text = input.text.slice(0, 16000);
   const density: PackDensity = input.density === "reading" ? "reading" : "speaker";
-  const { title, sections } = parseSections(text);
+  const incomingTables = (input.tables ?? []).slice(0, 8);
+  const { title, sections } = parseSections(text, incomingTables.length > 0);
   const topic = (
     input.topic ||
     title ||
+    incomingTables[0]?.sheetName ||
     sections[0]?.heading ||
     input.fileName.replace(/\.[^.]+$/, "") ||
     "我的演示"
@@ -634,32 +788,57 @@ export function buildRuleBasedPack(input: PackRequestInput): {
       : direction.scenarios[0] ?? analysis.detectedScenario;
   const target = Math.max(5, Math.min(24, Math.round(input.slideCount || analysis.suggestedSlideCount || 10)));
 
+  const tableSlides = incomingTables.map((tbl) => tableToPackSlide(tbl, density));
+
   const CLOSING_RE = /总结|小结|结论|展望|conclusion|summary/i;
   const lastIdx = sections.length - 1;
   const closingIdx =
     [lastIdx, lastIdx - 1].find((i) => i > 0 && CLOSING_RE.test(sections[i]?.heading ?? "")) ?? -1;
   const closingSec = closingIdx >= 0 ? sections[closingIdx] : null;
   const body = sections.filter((s) => s !== closingSec);
-  const useAgenda = body.length >= 3 && target >= 7;
-  const allSourceFacts = body.flatMap((s) => s.facts);
-  const useFactsPage = allSourceFacts.length >= 3 && target >= 9;
-  let budget = target - 2 - (useAgenda ? 1 : 0) - (useFactsPage ? 1 : 0);
 
-  let units: { sec: SourceSection; sents: string[]; part: number; parts: number }[] = body.map((sec) => ({
-    sec,
-    sents: sec.sentences,
-    part: 1,
-    parts: 1,
-  }));
-  if (units.length > budget) {
+  const agendaHeads = [
+    ...body.map((s) => s.heading),
+    ...incomingTables.map((t) => t.sheetName),
+  ].slice(0, 6);
+  const useAgenda = agendaHeads.length >= 3 && target >= 7;
+
+  const tableHighlightFacts = tableSlides.flatMap((ts) => ts.data).slice(0, 6);
+  const allSourceFacts = [...body.flatMap((s) => s.facts), ...tableHighlightFacts];
+  const useFactsPage =
+    (body.length > 0 && allSourceFacts.length >= 3 && target >= 9) ||
+    (body.length === 0 && tableHighlightFacts.length >= 2 && tableSlides.length + 2 < target);
+
+  let budget = Math.max(
+    0,
+    target - 2 - (useAgenda ? 1 : 0) - (useFactsPage ? 1 : 0) - tableSlides.length
+  );
+
+  let units: { sec: SourceSection; sents: string[]; part: number; parts: number }[] =
+    budget > 0 || body.length === 0
+      ? body.map((sec) => ({
+          sec,
+          sents: sec.sentences,
+          part: 1,
+          parts: 1,
+        }))
+      : body.slice(0, 1).map((sec) => ({
+          sec,
+          sents: sec.sentences,
+          part: 1,
+          parts: 1,
+        }));
+  if (units.length > budget && budget > 0) {
     const keep = [...units]
       .sort((a, b) => b.sec.raw.length + b.sec.facts.length * 80 - (a.sec.raw.length + a.sec.facts.length * 80))
       .slice(0, budget);
     units = units.filter((u) => keep.includes(u));
+  } else if (budget === 0 && tableSlides.length >= target - 2) {
+    units = [];
   }
   let guard = 0;
   const minSplitSents = density === "reading" ? 4 : 3;
-  while (units.length < budget && guard < 40) {
+  while (units.length > 0 && units.length < budget && guard < 40) {
     guard += 1;
     const idx = units.reduce(
       (best, u, i) => (u.sents.length > (units[best]?.sents.length ?? 0) ? i : best),
@@ -676,7 +855,10 @@ export function buildRuleBasedPack(input: PackRequestInput): {
   budget = units.length;
 
   const slides: PackSlide[] = [];
-  const firstSentence = sections[0]?.sentences[0] ?? "";
+  const firstSentence =
+    sections[0]?.sentences[0] ??
+    incomingTables[0]?.summaryLine ??
+    "";
   slides.push({
     id: newPackSlideId(),
     layout: "cover",
@@ -685,20 +867,19 @@ export function buildRuleBasedPack(input: PackRequestInput): {
     data: [],
     visual: visualFor("cover", null, [], direction, topic),
     note: `开场：点明主题「${topic}」与核心问题，面向${audience}对齐本次汇报目标。`,
-    source: input.fileName || "资料",
+    source: input.fileName || incomingTables[0]?.fileName || "资料",
   });
 
   if (useAgenda) {
-    const heads = body.slice(0, 6).map((s) => s.heading);
     slides.push({
       id: newPackSlideId(),
       layout: "agenda",
       title: "汇报脉络与核心议题",
-      points: heads,
+      points: agendaHeads,
       data: [],
       visual: visualFor("agenda", null, [], direction, topic),
-      note: `本次共分 ${heads.length} 个模块展开：${heads.join(" → ")}。`,
-      source: "资料章节结构",
+      note: `本次共分 ${agendaHeads.length} 个模块展开：${agendaHeads.join(" → ")}。`,
+      source: "资料章节与数据表结构",
     });
   }
 
@@ -718,7 +899,7 @@ export function buildRuleBasedPack(input: PackRequestInput): {
       data: top,
       visual: visualFor("big-number", null, top, direction, topic),
       note: `先用资料中的 ${top.length} 组核心量化指标建立全局锚点，随后逐页展开推导与证据。`,
-      source: "资料中的数字事实",
+      source: incomingTables[0] ? `${incomingTables[0].fileName} · 核心指标汇总` : "资料中的数字事实",
     });
   }
 
@@ -729,6 +910,7 @@ export function buildRuleBasedPack(input: PackRequestInput): {
     const effectiveFacts = unitFacts.length ? unitFacts : u.part === 1 ? u.sec.facts : [];
     const subSec: SourceSection = {
       heading: u.sec.heading,
+      sourceFile: u.sec.sourceFile,
       sentences: u.sents,
       facts: effectiveFacts,
       raw: unitRaw || u.sec.raw,
@@ -742,22 +924,53 @@ export function buildRuleBasedPack(input: PackRequestInput): {
           : effectiveFacts.slice(0, 2);
 
     const assertionTitle = buildAssertionTitle(u.sec.heading, u.sents, data, layout);
+    const srcPrefix = u.sec.sourceFile || input.fileName || "资料";
+    const chartVariant = layout === "chart" ? inferProseChartVariant(subSec.raw, data) : undefined;
     slides.push({
       id: newPackSlideId(),
       layout,
+      ...(chartVariant ? { chartVariant } : {}),
       title: shortenClause(assertionTitle, 28),
       points: pointsFor(layout, u.sents, density),
       data,
       visual: visualFor(layout, subSec, data, direction, topic),
       note: shortenClause(u.sents.slice(0, 4).join(" "), 240),
-      source: `资料 · ${u.sec.heading}`,
+      source: `${srcPrefix} · ${u.sec.heading}`.slice(0, 80),
     });
     prev = layout;
   }
 
+  // Append dedicated structured chart / native 3-line table slides from uploaded spreadsheets
+  for (const ts of tableSlides) {
+    slides.push(ts);
+  }
+
+  // When only a single spreadsheet was uploaded with zero prose, ensure >= 4 slides by adding a grounded row comparison slide
+  if (units.length === 0 && tableSlides.length === 1 && incomingTables[0] && incomingTables[0].rows.length >= 2 && slides.length < 3) {
+    const tbl = incomingTables[0];
+    const r0 = tbl.rows[0];
+    const r1 = tbl.rows[tbl.rows.length - 1];
+    slides.push({
+      id: newPackSlideId(),
+      layout: "comparison",
+      title: shortenClause(`${r0[0] || "首项"} vs ${r1[0] || "末项"}关键指标对照`, 28),
+      points: [
+        ...r0.slice(1, 3).map((v, i) => `${r0[0]} · ${tbl.headers[i + 1] || ""}：${v}`),
+        ...r1.slice(1, 3).map((v, i) => `${r1[0]} · ${tbl.headers[i + 1] || ""}：${v}`),
+      ].filter(Boolean),
+      data: [],
+      visual: visualFor("comparison", null, [], direction, topic),
+      note: `基于「${tbl.sheetName}」首尾样本进行双栏对照，突出核心指标差距。`,
+      source: `${tbl.fileName} · ${tbl.sheetName}`.slice(0, 80),
+    });
+  }
+
   const rawTakeaways = closingSec?.sentences.length
     ? closingSec.sentences
-    : body.map((s) => s.sentences[0]).filter(Boolean);
+    : [
+        ...body.map((s) => s.sentences[0]).filter(Boolean),
+        ...incomingTables.map((t) => t.summaryLine).filter(Boolean),
+      ];
   const takeaways = rawTakeaways
     .slice(0, density === "speaker" ? 3 : 4)
     .map((s) => shortenClause(s, density === "speaker" ? 42 : 64));
@@ -767,6 +980,7 @@ export function buildRuleBasedPack(input: PackRequestInput): {
       ? takeaways[0]
       : "核心结论与下一步行动";
 
+  const closingSourcePrefix = closingSec?.sourceFile || input.fileName || "资料";
   slides.push({
     id: newPackSlideId(),
     layout: "summary",
@@ -775,10 +989,10 @@ export function buildRuleBasedPack(input: PackRequestInput): {
     data: closingSec?.facts.slice(0, 2) ?? [],
     visual: visualFor("summary", closingSec, [], direction, topic),
     note: closingSec ? shortenClause(closingSec.sentences.join(" "), 220) : "回顾核心结论并邀请现场提问。",
-    source: closingSec ? `资料 · ${closingSec.heading}` : "全文提炼",
+    source: closingSec ? `${closingSourcePrefix} · ${closingSec.heading}`.slice(0, 80) : "全文与数据表提炼",
   });
 
-  const allFacts = sections.flatMap((s) => s.facts).slice(0, 6);
+  const allFacts = [...sections.flatMap((s) => s.facts), ...tableHighlightFacts].slice(0, 6);
   const insight: PackInsight = {
     topic,
     subtitle: "",
@@ -790,7 +1004,7 @@ export function buildRuleBasedPack(input: PackRequestInput): {
     tone: TONE_LABEL[analysis.suggestedTone] ?? analysis.suggestedTone,
     density,
     keyFacts: allFacts.map((f) => `${f.label} ${f.value}`),
-    sections: body.map((s) => s.heading).slice(0, 8),
+    sections: [...body.map((s) => s.heading), ...incomingTables.map((t) => t.sheetName)].slice(0, 8),
     fileName: input.fileName,
     charCount: text.length,
   };

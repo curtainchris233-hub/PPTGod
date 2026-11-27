@@ -14,6 +14,7 @@ import { PPTX_CONTENT_TYPE, readSavedPptx, savedPptxCacheKey, storeSavedPptx } f
 import { pickDefaultArtworkForArchetype } from "@/lib/slideArtworks";
 import { limitToolRequest } from "@/lib/toolRateLimit";
 import type {
+  DataDisplayMode,
   DeckSlideItem,
   DecorativeMotif,
   LayoutArchetype,
@@ -400,9 +401,35 @@ export async function POST(request: Request) {
       isRounded: cornerRadius >= 8,
     };
 
+    type PptxSkeleton = "consulting" | "academic" | "keynote" | "classroom";
+    const resolveSkeleton = (arch: LayoutArchetype): PptxSkeleton => {
+      switch (arch) {
+        case "consulting-mbb":
+        case "swiss-grid":
+        case "executive-emerald":
+        case "financial-terminal":
+        case "pmo-rag-grid":
+          return "consulting";
+        case "academic-paper":
+        case "scientific-figure":
+        case "clinical-clean":
+          return "academic";
+        case "keynote-center":
+        case "soft-bento":
+        case "luxury-minimal":
+        case "editorial-asymmetric":
+        case "tech-blueprint":
+        case "brutalist-poster":
+          return "keynote";
+        default:
+          return "classroom";
+      }
+    };
+    const skeleton: PptxSkeleton = resolveSkeleton(archetype);
+
     const total = slides.length;
 
-    // v8: Register a real PowerPoint Slide Master (inspired by ppt-master native depth)
+    // Register a real PowerPoint Slide Master
     pptx.defineSlideMaster({
       title: "PPTGOD_MASTER",
       background: { color: cBg },
@@ -417,62 +444,140 @@ export async function POST(request: Request) {
     ) => {
       const leftPad = tokens.isBauhaus ? 0.65 : 0.6;
       const barW = 9.4 - leftPad;
+      const resolvedTag =
+        safeText(sectionTag).trim() ||
+        `${String(idx + 1).padStart(2, "0")} / SECTION`;
 
-      // Accent dot + Section Tag
-      slide.addShape(
-        tokens.isRounded ? pptx.ShapeType.ellipse : pptx.ShapeType.rect,
-        {
+      if (skeleton === "consulting") {
+        // Consulting MBB: crisp top kicker + right deck title + sharp category hairline
+        slide.addShape(pptx.ShapeType.rect, {
           x: leftPad,
-          y: 0.42,
-          w: 0.1,
-          h: 0.1,
+          y: 0.36,
+          w: 0.18,
+          h: 0.06,
           fill: { color: cAccent },
           line: { color: cAccent, width: 0 },
-        }
-      );
-      slide.addText(
-        safeText(sectionTag).trim() ||
-          `${String(idx + 1).padStart(2, "0")} / SECTION`,
-        {
-          x: leftPad + 0.16,
-          y: 0.35,
+        });
+        slide.addText(resolvedTag.toUpperCase(), {
+          x: leftPad + 0.24,
+          y: 0.28,
           w: 4.5,
           h: 0.24,
-          fontSize: 9,
+          fontSize: 8.5,
           bold: true,
-          color: tokens.isTerminal ? cAccent : cMuted,
+          color: cAccent,
           fontFace: "Consolas",
-        }
-      );
-      slide.addText(title, {
-        x: 5.4,
-        y: 0.35,
-        w: 4.0,
-        h: 0.24,
-        fontSize: 9,
-        align: "right",
-        color: cMuted,
-        fontFace: fontBody,
-      });
-      slide.addShape(pptx.ShapeType.line, {
-        x: leftPad,
-        y: 0.66,
-        w: barW,
-        h: 0,
-        line: {
-          color: tokens.isAcademic ? cAccent : cBorder,
-          width: tokens.isAcademic ? 1.25 : 0.75,
-        },
-      });
+        });
+        slide.addText(title, {
+          x: 5.4,
+          y: 0.28,
+          w: 4.0,
+          h: 0.24,
+          fontSize: 8.5,
+          align: "right",
+          color: cMuted,
+          fontFace: fontBody,
+        });
+      } else if (skeleton === "academic") {
+        // Academic Journal: understated serif running head + double/crisp top rule
+        const cAcademicRule = cText === "FFFFFF" ? "E2E8F0" : cText;
+        slide.addText(`${title}  ·  ${resolvedTag}`, {
+          x: leftPad,
+          y: 0.32,
+          w: 6.8,
+          h: 0.24,
+          fontSize: 8.5,
+          italic: true,
+          color: cMuted,
+          fontFace: fontHeading,
+        });
+        slide.addShape(pptx.ShapeType.line, {
+          x: leftPad,
+          y: 0.62,
+          w: barW,
+          h: 0,
+          line: { color: cAcademicRule, width: 1.0 },
+        });
+      } else if (skeleton === "keynote") {
+        // Keynote / Bento: floating soft pill eyebrow, zero top divider clutter
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: leftPad,
+          y: 0.32,
+          w: Math.min(2.2, Math.max(1.15, resolvedTag.length * 0.12 + 0.35)),
+          h: 0.26,
+          rectRadius: 0.12,
+          fill: { color: cAccentSoft },
+          line: { color: cBorder, width: 0.5 },
+        });
+        slide.addText(resolvedTag, {
+          x: leftPad + 0.1,
+          y: 0.32,
+          w: Math.min(2.0, Math.max(0.95, resolvedTag.length * 0.12 + 0.15)),
+          h: 0.26,
+          fontSize: 8.5,
+          bold: true,
+          color: cAccent,
+          valign: "middle",
+          fontFace: "Consolas",
+        });
+      } else {
+        // Classroom / Civic: solid colored module badge + clear top rule
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: leftPad,
+          y: 0.32,
+          w: 1.55,
+          h: 0.27,
+          rectRadius: 0.06,
+          fill: { color: cAccent },
+          line: { color: cAccent, width: 0 },
+        });
+        slide.addText(resolvedTag.slice(0, 14), {
+          x: leftPad,
+          y: 0.32,
+          w: 1.55,
+          h: 0.27,
+          fontSize: 8.5,
+          bold: true,
+          align: "center",
+          valign: "middle",
+          color: cAccentText,
+          fontFace: fontBody,
+        });
+        slide.addText(title, {
+          x: 5.2,
+          y: 0.34,
+          w: 4.2,
+          h: 0.24,
+          fontSize: 9,
+          align: "right",
+          color: cMuted,
+          fontFace: fontBody,
+        });
+        slide.addShape(pptx.ShapeType.line, {
+          x: leftPad,
+          y: 0.66,
+          w: barW,
+          h: 0,
+          line: { color: cBorder, width: 0.75 },
+        });
+      }
 
       // Footer
-      slide.addShape(pptx.ShapeType.line, {
-        x: leftPad,
-        y: 5.12,
-        w: barW,
-        h: 0,
-        line: { color: cBorder, width: 0.5 },
-      });
+      if (skeleton !== "keynote") {
+        const cFootRule =
+          skeleton === "academic"
+            ? cText === "FFFFFF"
+              ? "E2E8F0"
+              : cText
+            : cBorder;
+        slide.addShape(pptx.ShapeType.line, {
+          x: leftPad,
+          y: 5.12,
+          w: barW,
+          h: 0,
+          line: { color: cFootRule, width: 0.5 },
+        });
+      }
       const customBrandFooter =
         typeof layoutObj?.brandFooter === "string"
           ? layoutObj.brandFooter.replace(/[<>]/g, "").trim().slice(0, 60)
@@ -505,6 +610,65 @@ export async function POST(request: Request) {
           fontFace: "Consolas",
         }
       );
+    };
+
+    const addSlideHeading = (slide: PptxGenJS.Slide, headingText: string) => {
+      if (skeleton === "consulting") {
+        slide.addText(headingText, {
+          x: 0.6,
+          y: 0.62,
+          w: 8.8,
+          h: 0.64,
+          fontSize: 19.5,
+          bold: true,
+          color: cText,
+          fontFace: fontHeading,
+          valign: "middle",
+        });
+        slide.addShape(pptx.ShapeType.line, {
+          x: 0.6,
+          y: 1.32,
+          w: 8.8,
+          h: 0,
+          line: { color: cAccent, width: 1.25 },
+        });
+      } else if (skeleton === "academic") {
+        slide.addText(headingText, {
+          x: 0.6,
+          y: 0.72,
+          w: 8.8,
+          h: 0.62,
+          fontSize: 19,
+          bold: true,
+          color: cText,
+          fontFace: fontHeading,
+          valign: "middle",
+        });
+      } else if (skeleton === "keynote") {
+        slide.addText(headingText, {
+          x: 0.6,
+          y: 0.68,
+          w: 8.8,
+          h: 0.68,
+          fontSize: 22,
+          bold: true,
+          color: cText,
+          fontFace: fontHeading,
+          valign: "middle",
+        });
+      } else {
+        slide.addText(headingText, {
+          x: 0.6,
+          y: 0.78,
+          w: 8.8,
+          h: 0.56,
+          fontSize: 20,
+          bold: true,
+          color: cText,
+          fontFace: fontHeading,
+          valign: "middle",
+        });
+      }
     };
 
     const SOURCE_STATUS_ZH: Record<string, string> = {
@@ -558,93 +722,204 @@ export async function POST(request: Request) {
         typeof item.sourceNote === "string" ? item.sourceNote : undefined
       );
 
-      // Slide Heading
-      slide.addText(safeText(item.title).trim() || title, {
-        x: 0.6,
-        y: 0.8,
-        w: 8.8,
-        h: 0.54,
-        fontSize: 20,
-        bold: true,
-        color: cText,
-        fontFace: fontHeading,
-      });
+      addSlideHeading(slide, safeText(item.title).trim() || title);
 
-      /* -------- 1. AGENDA -------- */
+      /* -------- 1. AGENDA (Skeleton-Aware) -------- */
       if (item.slideType === "agenda") {
         const steps = sanitizeSteps(item.steps, 4, DEFAULT_AGENDA_STEPS);
-        steps.forEach((st, sIdx) => {
-          const col = sIdx % 2;
-          const row = Math.floor(sIdx / 2);
-          const x = 0.6 + col * 4.5;
-          const y = 1.62 + row * 1.62;
-          addStyledCard(pptx, slide, tokens, {
-            x,
-            y,
-            w: 4.3,
-            h: 1.42,
-            borderColor: sIdx === 0 ? cAccent : cBorder,
+        if (skeleton === "consulting") {
+          // Executive horizontal strip list with left accent bar
+          const rowH = Math.min(0.72, 3.2 / Math.max(1, steps.length));
+          steps.forEach((st, sIdx) => {
+            const y = 1.56 + sIdx * (rowH + 0.12);
+            addStyledCard(pptx, slide, tokens, {
+              x: 0.6,
+              y,
+              w: 8.8,
+              h: rowH,
+              borderColor: sIdx === 0 ? cAccent : cBorder,
+            });
+            slide.addShape(pptx.ShapeType.rect, {
+              x: 0.6,
+              y,
+              w: 0.08,
+              h: rowH,
+              fill: { color: sIdx === 0 ? cAccent : cChart3 },
+              line: { color: sIdx === 0 ? cAccent : cChart3, width: 0 },
+            });
+            slide.addText(st.code || String(sIdx + 1).padStart(2, "0"), {
+              x: 0.82,
+              y,
+              w: 0.65,
+              h: rowH,
+              fontSize: 15,
+              bold: true,
+              valign: "middle",
+              color: sIdx === 0 ? cAccent : cText,
+              fontFace: "Consolas",
+            });
+            slide.addText(st.title, {
+              x: 1.52,
+              y,
+              w: 2.8,
+              h: rowH,
+              fontSize: 13,
+              bold: true,
+              valign: "middle",
+              color: cText,
+              fontFace: fontHeading,
+            });
+            slide.addText(st.desc, {
+              x: 4.45,
+              y,
+              w: 4.75,
+              h: rowH,
+              fontSize: 10.5,
+              valign: "middle",
+              color: cMuted,
+              fontFace: fontBody,
+            });
           });
-          slide.addText(st.code || String(sIdx + 1).padStart(2, "0"), {
-            x: x + 0.2,
-            y: y + 0.18,
-            w: 0.7,
-            h: 0.45,
-            fontSize: 18,
-            bold: true,
-            color: sIdx === 0 ? cAccent : cText,
-            fontFace: "Consolas",
+        } else if (skeleton === "academic") {
+          // Minimalist borderless academic outline with hairline separators
+          steps.forEach((st, sIdx) => {
+            const col = sIdx % 2;
+            const row = Math.floor(sIdx / 2);
+            const x = 0.6 + col * 4.55;
+            const y = 1.66 + row * 1.56;
+            slide.addText(`§ ${st.code || String(sIdx + 1).padStart(2, "0")}`, {
+              x,
+              y,
+              w: 4.1,
+              h: 0.28,
+              fontSize: 10,
+              bold: true,
+              color: cAccent,
+              fontFace: "Consolas",
+            });
+            slide.addText(st.title, {
+              x,
+              y: y + 0.3,
+              w: 4.1,
+              h: 0.38,
+              fontSize: 14,
+              bold: true,
+              color: cText,
+              fontFace: fontHeading,
+            });
+            slide.addShape(pptx.ShapeType.line, {
+              x,
+              y: y + 0.72,
+              w: 4.1,
+              h: 0,
+              line: { color: cBorder, width: 0.75 },
+            });
+            slide.addText(st.desc, {
+              x,
+              y: y + 0.8,
+              w: 4.1,
+              h: 0.6,
+              fontSize: 10.5,
+              color: cMuted,
+              fontFace: fontBody,
+              valign: "top",
+            });
           });
-          slide.addText(st.title, {
-            x: x + 0.95,
-            y: y + 0.18,
-            w: 3.15,
-            h: 0.38,
-            fontSize: 13.5,
-            bold: true,
-            color: cText,
-            fontFace: fontHeading,
+        } else {
+          steps.forEach((st, sIdx) => {
+            const col = sIdx % 2;
+            const row = Math.floor(sIdx / 2);
+            const x = 0.6 + col * 4.5;
+            const y = 1.62 + row * 1.62;
+            addStyledCard(pptx, slide, tokens, {
+              x,
+              y,
+              w: 4.3,
+              h: 1.42,
+              borderColor: sIdx === 0 ? cAccent : cBorder,
+            });
+            slide.addText(st.code || String(sIdx + 1).padStart(2, "0"), {
+              x: x + 0.2,
+              y: y + 0.18,
+              w: 0.7,
+              h: 0.45,
+              fontSize: 18,
+              bold: true,
+              color: sIdx === 0 ? cAccent : cText,
+              fontFace: "Consolas",
+            });
+            slide.addText(st.title, {
+              x: x + 0.95,
+              y: y + 0.18,
+              w: 3.15,
+              h: 0.38,
+              fontSize: 13.5,
+              bold: true,
+              color: cText,
+              fontFace: fontHeading,
+            });
+            slide.addText(st.desc, {
+              x: x + 0.95,
+              y: y + 0.6,
+              w: 3.15,
+              h: 0.68,
+              fontSize: 10.5,
+              color: cMuted,
+              fontFace: fontBody,
+              valign: "top",
+            });
           });
-          slide.addText(st.desc, {
-            x: x + 0.95,
-            y: y + 0.6,
-            w: 3.15,
-            h: 0.68,
-            fontSize: 10.5,
-            color: cMuted,
-            fontFace: fontBody,
-            valign: "top",
-          });
-        });
+        }
         return;
       }
 
-      /* -------- 2. PROCESS / CLOSING -------- */
+      /* -------- 2. PROCESS / CLOSING (Skeleton-Aware) -------- */
       if (item.slideType === "process" || item.slideType === "closing") {
         const steps = sanitizeSteps(item.steps, 3, DEFAULT_PROCESS_STEPS);
         steps.forEach((st, sIdx) => {
           const x = 0.6 + sIdx * 3.0;
-          const y = 1.66;
+          const y = 1.64;
           addStyledCard(pptx, slide, tokens, {
             x,
             y,
             w: 2.8,
-            h: 3.12,
+            h: 3.14,
             borderColor: sIdx === 0 ? cAccent : cBorder,
           });
+          if (skeleton === "consulting") {
+            slide.addShape(pptx.ShapeType.rect, {
+              x,
+              y,
+              w: 2.8,
+              h: 0.08,
+              fill: { color: sIdx === 0 ? cAccent : cChart3 },
+              line: { color: sIdx === 0 ? cAccent : cChart3, width: 0 },
+            });
+          } else if (skeleton === "classroom") {
+            slide.addShape(pptx.ShapeType.ellipse, {
+              x: x + 0.2,
+              y: y + 0.2,
+              w: 0.42,
+              h: 0.42,
+              fill: { color: cAccent },
+              line: { color: cAccent, width: 0 },
+            });
+          }
           slide.addText(st.code || String(sIdx + 1).padStart(2, "0"), {
-            x: x + 0.22,
-            y: y + 0.24,
-            w: 2.36,
-            h: 0.32,
+            x: skeleton === "classroom" ? x + 0.2 : x + 0.22,
+            y: skeleton === "classroom" ? y + 0.2 : y + 0.24,
+            w: skeleton === "classroom" ? 0.42 : 2.36,
+            h: skeleton === "classroom" ? 0.42 : 0.32,
             fontSize: 11,
             bold: true,
-            color: cAccent,
+            align: skeleton === "classroom" ? "center" : "left",
+            valign: "middle",
+            color: skeleton === "classroom" ? cAccentText : cAccent,
             fontFace: "Consolas",
           });
           slide.addText(st.title, {
             x: x + 0.22,
-            y: y + 0.68,
+            y: y + 0.72,
             w: 2.36,
             h: 0.55,
             fontSize: 14.5,
@@ -654,7 +929,7 @@ export async function POST(request: Request) {
           });
           slide.addText(st.desc, {
             x: x + 0.22,
-            y: y + 1.32,
+            y: y + 1.34,
             w: 2.36,
             h: 1.5,
             fontSize: 11,
@@ -666,7 +941,7 @@ export async function POST(request: Request) {
         return;
       }
 
-      /* -------- 3. IMAGE-SPLIT (NEW v3: Real embedded Image OR Native Vector Artwork) -------- */
+      /* -------- 3. IMAGE-SPLIT (Real Embedded Image OR Clean Dashed Placeholder OR Vector Preset) -------- */
       if (item.slideType === "image-split") {
         const slot: Record<string, unknown> = isPlainObject(item.imageSlot)
           ? item.imageSlot
@@ -680,6 +955,7 @@ export async function POST(request: Request) {
           slot.kind === "data-url" && isValidImageDataUrl(slot.dataUrl)
             ? String(slot.dataUrl).trim()
             : "";
+        const isPlaceholderSlot = !dataUrl && slot.kind === "placeholder";
 
         if (dataUrl) {
           addStyledCard(pptx, slide, tokens, {
@@ -689,15 +965,64 @@ export async function POST(request: Request) {
           });
           slide.addImage({
             data: dataUrl,
-            x: imgBox.x + 0.06,
-            y: imgBox.y + 0.06,
-            w: imgBox.w - 0.12,
-            h: imgBox.h - 0.12,
+            x: imgBox.x + 0.08,
+            y: imgBox.y + 0.08,
+            w: imgBox.w - 0.16,
+            h: imgBox.h - 0.16,
             sizing: {
-              type: "cover",
-              w: imgBox.w - 0.12,
-              h: imgBox.h - 0.12,
+              type: "contain",
+              w: imgBox.w - 0.16,
+              h: imgBox.h - 0.16,
             },
+          });
+        } else if (isPlaceholderSlot) {
+          // Clean, restrained dashed placeholder frame for direct screenshot/figure pasting in PowerPoint
+          slide.addShape(
+            tokens.isRounded ? pptx.ShapeType.roundRect : pptx.ShapeType.rect,
+            {
+              x: imgBox.x,
+              y: imgBox.y,
+              w: imgBox.w,
+              h: imgBox.h,
+              rectRadius: tokens.isRounded ? 0.08 : 0,
+              fill: { color: cSurface },
+              line: { color: cAccent, width: 1.25, dashType: "dash" },
+            }
+          );
+          slide.addShape(pptx.ShapeType.roundRect, {
+            x: imgBox.x + imgBox.w / 2 - 0.72,
+            y: imgBox.y + 0.78,
+            w: 1.44,
+            h: 0.3,
+            rectRadius: 0.12,
+            fill: { color: cAccentSoft },
+            line: { color: cBorder, width: 0.5 },
+          });
+          slide.addText("配图占位框", {
+            x: imgBox.x + imgBox.w / 2 - 0.72,
+            y: imgBox.y + 0.78,
+            w: 1.44,
+            h: 0.3,
+            fontSize: 9.5,
+            bold: true,
+            align: "center",
+            valign: "middle",
+            color: cAccent,
+            fontFace: fontBody,
+          });
+          const hintText =
+            safeText(slot.promptHint).trim() ||
+            "在此直接粘贴论文架构图、实验截图或核心业务配图";
+          slide.addText(hintText.slice(0, 96), {
+            x: imgBox.x + 0.32,
+            y: imgBox.y + 1.22,
+            w: imgBox.w - 0.64,
+            h: 1.35,
+            fontSize: 10.5,
+            color: cMuted,
+            align: "center",
+            valign: "top",
+            fontFace: fontBody,
           });
         } else {
           const presetId =
@@ -706,7 +1031,9 @@ export async function POST(request: Request) {
           drawNativeArtworkPreset(pptx, slide, tokens, presetId, imgBox);
         }
 
-        const caption = safeText(slot.caption).trim();
+        const caption =
+          safeText(slot.caption).trim() ||
+          (isPlaceholderSlot ? "提示：在 PowerPoint 中可直接将截图粘贴至此虚线框位置" : "");
         if (caption) {
           slide.addText(caption, {
             x: imgBox.x,
@@ -1174,19 +1501,52 @@ export async function POST(request: Request) {
         return;
       }
 
-      /* -------- 8. QUOTE -------- */
+      /* -------- 8. QUOTE (Skeleton-Aware) -------- */
       if (item.slideType === "quote") {
-        addStyledCard(pptx, slide, tokens, {
-          x: 0.6,
-          y: 1.55,
-          w: 8.8,
-          h: 2.15,
-          borderColor: cAccent,
-          borderWidth: 1.5,
-        });
-        slide.addText(
-          `“${safeText(item.quoteText).trim() || safeText(item.title).trim() || title}”`,
-          {
+        const quoteStr = `“${safeText(item.quoteText).trim() || safeText(item.title).trim() || title}”`;
+        const authorStr = `— ${safeText(item.quoteAuthor).trim() || audience}`;
+
+        if (skeleton === "keynote") {
+          slide.addText("“", {
+            x: 0.6,
+            y: 1.4,
+            w: 1.2,
+            h: 0.9,
+            fontSize: 54,
+            bold: true,
+            color: cAccent,
+            fontFace: fontHeading,
+          });
+          slide.addText(quoteStr.replace(/^[“"]|[”"]$/g, ""), {
+            x: 0.85,
+            y: 1.88,
+            w: 8.3,
+            h: 1.4,
+            fontSize: 21,
+            bold: true,
+            color: cText,
+            fontFace: fontHeading,
+            valign: "middle",
+          });
+          slide.addText(authorStr, {
+            x: 0.85,
+            y: 3.32,
+            w: 8.3,
+            h: 0.34,
+            fontSize: 11,
+            color: cMuted,
+            fontFace: fontBody,
+          });
+        } else {
+          addStyledCard(pptx, slide, tokens, {
+            x: 0.6,
+            y: 1.55,
+            w: 8.8,
+            h: 2.15,
+            borderColor: cAccent,
+            borderWidth: 1.5,
+          });
+          slide.addText(quoteStr, {
             x: 0.95,
             y: 1.78,
             w: 8.1,
@@ -1196,17 +1556,17 @@ export async function POST(request: Request) {
             color: cText,
             fontFace: fontHeading,
             valign: "middle",
-          }
-        );
-        slide.addText(`— ${safeText(item.quoteAuthor).trim() || audience}`, {
-          x: 0.95,
-          y: 3.12,
-          w: 8.1,
-          h: 0.36,
-          fontSize: 10.5,
-          color: cMuted,
-          fontFace: fontBody,
-        });
+          });
+          slide.addText(authorStr, {
+            x: 0.95,
+            y: 3.12,
+            w: 8.1,
+            h: 0.36,
+            fontSize: 10.5,
+            color: cMuted,
+            fontFace: fontBody,
+          });
+        }
 
         const kpis = sanitizeKpis(item.kpis, 3);
         kpis.forEach((k, kIdx) => {
@@ -1241,7 +1601,7 @@ export async function POST(request: Request) {
         return;
       }
 
-      /* -------- 9. COMPARISON (v8: Native Editable PowerPoint Table) -------- */
+      /* -------- 9. COMPARISON (Native Editable PowerPoint Table) -------- */
       if (item.slideType === "comparison") {
         const leftHeading = safeText(item.leftTitle).trim() || "传统方案";
         const rightHeading = safeText(item.rightTitle).trim() || "升级方案（推荐）";
@@ -1252,6 +1612,23 @@ export async function POST(request: Request) {
           "标准化端到端闭环交付，指标透明可控",
         ]);
         const rowCount = Math.max(leftPoints.length, rightPoints.length, 1);
+        const cRuleInk = cText === "FFFFFF" ? "E2E8F0" : cText;
+        const noBdr: PptxGenJS.BorderProps = { type: "none" };
+        const isAcadCmp = skeleton === "academic";
+
+        const headBorders: [
+          PptxGenJS.BorderProps,
+          PptxGenJS.BorderProps,
+          PptxGenJS.BorderProps,
+          PptxGenJS.BorderProps,
+        ] | undefined = isAcadCmp
+          ? [
+              { type: "solid", pt: 1.5, color: cRuleInk },
+              noBdr,
+              { type: "solid", pt: 0.85, color: cRuleInk },
+              noBdr,
+            ]
+          : undefined;
 
         const tableRows: PptxGenJS.TableRow[] = [
           [
@@ -1260,10 +1637,11 @@ export async function POST(request: Request) {
               options: {
                 bold: true,
                 color: cMuted,
-                fill: { color: cSurface },
+                fill: { color: isAcadCmp ? cBg : cSurface },
                 align: "center",
                 fontFace: "Consolas",
                 fontSize: 10,
+                ...(headBorders ? { border: headBorders } : {}),
               },
             },
             {
@@ -1271,19 +1649,21 @@ export async function POST(request: Request) {
               options: {
                 bold: true,
                 color: cText,
-                fill: { color: cSurface },
+                fill: { color: isAcadCmp ? cBg : cSurface },
                 fontFace: fontHeading,
                 fontSize: 12,
+                ...(headBorders ? { border: headBorders } : {}),
               },
             },
             {
               text: rightHeading,
               options: {
                 bold: true,
-                color: cAccentText,
-                fill: { color: cAccent },
+                color: isAcadCmp ? cAccent : cAccentText,
+                fill: { color: isAcadCmp ? cBg : cAccent },
                 fontFace: fontHeading,
                 fontSize: 12,
+                ...(headBorders ? { border: headBorders } : {}),
               },
             },
           ],
@@ -1291,7 +1671,22 @@ export async function POST(request: Request) {
 
         for (let r = 0; r < rowCount; r += 1) {
           const isAlt = r % 2 === 1;
-          const rowFill = isAlt ? cBg : cSurface;
+          const isLast = r === rowCount - 1;
+          const rowFill = isAcadCmp ? cBg : isAlt ? cBg : cSurface;
+          const rowBorders: [
+            PptxGenJS.BorderProps,
+            PptxGenJS.BorderProps,
+            PptxGenJS.BorderProps,
+            PptxGenJS.BorderProps,
+          ] | undefined = isAcadCmp
+            ? [
+                noBdr,
+                noBdr,
+                isLast ? { type: "solid", pt: 1.5, color: cRuleInk } : noBdr,
+                noBdr,
+              ]
+            : undefined;
+
           tableRows.push([
             {
               text: String(r + 1).padStart(2, "0"),
@@ -1303,6 +1698,7 @@ export async function POST(request: Request) {
                 valign: "middle",
                 fontFace: "Consolas",
                 fontSize: 10,
+                ...(rowBorders ? { border: rowBorders } : {}),
               },
             },
             {
@@ -1313,6 +1709,7 @@ export async function POST(request: Request) {
                 valign: "middle",
                 fontFace: fontBody,
                 fontSize: 10.5,
+                ...(rowBorders ? { border: rowBorders } : {}),
               },
             },
             {
@@ -1320,10 +1717,11 @@ export async function POST(request: Request) {
               options: {
                 color: cText,
                 bold: r === 0,
-                fill: { color: isAlt ? cAccentSoft : cSurface },
+                fill: { color: isAcadCmp ? cBg : isAlt ? cAccentSoft : cSurface },
                 valign: "middle",
                 fontFace: fontBody,
                 fontSize: 10.5,
+                ...(rowBorders ? { border: rowBorders } : {}),
               },
             },
           ]);
@@ -1335,13 +1733,22 @@ export async function POST(request: Request) {
           w: 8.8,
           colW: [0.65, 4.0, 4.15],
           rowH: Math.min(0.86, 3.3 / (rowCount + 1)),
-          border: { pt: 0.75, color: cBorder },
+          ...(isAcadCmp ? {} : { border: { pt: 0.75, color: cBorder } }),
           margin: [0.08, 0.12, 0.08, 0.12],
         });
         return;
       }
 
-      /* -------- 10. DATA: Native Editable Bar Chart + 3 KPI Callouts -------- */
+      /* -------- 10. DATA: Hero KPIs / Academic 3-Line Table / 4 Native Chart Variants -------- */
+      const displayMode: DataDisplayMode =
+        item.dataDisplay === "bar" ||
+        item.dataDisplay === "line" ||
+        item.dataDisplay === "doughnut" ||
+        item.dataDisplay === "kpi-only" ||
+        item.dataDisplay === "data-matrix"
+          ? item.dataDisplay
+          : "col";
+
       const rawBars = Array.isArray(item.bars)
         ? item.bars.filter(isPlainObject).map((b, bIdx) => ({
             label: safeText(b.label).trim() || `项 ${bIdx + 1}`,
@@ -1351,7 +1758,280 @@ export async function POST(request: Request) {
         : [];
       const bars = rawBars.length > 0 ? rawBars : DEFAULT_BARS;
       const isSingleSeries = Boolean(item.singleSeries) && rawBars.length > 0;
+      const kpis = sanitizeKpis(item.kpis, 3);
+      const palette4 = [cChart1, cChart2, cChart3, cChart4];
 
+      const hasMultiSeries =
+        Array.isArray(item.chartCategories) &&
+        item.chartCategories.length > 0 &&
+        Array.isArray(item.chartSeries) &&
+        item.chartSeries.length > 0;
+
+      const resolvedCategories: string[] = hasMultiSeries
+        ? item.chartCategories!.slice(0, 16).map((c, cIdx) => safeText(c, `项 ${cIdx + 1}`))
+        : bars.map((b) => b.label);
+
+      const resolvedSeries: { name: string; labels: string[]; values: number[]; unit: string }[] =
+        hasMultiSeries
+          ? item.chartSeries!
+              .filter(isPlainObject)
+              .slice(0, 4)
+              .map((ser, sIdx) => ({
+                name: safeText(ser.name, `序列 ${sIdx + 1}`),
+                labels: resolvedCategories,
+                values: resolvedCategories.map((_, idx) =>
+                  Array.isArray(ser.values) ? sanitizeBarNum(ser.values[idx]) : 0
+                ),
+                unit: safeText(ser.unit, ""),
+              }))
+          : isSingleSeries
+            ? [
+                {
+                  name: "核心指标",
+                  labels: bars.map((b) => b.label),
+                  values: bars.map((b) => b.v2),
+                  unit: "",
+                },
+              ]
+            : [
+                {
+                  name: "基准方案",
+                  labels: bars.map((b) => b.label),
+                  values: bars.map((b) => b.v1),
+                  unit: "",
+                },
+                {
+                  name: "升级方案",
+                  labels: bars.map((b) => b.label),
+                  values: bars.map((b) => b.v2),
+                  unit: "",
+                },
+              ];
+
+      /* 10A. Pure Hero KPI Showcase (`big-number` / `kpi-only`) — ZERO forced chart */
+      if (displayMode === "kpi-only") {
+        const heroKpis =
+          kpis.length > 0
+            ? kpis
+            : [
+                { label: "核心关键指标", value: "+151%", note: "基于源资料自动提取的实证焦点" },
+              ];
+        const kCount = heroKpis.length;
+        const extraBullets = sanitizePoints(item.bullets, []).slice(0, 3);
+        const gap = 0.22;
+        const cardW = (8.8 - gap * (kCount - 1)) / kCount;
+        const cardH = extraBullets.length > 0 ? 2.25 : 3.15;
+        const valFontSize = kCount === 1 ? 48 : kCount === 2 ? 38 : 30;
+
+        heroKpis.forEach((kpi, kIdx) => {
+          const x = 0.6 + kIdx * (cardW + gap);
+          const y = 1.54;
+          addStyledCard(pptx, slide, tokens, {
+            x,
+            y,
+            w: cardW,
+            h: cardH,
+            fill: kIdx === 0 ? cAccentSoft : cSurface,
+            borderColor: kIdx === 0 ? cAccent : cBorder,
+            borderWidth: kIdx === 0 ? 1.5 : 1,
+          });
+          slide.addText(kpi.label, {
+            x: x + 0.24,
+            y: y + 0.2,
+            w: cardW - 0.48,
+            h: 0.3,
+            fontSize: 10.5,
+            bold: true,
+            color: kIdx === 0 ? cAccent : cMuted,
+            fontFace: fontBody,
+          });
+          slide.addText(kpi.value, {
+            x: x + 0.24,
+            y: y + 0.56,
+            w: cardW - 0.48,
+            h: cardH - 1.25,
+            fontSize: valFontSize,
+            bold: true,
+            valign: "middle",
+            color: kIdx === 0 ? cAccent : cText,
+            fontFace: fontHeading,
+          });
+          slide.addShape(pptx.ShapeType.line, {
+            x: x + 0.24,
+            y: y + cardH - 0.62,
+            w: cardW - 0.48,
+            h: 0,
+            line: { color: cBorder, width: 0.6 },
+          });
+          slide.addText(kpi.note || "源资料核心量化事实", {
+            x: x + 0.24,
+            y: y + cardH - 0.54,
+            w: cardW - 0.48,
+            h: 0.44,
+            fontSize: 9.5,
+            color: cMuted,
+            valign: "top",
+            fontFace: fontBody,
+          });
+        });
+
+        if (extraBullets.length > 0) {
+          const bCount = extraBullets.length;
+          const bGap = 0.18;
+          const bW = (8.8 - bGap * (bCount - 1)) / bCount;
+          extraBullets.forEach((pt, bIdx) => {
+            const bx = 0.6 + bIdx * (bW + bGap);
+            const by = 3.96;
+            addStyledCard(pptx, slide, tokens, {
+              x: bx,
+              y: by,
+              w: bW,
+              h: 0.9,
+              borderColor: cBorder,
+            });
+            slide.addText(pt, {
+              x: bx + 0.16,
+              y: by + 0.08,
+              w: bW - 0.32,
+              h: 0.74,
+              fontSize: 9.5,
+              color: cText,
+              valign: "middle",
+              fontFace: fontBody,
+            });
+          });
+        }
+        return;
+      }
+
+      /* 10B. Native Editable Data Table (`table` / `data-matrix` — Academic 3-Line or Executive Scorecard) */
+      if (displayMode === "data-matrix") {
+        const rawTd = isPlainObject(item.tableData) ? item.tableData : null;
+        const tdHeaders =
+          rawTd && Array.isArray(rawTd.headers) && rawTd.headers.length > 0
+            ? rawTd.headers.slice(0, 10).map((h, i) => safeText(h, `列 ${i + 1}`))
+            : ["指标维度", ...resolvedSeries.map((s) => s.name)];
+        const tdRowsRaw: string[][] =
+          rawTd && Array.isArray(rawTd.rows) && rawTd.rows.length > 0
+            ? rawTd.rows
+                .filter(Array.isArray)
+                .slice(0, 16)
+                .map((r) => tdHeaders.map((_, cIdx) => safeText(r[cIdx], "—")))
+            : resolvedCategories.slice(0, 12).map((cat, rIdx) => [
+                cat,
+                ...resolvedSeries.map((s) => `${s.values[rIdx] ?? 0}${s.unit}`),
+              ]);
+        const tdRows = tdRowsRaw.length > 0 ? tdRowsRaw : [["样本 1", "—"]];
+        const hlCoords = new Set<string>(
+          rawTd && Array.isArray(rawTd.highlightCoords)
+            ? rawTd.highlightCoords
+                .filter((p): p is [number, number] => Array.isArray(p) && p.length === 2)
+                .map(([r, c]) => `${r}:${c}`)
+            : []
+        );
+
+        const colCount = Math.max(1, tdHeaders.length);
+        const firstColW = colCount <= 2 ? 3.8 : colCount <= 4 ? 2.6 : 2.0;
+        const restColW = colCount > 1 ? (8.8 - firstColW) / (colCount - 1) : 8.8;
+        const colW = tdHeaders.map((_, cIdx) => (cIdx === 0 ? firstColW : restColW));
+
+        const totalTableRows = tdRows.length + 1;
+        const fontSize = totalTableRows <= 7 ? 10 : totalTableRows <= 11 ? 9 : 8;
+        const rowH = Math.min(0.42, 3.35 / totalTableRows);
+        const isAcadTbl = skeleton === "academic";
+        const cRuleInk = cText === "FFFFFF" ? "E2E8F0" : cText;
+        const noBdr: PptxGenJS.BorderProps = { type: "none" };
+
+        const headBorders: [
+          PptxGenJS.BorderProps,
+          PptxGenJS.BorderProps,
+          PptxGenJS.BorderProps,
+          PptxGenJS.BorderProps,
+        ] = isAcadTbl
+          ? [
+              { type: "solid", pt: 1.5, color: cRuleInk },
+              noBdr,
+              { type: "solid", pt: 0.85, color: cRuleInk },
+              noBdr,
+            ]
+          : [
+              { type: "solid", pt: 1.0, color: cBorder },
+              noBdr,
+              { type: "solid", pt: 1.25, color: cAccent },
+              noBdr,
+            ];
+
+        const matrixRows: PptxGenJS.TableRow[] = [
+          tdHeaders.map((h, cIdx) => ({
+            text: h,
+            options: {
+              bold: true,
+              color: cText,
+              fill: { color: isAcadTbl ? cBg : cAccentSoft },
+              align: cIdx === 0 ? ("left" as const) : ("right" as const),
+              valign: "middle" as const,
+              fontFace: cIdx === 0 ? fontHeading : "Consolas",
+              fontSize,
+              border: headBorders,
+            },
+          })),
+        ];
+
+        tdRows.forEach((row, rIdx) => {
+          const isLast = rIdx === tdRows.length - 1;
+          const isAlt = rIdx % 2 === 1;
+          const rowBorders: [
+            PptxGenJS.BorderProps,
+            PptxGenJS.BorderProps,
+            PptxGenJS.BorderProps,
+            PptxGenJS.BorderProps,
+          ] = isAcadTbl
+            ? [
+                noBdr,
+                noBdr,
+                isLast ? { type: "solid", pt: 1.5, color: cRuleInk } : noBdr,
+                noBdr,
+              ]
+            : [
+                noBdr,
+                noBdr,
+                { type: "solid", pt: 0.5, color: cBorder },
+                noBdr,
+              ];
+
+          matrixRows.push(
+            tdHeaders.map((_, cIdx) => {
+              const isOptimal = hlCoords.has(`${rIdx}:${cIdx}`);
+              const baseFill = isAcadTbl ? cBg : isAlt ? cBg : cSurface;
+              return {
+                text: row[cIdx] || "—",
+                options: {
+                  bold: isOptimal || cIdx === 0,
+                  color: isOptimal ? cAccent : cText,
+                  fill: { color: isOptimal && !isAcadTbl ? cAccentSoft : baseFill },
+                  align: cIdx === 0 ? ("left" as const) : ("right" as const),
+                  valign: "middle" as const,
+                  fontFace: cIdx === 0 ? fontBody : "Consolas",
+                  fontSize,
+                  border: rowBorders,
+                },
+              };
+            })
+          );
+        });
+
+        slide.addTable(matrixRows, {
+          x: 0.6,
+          y: 1.54,
+          w: 8.8,
+          colW,
+          rowH,
+          margin: [0.05, 0.1, 0.05, 0.1],
+        });
+        return;
+      }
+
+      /* 10C. Native Editable Charts (`col` | `bar` | `line` | `doughnut`) + 3 KPI Callouts */
       addStyledCard(pptx, slide, tokens, {
         x: 0.6,
         y: 1.55,
@@ -1359,36 +2039,60 @@ export async function POST(request: Request) {
         h: 3.35,
         borderColor: cBorder,
       });
-      slide.addChart(
-        pptx.ChartType.bar,
-        isSingleSeries
-          ? [
-              {
-                name: "核心指标",
-                labels: bars.map((b) => b.label),
-                values: bars.map((b) => b.v2),
-              },
-            ]
-          : [
-              {
-                name: "基准方案",
-                labels: bars.map((b) => b.label),
-                values: bars.map((b) => b.v1),
-              },
-              {
-                name: "升级方案",
-                labels: bars.map((b) => b.label),
-                values: bars.map((b) => b.v2),
-              },
-            ],
-        {
+
+      const chartPayload = resolvedSeries.map((s) => ({
+        name: s.name,
+        labels: s.labels,
+        values: s.values,
+      }));
+      const sCount = chartPayload.length;
+      const resolvedChartColors =
+        !hasMultiSeries && sCount === 2
+          ? [cChart3, cChart1]
+          : chartPayload.map((_, sIdx) => palette4[sIdx % palette4.length]);
+
+      if (displayMode === "doughnut") {
+        const dnSeries = chartPayload[0] || {
+          name: "占比分布",
+          labels: ["核心项"],
+          values: [100],
+        };
+        slide.addChart(
+          pptx.ChartType.doughnut,
+          [
+            {
+              name: dnSeries.name,
+              labels: dnSeries.labels,
+              values: dnSeries.values.map((v) => (v > 0 ? v : 1)),
+            },
+          ],
+          {
+            x: 0.78,
+            y: 1.66,
+            w: 4.94,
+            h: 3.1,
+            holeSize: 55,
+            chartColors: dnSeries.labels.map((_, i) => palette4[i % palette4.length]),
+            showLegend: true,
+            legendPos: "b",
+            legendColor: cMuted,
+            legendFontSize: 8.5,
+            showPercent: true,
+            dataLabelColor: cText,
+            dataLabelFontSize: 9,
+          }
+        );
+      } else if (displayMode === "line") {
+        slide.addChart(pptx.ChartType.line, chartPayload, {
           x: 0.75,
           y: 1.7,
           w: 5.0,
           h: 3.05,
-          barDir: "col",
-          chartColors: isSingleSeries ? [cChart1] : [cChart3, cChart1],
-          showLegend: !isSingleSeries,
+          lineSize: 2.5,
+          lineDataSymbol: "circle",
+          lineDataSymbolSize: 6,
+          chartColors: resolvedChartColors,
+          showLegend: sCount > 1,
           legendPos: "t",
           legendColor: cMuted,
           legendFontSize: 9,
@@ -1396,13 +2100,32 @@ export async function POST(request: Request) {
           catAxisLabelFontSize: 9,
           valAxisLabelColor: cMuted,
           valAxisLabelFontSize: 8.5,
-          showValue: true,
+          showValue: sCount <= 2,
           dataLabelColor: cText,
           dataLabelFontSize: 8.5,
-        }
-      );
+        });
+      } else {
+        slide.addChart(pptx.ChartType.bar, chartPayload, {
+          x: 0.75,
+          y: 1.7,
+          w: 5.0,
+          h: 3.05,
+          barDir: displayMode === "bar" ? "bar" : "col",
+          chartColors: resolvedChartColors,
+          showLegend: sCount > 1,
+          legendPos: "t",
+          legendColor: cMuted,
+          legendFontSize: 9,
+          catAxisLabelColor: cMuted,
+          catAxisLabelFontSize: 9,
+          valAxisLabelColor: cMuted,
+          valAxisLabelFontSize: 8.5,
+          showValue: sCount <= 2,
+          dataLabelColor: cText,
+          dataLabelFontSize: 8.5,
+        });
+      }
 
-      const kpis = sanitizeKpis(item.kpis, 3);
       kpis.forEach((kpi, kIdx) => {
         const y = 1.55 + kIdx * 1.15;
         addStyledCard(pptx, slide, tokens, {

@@ -599,12 +599,21 @@ export function exportStandaloneHtmlDeck(options: {
         SAFE_DATA_IMG_RE.test(slot.dataUrl.trim())
           ? slot.dataUrl.trim()
           : "";
+      const isPlaceholder = !safeDataUrl && slot?.kind === "placeholder";
       const presetId =
         safeTextVal(slot?.presetId).trim() ||
         pickDefaultArtworkForArchetype(layout?.archetype);
+      const placeholderHint =
+        safeTextVal(slot?.promptHint).trim() ||
+        `在此粘贴「${safeTextVal(s.title).slice(0, 18)}」相关架构图、实验截图或业务配图`;
       const visualMarkup = safeDataUrl
         ? `<img src="${esc(safeDataUrl)}" alt="${esc(safeTextVal(slot?.caption) || s.title)}" class="split-img" />`
-        : `<div class="split-svg-box">${renderArtworkSvgString(presetId, safePalette)}</div>`;
+        : isPlaceholder
+          ? `<div class="split-placeholder-box">
+              <span class="badge">配图占位建议</span>
+              <p>${esc(placeholderHint.slice(0, 96))}</p>
+            </div>`
+          : `<div class="split-svg-box">${renderArtworkSvgString(presetId, safePalette)}</div>`;
       const bullets =
         Array.isArray(s.bullets) && s.bullets.length > 0
           ? s.bullets
@@ -612,10 +621,13 @@ export function exportStandaloneHtmlDeck(options: {
               "直观展示核心产品界面或业务架构，大幅降低受众理解成本",
               "5:5 视觉黄金分栏兼顾高审美张力与清晰叙事逻辑",
             ];
+      const captionText =
+        safeTextVal(slot?.caption).trim() ||
+        (isPlaceholder ? "配图留白占位框 · 可直接替换为真实图表截图" : "");
       const visualCol = `
         <div class="card split-visual-card">
           ${visualMarkup}
-          ${slot?.caption ? `<div class="split-caption">${esc(slot.caption)}</div>` : ""}
+          ${captionText ? `<div class="split-caption">${esc(captionText)}</div>` : ""}
         </div>
       `;
       const copyCol = `
@@ -812,7 +824,13 @@ export function exportStandaloneHtmlDeck(options: {
         ${footerHtml}
       `;
     } else {
-      // Data slide
+      // Data slide (supports col, bar, line, doughnut, kpi-only, and data-matrix)
+      const displayMode = s.dataDisplay || "col";
+      const isAcademicTable =
+        layout?.archetype === "academic-paper" ||
+        layout?.archetype === "scientific-figure" ||
+        layout?.archetype === "clinical-clean";
+
       const rawBars = Array.isArray(s.bars)
         ? s.bars
             .filter((b) => Boolean(b && typeof b === "object"))
@@ -827,76 +845,263 @@ export function exportStandaloneHtmlDeck(options: {
         : [];
       const bars = rawBars.length > 0 ? rawBars : DEFAULT_BARS;
       const isSingle = Boolean(s.singleSeries) && rawBars.length > 0;
-      const rawMax = Math.max(0, ...bars.flatMap((b) => (isSingle ? [b.v2] : [b.v1, b.v2])));
-      const maxV = rawMax > 0 ? rawMax * 1.1 : 1;
 
-      const plotLeft = 30;
-      const plotRight = 420;
-      const plotWidth = plotRight - plotLeft;
-      const baselineY = 185;
-      const maxBarH = 152;
-      const n = bars.length;
-      const slotW = plotWidth / n;
-      const groupW = Math.min(64, slotW * 0.72);
-      const barGap = Math.max(1, Math.min(6, groupW * 0.12));
-      const bw = Math.max(1, (groupW - barGap) / 2);
-      const singleW = Math.min(40, Math.max(14, slotW * 0.44));
-      const pairW = bw * 2 + barGap;
-      const rx = Math.min(3, bw / 3);
-      const fontSize = n <= 4 ? 11 : n <= 8 ? 9.5 : 8;
+      const hasMulti =
+        Array.isArray(s.chartCategories) &&
+        s.chartCategories.length > 0 &&
+        Array.isArray(s.chartSeries) &&
+        s.chartSeries.length > 0;
+
+      const categories = hasMulti
+        ? s.chartCategories!.slice(0, 10).map((c, idx) => safeTextVal(c) || `项 ${idx + 1}`)
+        : bars.map((b) => b.label);
+
+      const seriesList = hasMulti
+        ? s.chartSeries!.slice(0, 4).map((ser, sIdx) => ({
+            name: safeTextVal(ser.name) || `序列 ${sIdx + 1}`,
+            unit: safeTextVal(ser.unit),
+            values: categories.map((_, idx) => sanitizeBarNum(ser.values?.[idx])),
+          }))
+        : isSingle
+          ? [{ name: "核心实证值", unit: "", values: bars.map((b) => b.v2) }]
+          : [
+              { name: "基准方案", unit: "", values: bars.map((b) => b.v1) },
+              { name: "优化方案", unit: "", values: bars.map((b) => b.v2) },
+            ];
+
+      const rawMax = Math.max(0, ...seriesList.flatMap((ser) => ser.values));
+      const maxV = rawMax > 0 ? rawMax * 1.12 : 1;
 
       const kpis = Array.isArray(s.kpis)
         ? s.kpis.filter((k) => Boolean(k && typeof k === "object"))
         : [];
 
-      bodyHtml = `
-        ${headerHtml}
-        <h2>${esc(s.title)}</h2>
-        <div class="data-split body-fill">
-          <div class="card chart-wrap">
-            <svg viewBox="0 0 440 220" style="width:100%;height:100%;">
-              ${bars
-                .map((b, i) => {
-                  const cx = plotLeft + (i + 0.5) * slotW;
-                  const h2 = Math.round((b.v2 / maxV) * maxBarH);
-                  if (isSingle) {
-                    const sx = cx - singleW / 2;
-                    return `
-                      <rect x="${sx.toFixed(1)}" y="${(baselineY - h2).toFixed(1)}" width="${singleW.toFixed(1)}" height="${h2}" rx="${rx.toFixed(1)}" fill="${esc(safeChartColors[i % 2 === 0 ? 0 : 1])}"/>
-                      <text x="${cx.toFixed(1)}" y="${(baselineY - h2 - 6).toFixed(1)}" text-anchor="middle" fill="${esc(cssText)}" font-size="${fontSize}" font-weight="700">${esc(b.v2)}</text>
-                      <text x="${cx.toFixed(1)}" y="206" text-anchor="middle" fill="${esc(cssMuted)}" font-size="${fontSize}">${esc(b.label)}</text>
-                    `;
-                  }
-                  const x1 = cx - pairW / 2;
-                  const x2 = x1 + bw + barGap;
-                  const h1 = Math.round((b.v1 / maxV) * maxBarH);
-                  return `
-                    <rect x="${x1.toFixed(1)}" y="${(baselineY - h1).toFixed(1)}" width="${bw.toFixed(1)}" height="${h1}" rx="${rx.toFixed(1)}" fill="${esc(safeChartColors[2])}" opacity="0.7"/>
-                    <rect x="${x2.toFixed(1)}" y="${(baselineY - h2).toFixed(1)}" width="${bw.toFixed(1)}" height="${h2}" rx="${rx.toFixed(1)}" fill="${esc(safeChartColors[0])}"/>
-                    <text x="${(x2 + bw / 2).toFixed(1)}" y="${(baselineY - h2 - 6).toFixed(1)}" text-anchor="middle" fill="${esc(cssText)}" font-size="${fontSize}" font-weight="700">${esc(b.v2)}</text>
-                    <text x="${cx.toFixed(1)}" y="206" text-anchor="middle" fill="${esc(cssMuted)}" font-size="${fontSize}">${esc(b.label)}</text>
-                  `;
-                })
-                .join("")}
-              <line x1="30" y1="185" x2="420" y2="185" stroke="${esc(cssBorder)}" stroke-width="1"/>
-            </svg>
-          </div>
-          <div class="kpi-col">
-            ${kpis
+      if (displayMode === "kpi-only") {
+        const heroKpis = kpis.slice(0, 3);
+        const gridCls = heroKpis.length <= 2 ? "grid-2" : "grid-3";
+        const bullets = Array.isArray(s.bullets) ? s.bullets.slice(0, 3) : [];
+        bodyHtml = `
+          ${headerHtml}
+          <h2>${esc(s.title)}</h2>
+          <div class="${gridCls} body-fill">
+            ${heroKpis
               .map(
                 (k, i) => `
-              <div class="card ${i === 0 ? "highlight-card" : ""}">
+              <div class="card hero-kpi-card ${i === 0 ? "highlight-card" : ""}">
                 <small>${esc(k.label)}</small>
-                <div class="kpi-val ${i === 0 ? "accent" : ""}">${esc(k.value)}</div>
-                <p>${esc(k.note)}</p>
+                <div class="hero-kpi-val ${i === 0 ? "accent" : ""}">${esc(k.value)}</div>
+                <p>${esc(k.note || "源资料核心量化指标")}</p>
               </div>
             `
               )
               .join("")}
           </div>
-        </div>
-        ${footerHtml}
-      `;
+          ${
+            bullets.length > 0
+              ? `<div class="grid-${bullets.length}" style="margin-top:12px;">
+                  ${bullets
+                    .map((b) => `<div class="card compact"><p>${esc(b)}</p></div>`)
+                    .join("")}
+                </div>`
+              : ""
+          }
+          ${footerHtml}
+        `;
+      } else if (displayMode === "data-matrix") {
+        const td =
+          s.tableData &&
+          Array.isArray(s.tableData.headers) &&
+          s.tableData.headers.length > 0 &&
+          Array.isArray(s.tableData.rows) &&
+          s.tableData.rows.length > 0
+            ? s.tableData
+            : {
+                headers: ["指标维度", ...seriesList.map((ser) => ser.name)],
+                rows: categories.map((cat, rIdx) => [
+                  cat,
+                  ...seriesList.map((ser) => `${ser.values[rIdx] ?? 0}${ser.unit}`),
+                ]),
+                highlightCoords: [] as [number, number][],
+              };
+        const tHeaders = td.headers.slice(0, 8);
+        const tRows = td.rows.slice(0, 10);
+        const hlSet = new Set(
+          (td.highlightCoords || []).map(([r, c]) => `${r}:${c}`)
+        );
+        bodyHtml = `
+          ${headerHtml}
+          <h2>${esc(s.title)}</h2>
+          <div class="${isAcademicTable ? "body-fill table-stage" : "card body-fill table-stage"}">
+            <table class="data-table ${isAcademicTable ? "academic-three-line" : "exec-scorecard"}">
+              <thead>
+                <tr>
+                  ${tHeaders
+                    .map(
+                      (h, cIdx) =>
+                        `<th class="${cIdx === 0 ? "align-left" : "align-right"}">${esc(h)}</th>`
+                    )
+                    .join("")}
+                </tr>
+              </thead>
+              <tbody>
+                ${tRows
+                  .map(
+                    (row, rIdx) => `
+                  <tr>
+                    ${tHeaders
+                      .map((_, cIdx) => {
+                        const isBest = hlSet.has(`${rIdx}:${cIdx}`);
+                        return `<td class="${cIdx === 0 ? "align-left" : "align-right"} ${
+                          isBest ? "cell-optimal" : ""
+                        }">${esc(row[cIdx] ?? "—")}</td>`;
+                      })
+                      .join("")}
+                  </tr>
+                `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+          ${footerHtml}
+        `;
+      } else {
+        const n = Math.max(1, categories.length);
+        const fontSize = n <= 4 ? 11 : n <= 8 ? 9.5 : 8;
+        let chartSvg = "";
+
+        if (displayMode === "doughnut") {
+          const stages = categories.slice(0, 6).map((cat, idx) => ({
+            label: cat,
+            value: Math.max(1, seriesList[0]?.values[idx] || 0),
+            unit: seriesList[0]?.unit || "",
+          }));
+          chartSvg = buildDonutSvg(stages, safeChartColors, cssText, cssMuted);
+        } else if (displayMode === "bar") {
+          const rowCats = categories.slice(0, 6);
+          const rowStep = 186 / Math.max(1, rowCats.length);
+          const barLeft = 116;
+          const barMaxW = 264;
+          chartSvg = `<svg viewBox="0 0 440 220" style="width:100%;height:100%;">
+            <line x1="${barLeft}" y1="14" x2="${barLeft}" y2="204" stroke="${esc(cssBorder)}" stroke-width="1"/>
+            ${rowCats
+              .map((cat, idx) => {
+                const cy = 18 + (idx + 0.5) * rowStep;
+                const val = seriesList[0]?.values[idx] ?? 0;
+                const w = Math.max(4, Math.round((val / maxV) * barMaxW));
+                const bh = Math.min(20, Math.max(10, rowStep * 0.52));
+                return `
+                  <text x="${barLeft - 8}" y="${(cy + 4).toFixed(1)}" text-anchor="end" fill="${esc(cssText)}" font-size="10.5">${esc(cat.slice(0, 12))}</text>
+                  <rect x="${barLeft}" y="${(cy - bh / 2).toFixed(1)}" width="${w}" height="${bh.toFixed(1)}" rx="3" fill="${esc(safeChartColors[idx % 2 === 0 ? 0 : 1])}"/>
+                  <text x="${barLeft + w + 6}" y="${(cy + 4).toFixed(1)}" fill="${esc(cssText)}" font-size="10.5" font-weight="700">${esc(val)}${esc(seriesList[0]?.unit || "")}</text>
+                `;
+              })
+              .join("")}
+          </svg>`;
+        } else if (displayMode === "line") {
+          const plotLeft = 36;
+          const plotWidth = 384;
+          const slotW = plotWidth / n;
+          const baselineY = 185;
+          const maxLineH = 150;
+          chartSvg = `<svg viewBox="0 0 440 220" style="width:100%;height:100%;">
+            <line x1="32" y1="185" x2="424" y2="185" stroke="${esc(cssBorder)}" stroke-width="1"/>
+            ${seriesList
+              .map((ser, sIdx) => {
+                const stroke = safeChartColors[sIdx % safeChartColors.length];
+                const pts = categories
+                  .map((_, i) => {
+                    const cx = plotLeft + (i + 0.5) * slotW;
+                    const cy = baselineY - (ser.values[i] / maxV) * maxLineH;
+                    return `${cx.toFixed(1)},${cy.toFixed(1)}`;
+                  })
+                  .join(" ");
+                const dots = categories
+                  .map((_, i) => {
+                    const cx = plotLeft + (i + 0.5) * slotW;
+                    const cy = baselineY - (ser.values[i] / maxV) * maxLineH;
+                    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="${esc(cssSurface)}" stroke="${esc(stroke)}" stroke-width="2.4"/>
+                    ${sIdx === 0 ? `<text x="${cx.toFixed(1)}" y="${(cy - 8).toFixed(1)}" text-anchor="middle" fill="${esc(cssText)}" font-size="${fontSize}" font-weight="700">${esc(ser.values[i])}</text>` : ""}`;
+                  })
+                  .join("");
+                return `<polyline fill="none" stroke="${esc(stroke)}" stroke-width="2.8" points="${pts}"/>${dots}`;
+              })
+              .join("")}
+            ${categories
+              .map((cat, i) => {
+                const cx = plotLeft + (i + 0.5) * slotW;
+                return `<text x="${cx.toFixed(1)}" y="206" text-anchor="middle" fill="${esc(cssMuted)}" font-size="${fontSize}">${esc(cat.slice(0, 10))}</text>`;
+              })
+              .join("")}
+          </svg>`;
+        } else {
+          const plotLeft = 30;
+          const plotWidth = 390;
+          const baselineY = 185;
+          const maxBarH = 152;
+          const slotW = plotWidth / n;
+          const sCount = seriesList.length;
+          const singleW = Math.min(40, Math.max(14, slotW * 0.44));
+          chartSvg = `<svg viewBox="0 0 440 220" style="width:100%;height:100%;">
+            ${categories
+              .map((cat, i) => {
+                const cx = plotLeft + (i + 0.5) * slotW;
+                if (sCount === 1) {
+                  const v0 = seriesList[0].values[i] ?? 0;
+                  const h0 = Math.round((v0 / maxV) * maxBarH);
+                  const sx = cx - singleW / 2;
+                  return `
+                    <rect x="${sx.toFixed(1)}" y="${(baselineY - h0).toFixed(1)}" width="${singleW.toFixed(1)}" height="${h0}" rx="3" fill="${esc(safeChartColors[i % 2 === 0 ? 0 : 1])}"/>
+                    <text x="${cx.toFixed(1)}" y="${(baselineY - h0 - 6).toFixed(1)}" text-anchor="middle" fill="${esc(cssText)}" font-size="${fontSize}" font-weight="700">${esc(v0)}</text>
+                    <text x="${cx.toFixed(1)}" y="206" text-anchor="middle" fill="${esc(cssMuted)}" font-size="${fontSize}">${esc(cat.slice(0, 10))}</text>
+                  `;
+                }
+                const groupW = Math.min(60, slotW * 0.74);
+                const gap = 3;
+                const bw = Math.max(5, (groupW - gap * (sCount - 1)) / sCount);
+                const startX = cx - groupW / 2;
+                const rects = seriesList
+                  .map((ser, sIdx) => {
+                    const v = ser.values[i] ?? 0;
+                    const h = Math.round((v / maxV) * maxBarH);
+                    const bx = startX + sIdx * (bw + gap);
+                    const fill = !hasMulti && sCount === 2 && sIdx === 0 ? safeChartColors[2] : safeChartColors[sIdx % safeChartColors.length];
+                    const isLead = hasMulti ? sIdx === 0 : sIdx === sCount - 1;
+                    return `
+                      <rect x="${bx.toFixed(1)}" y="${(baselineY - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h}" rx="2.5" fill="${esc(fill)}" opacity="${!hasMulti && sCount === 2 && sIdx === 0 ? "0.72" : "1"}"/>
+                      ${isLead ? `<text x="${(bx + bw / 2).toFixed(1)}" y="${(baselineY - h - 5).toFixed(1)}" text-anchor="middle" fill="${esc(cssText)}" font-size="${fontSize}" font-weight="700">${esc(v)}</text>` : ""}
+                    `;
+                  })
+                  .join("");
+                return `${rects}<text x="${cx.toFixed(1)}" y="206" text-anchor="middle" fill="${esc(cssMuted)}" font-size="${fontSize}">${esc(cat.slice(0, 10))}</text>`;
+              })
+              .join("")}
+            <line x1="30" y1="185" x2="420" y2="185" stroke="${esc(cssBorder)}" stroke-width="1"/>
+          </svg>`;
+        }
+
+        bodyHtml = `
+          ${headerHtml}
+          <h2>${esc(s.title)}</h2>
+          <div class="data-split body-fill">
+            <div class="card chart-wrap">${chartSvg}</div>
+            <div class="kpi-col">
+              ${kpis
+                .map(
+                  (k, i) => `
+                <div class="card ${i === 0 ? "highlight-card" : ""}">
+                  <small>${esc(k.label)}</small>
+                  <div class="kpi-val ${i === 0 ? "accent" : ""}">${esc(k.value)}</div>
+                  <p>${esc(k.note)}</p>
+                </div>
+              `
+                )
+                .join("")}
+            </div>
+          </div>
+          ${footerHtml}
+        `;
+      }
     }
 
     return `${motifHtml}<div class="slide-content">${bodyHtml}</div>`;
@@ -1009,6 +1214,19 @@ export function exportStandaloneHtmlDeck(options: {
   .card.compact { padding: 10px 14px; }
   .highlight-card { border-color: var(--accent); border-width: 1.5px; }
   .kpi-val { font-size: clamp(22px, 2.4vw, 34px); font-weight: 800; line-height: 1.1; margin: 4px 0; color: var(--text); }
+  .hero-kpi-card { justify-content: space-between; padding: 24px 26px; }
+  .hero-kpi-val { font-family: ${headingStack}; font-size: clamp(32px, 3.8vw, 54px); font-weight: 800; line-height: 1.05; margin: 10px 0; color: var(--text); }
+  .table-stage { justify-content: center; overflow: hidden; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: clamp(11.5px, 1vw, 14px); }
+  .data-table th, .data-table td { padding: 8px 12px; }
+  .data-table .align-left { text-align: left; }
+  .data-table .align-right { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .data-table.academic-three-line { border-top: 2px solid var(--text); border-bottom: 2px solid var(--text); }
+  .data-table.academic-three-line thead tr { border-bottom: 1.25px solid var(--text); }
+  .data-table.exec-scorecard thead tr { background: var(--accent-soft); border-bottom: 1.5px solid var(--border); }
+  .data-table.exec-scorecard tbody tr { border-bottom: 1px solid var(--border); }
+  .data-table.exec-scorecard tbody tr:last-child { border-bottom: none; }
+  .data-table td.cell-optimal { color: var(--accent); font-weight: 800; }
   .clean-list { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: clamp(12px, 1.02vw, 14.5px); line-height: 1.48; }
   .clean-list.muted { color: var(--muted); }
   .quote-box { display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 0 4%; }
@@ -1017,7 +1235,8 @@ export function exportStandaloneHtmlDeck(options: {
   cite { font-style: normal; font-size: 13px; color: var(--muted); }
   .quote-kpis { margin-top: 12px; }
   .split-visual-card { padding: 12px; gap: 8px; justify-content: space-between; }
-  .split-img { width: 100%; height: 100%; max-height: 300px; object-fit: cover; border-radius: calc(var(--radius) * 0.7); display: block; }
+  .split-img { width: 100%; height: 100%; max-height: 300px; object-fit: contain; border-radius: calc(var(--radius) * 0.7); display: block; }
+  .split-placeholder-box { flex: 1; min-height: 220px; border: 1.5px dashed var(--accent); border-radius: calc(var(--radius) * 0.7); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 12px; padding: 20px; }
   .split-svg-box { width: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: calc(var(--radius) * 0.7); }
   .split-svg-box svg { width: 100%; height: auto; max-height: 290px; display: block; }
   .split-caption { font-size: 11px; color: var(--muted); text-align: center; font-family: ui-monospace, monospace; }

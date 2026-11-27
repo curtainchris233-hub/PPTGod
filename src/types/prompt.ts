@@ -373,8 +373,25 @@ export interface DeckSlideTeamMember {
   badge?: string;
 }
 
+export type ChartVariant = "col" | "bar" | "line" | "doughnut";
+
+export type DataDisplayMode = ChartVariant | "kpi-only" | "data-matrix";
+
+export interface SlideChartSeries {
+  name: string;
+  values: number[];
+  unit?: string;
+}
+
+export interface SlideTableData {
+  headers: string[];
+  rows: string[][];
+  /** [rowIdx, colIdx] coordinates (0-indexed into `rows` and `headers`) of optimal cells */
+  highlightCoords?: [number, number][];
+}
+
 export interface DeckSlideImageSlot {
-  kind: "svg-preset" | "data-url";
+  kind: "svg-preset" | "data-url" | "placeholder";
   presetId?: string;
   dataUrl?: string;
   caption?: string;
@@ -411,6 +428,11 @@ export interface DeckSlideItem {
   sourceNote?: string;
   /** M8: Render data chart as a clean single series when sourced from 1D document facts */
   singleSeries?: boolean;
+  /** M9: Synchronized data display mode across SlideCanvas, standalone HTML & native PPTX */
+  dataDisplay?: DataDisplayMode;
+  chartCategories?: string[];
+  chartSeries?: SlideChartSeries[];
+  tableData?: SlideTableData;
 }
 
 export interface OutlineDraftItem {

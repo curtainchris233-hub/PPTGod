@@ -1233,6 +1233,11 @@
   color: #c2410c;
 }
 
+.gl-upload-ext-badge--xlsx {
+  background: #dcfce7;
+  color: #166534;
+}
+
 .gl-upload-ext-badge--doc {
   background: var(--gl-bg-subtle);
   color: var(--gl-text);

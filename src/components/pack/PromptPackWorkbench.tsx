@@ -20,12 +20,13 @@ import {
   X,
 } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
-import { Button, Stepper, UploadDropzone, type StepperStep, type UploadFileItem } from "@/components/ui";
+import { Button, Stepper, UploadDropzone, type StepperStep } from "@/components/ui";
 import { useApp } from "@/context/AppContext";
 import { useLayout } from "@/context/LayoutContext";
 import { readByokPrefs, subscribeByokPrefs, type ByokLocalPrefs } from "@/lib/byokLocalStore";
 import { saveDocIntakeHandoff } from "@/lib/docIntakeHandoff";
 import { PACK_SAMPLES } from "@/lib/packSamples";
+import type { ParsedDataTable } from "@/lib/spreadsheetParser";
 import {
   DESIGN_DIRECTIONS,
   PACK_DENSITIES,
@@ -57,6 +58,23 @@ type InputTab = "paste" | "upload" | "sample";
 const MAX_CHARS = 16000;
 const MAX_RAW_CHARS = 120000;
 const MIN_CHARS = 20;
+const MAX_MULTI_UPLOAD_FILES = 5;
+
+interface UploadedSourceDoc {
+  id: string;
+  fileName: string;
+  fileType: string;
+  size: number;
+  enabled: boolean;
+  status: "parsing" | "success" | "error";
+  statusText?: string;
+  warning?: string;
+  error?: string;
+  text: string;
+  suggestedTopic?: string;
+  tables: ParsedDataTable[];
+  selectedTableIds: string[];
+}
 
 interface Draft {
   pack: PromptPack;
@@ -123,7 +141,7 @@ export default function PromptPackWorkbench({
   const [directionId, setDirectionId] = useState("auto");
   const [anchorStyle, setAnchorStyle] = useState<PackStyle | null>(initialAnchorStyle);
   const [rulesOnly, setRulesOnly] = useState(false);
-  const [uploadFiles, setUploadFiles] = useState<UploadFileItem[]>([]);
+  const [uploadedDocs, setUploadedDocs] = useState<UploadedSourceDoc[]>([]);
   const [parsing, setParsing] = useState(false);
 
   // Long-document (> 16,000 chars) section selection (derived without effect cascades)
@@ -155,12 +173,60 @@ export default function PromptPackWorkbench({
     return subscribeByokPrefs(sync);
   }, []);
 
+  const enabledDocs = useMemo(
+    () => uploadedDocs.filter((d) => d.status === "success" && d.enabled),
+    [uploadedDocs]
+  );
+
+  // Strict Q5 boundary: `paste` tab uses pure plain `text` with zero table auto-detection;
+  // `upload` tab combines enabled uploaded files & selected `.xlsx`/`.csv` sheets.
+  const useUploadedBundle = enabledDocs.length > 0 && (tab === "upload" || text.trim().length === 0);
+
+  const combinedUploadText = useMemo(() => {
+    if (!enabledDocs.length) return "";
+    return enabledDocs
+      .map((doc) => {
+        if (doc.tables.length > 0) {
+          const chosen = doc.tables.filter((t) => doc.selectedTableIds.includes(t.id));
+          if (!chosen.length) return "";
+          const tblBlocks = chosen
+            .map(
+              (tbl) =>
+                `## 【数据表：${doc.fileName} · ${tbl.sheetName}】\n核心结论：${tbl.summaryLine}\n${tbl.headers.join(" | ")}\n${tbl.rows.map((r) => r.join(" | ")).join("\n")}`
+            )
+            .join("\n\n");
+          return `# 【资料来源：${doc.fileName}】\n${tblBlocks}`;
+        }
+        return doc.text.trim() ? `# 【资料来源：${doc.fileName}】\n${doc.text}` : "";
+      })
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, MAX_RAW_CHARS);
+  }, [enabledDocs]);
+
+  const activeUploadTables = useMemo<ParsedDataTable[]>(() => {
+    if (!useUploadedBundle) return [];
+    return enabledDocs.flatMap((doc) =>
+      doc.tables.filter((t) => doc.selectedTableIds.includes(t.id))
+    );
+  }, [useUploadedBundle, enabledDocs]);
+
+  const activeFileName = useMemo(() => {
+    if (!useUploadedBundle) return fileName;
+    if (enabledDocs.length === 1) return enabledDocs[0].fileName;
+    return `${enabledDocs[0].fileName} 等 ${enabledDocs.length} 份资料`;
+  }, [useUploadedBundle, enabledDocs, fileName]);
+
+  const rawActiveText = useUploadedBundle ? combinedUploadText : text;
+
   // Recompute long-document sections whenever raw text exceeds MAX_CHARS.
-  const isLongDoc = text.length > MAX_CHARS;
-  const docKey = isLongDoc ? `${text.length}:${text.slice(0, 64)}:${text.slice(-64)}` : "";
+  const isLongDoc = rawActiveText.length > MAX_CHARS;
+  const docKey = isLongDoc
+    ? `${rawActiveText.length}:${rawActiveText.slice(0, 64)}:${rawActiveText.slice(-64)}`
+    : "";
   const docSections: DocumentSectionSlice[] = useMemo(
-    () => (isLongDoc ? outlineDocumentSections(text) : []),
-    [isLongDoc, text]
+    () => (isLongDoc ? outlineDocumentSections(rawActiveText) : []),
+    [isLongDoc, rawActiveText]
   );
 
   const selectedSectionIds = useMemo(() => {
@@ -172,11 +238,11 @@ export default function PromptPackWorkbench({
   }, [isLongDoc, docKey, sectionOverrides, docSections]);
 
   const effectiveSource = useMemo(() => {
-    if (!isLongDoc) return text;
+    if (!isLongDoc) return rawActiveText;
     const chosen = docSections.filter((s) => selectedSectionIds.includes(s.id));
-    if (!chosen.length) return text.slice(0, MAX_CHARS);
+    if (!chosen.length) return rawActiveText.slice(0, MAX_CHARS);
     return chosen.map((s) => s.text).join("\n\n").slice(0, MAX_CHARS);
-  }, [isLongDoc, text, docSections, selectedSectionIds]);
+  }, [isLongDoc, rawActiveText, docSections, selectedSectionIds]);
 
   const hasKey = Boolean(byok?.apiKey);
   const engineLabel = rulesOnly
@@ -193,8 +259,10 @@ export default function PromptPackWorkbench({
       audience?: string;
       slideCount?: number;
       anchorStyle?: PackStyle | null;
+      tables?: ParsedDataTable[];
     }) => {
       const rawSrc = (override?.text ?? effectiveSource).trim();
+      const tablesToUse = override ? (override.tables ?? []) : activeUploadTables;
       const src =
         rawSrc.length > MAX_CHARS
           ? (() => {
@@ -205,8 +273,8 @@ export default function PromptPackWorkbench({
             })()
           : rawSrc;
 
-      if (src.length < MIN_CHARS) {
-        setError(`资料内容太少（至少 ${MIN_CHARS} 个字）。可以粘贴论文摘要、课本章节、会议纪要或报告正文。`);
+      if (src.length < MIN_CHARS && tablesToUse.length === 0) {
+        setError(`资料内容太少（至少 ${MIN_CHARS} 个字）。可以粘贴论文摘要、课本章节、会议纪要或上传汇总数据表。`);
         return;
       }
       abortRef.current?.abort();
@@ -223,7 +291,7 @@ export default function PromptPackWorkbench({
           signal: ctrl.signal,
           body: JSON.stringify({
             text: src.slice(0, MAX_CHARS),
-            fileName: override?.fileName ?? fileName,
+            fileName: override?.fileName ?? activeFileName,
             topic: override?.topic ?? topic,
             audience: override?.audience ?? audience,
             slideCount: override?.slideCount ?? slideCount,
@@ -231,6 +299,7 @@ export default function PromptPackWorkbench({
             density,
             directionId,
             ...(useAnchor ? { anchorStyle: useAnchor } : {}),
+            ...(tablesToUse.length > 0 ? { tables: tablesToUse } : {}),
             mode: rulesOnly ? "smart" : "auto",
             ...(prefs.apiKey && !rulesOnly
               ? { apiKey: prefs.apiKey, apiBase: prefs.apiBase, model: prefs.modelName }
@@ -267,7 +336,7 @@ export default function PromptPackWorkbench({
         }
       }
     },
-    [effectiveSource, fileName, topic, audience, slideCount, language, density, directionId, anchorStyle, rulesOnly, tool]
+    [effectiveSource, activeUploadTables, activeFileName, topic, audience, slideCount, language, density, directionId, anchorStyle, rulesOnly, tool]
   );
 
   // Mount: load local history; handle homepage handoff → auto-generate; otherwise restore last draft.
@@ -321,57 +390,147 @@ export default function PromptPackWorkbench({
   const loadSample = (id: string) => {
     const s = PACK_SAMPLES.find((x) => x.id === id);
     if (!s) return;
+    setUploadedDocs([]);
     setText(s.text);
     setFileName(s.fileName);
     setAudience(s.audience);
     setSlideCount(s.slideCount);
     setTopic("");
     setTab("paste");
-    void generate({ text: s.text, fileName: s.fileName, audience: s.audience, slideCount: s.slideCount, topic: "" });
+    void generate({ text: s.text, fileName: s.fileName, audience: s.audience, slideCount: s.slideCount, topic: "", tables: [] });
   };
 
   const handleFiles = async (files: File[]) => {
-    const file = files[0];
-    if (!file || parsing) return;
-    const id = `${file.name}-${file.size}-${Date.now()}`;
-    setUploadFiles([{ id, name: file.name, size: file.size, status: "parsing", statusText: "正在提取文字…" }]);
+    if (!files.length || parsing) return;
+    const activeNonErrorCount = uploadedDocs.filter((d) => d.status !== "error").length;
+    const slotsLeft = MAX_MULTI_UPLOAD_FILES - activeNonErrorCount;
+    if (slotsLeft <= 0) {
+      showToast(`最多支持同时混传 ${MAX_MULTI_UPLOAD_FILES} 份文件，请先移除不需要的文件`, "error");
+      return;
+    }
+    const batch = files.slice(0, slotsLeft);
+    if (files.length > slotsLeft) {
+      showToast(`最多混传 ${MAX_MULTI_UPLOAD_FILES} 份文件，已为您取前 ${slotsLeft} 份`, "default");
+    }
+
+    const pendingDocs: UploadedSourceDoc[] = batch.map((f, idx) => ({
+      id: `${f.name}-${f.size}-${Date.now()}-${idx}`,
+      fileName: f.name,
+      fileType: f.name.split(".").pop()?.toLowerCase() || "txt",
+      size: f.size,
+      enabled: true,
+      status: "parsing",
+      statusText: "正在解析资料内容…",
+      text: "",
+      tables: [],
+      selectedTableIds: [],
+    }));
+
+    setUploadedDocs((prev) => [...prev.filter((d) => d.status !== "error"), ...pendingDocs]);
     setParsing(true);
     setError(null);
+
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/parse-document", { method: "POST", body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = data.error || "文档解析失败，请检查文件格式";
-        setUploadFiles([{ id, name: file.name, size: file.size, status: "error", error: msg }]);
-        return;
+      let firstSuggestedTopic = "";
+      for (let i = 0; i < batch.length; i++) {
+        const file = batch[i];
+        const docId = pendingDocs[i].id;
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          const res = await fetch("/api/parse-document", { method: "POST", body: fd });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const msg = data.error || "文档解析失败，请检查文件格式";
+            setUploadedDocs((prev) =>
+              prev.map((d) =>
+                d.id === docId ? { ...d, status: "error", enabled: false, error: msg } : d
+              )
+            );
+            continue;
+          }
+          const extracted = String(data.text || "");
+          const parsedTables: ParsedDataTable[] = Array.isArray(data.tables) ? data.tables : [];
+          const resolvedName = String(data.fileName || file.name);
+          if (!firstSuggestedTopic && data.suggestedTopic) {
+            firstSuggestedTopic = String(data.suggestedTopic).slice(0, 60);
+          }
+
+          const totalRows = parsedTables.reduce((sum, t) => sum + t.rowCount, 0);
+          const statusText =
+            parsedTables.length > 0
+              ? `已读取 ${parsedTables.length} 张汇总表（共 ${totalRows} 行）`
+              : extracted.length > MAX_CHARS
+                ? `已提取 ${extracted.length.toLocaleString("zh-CN")} 字（已开启长文档章节筛选）`
+                : `已提取 ${extracted.length.toLocaleString("zh-CN")} 字`;
+
+          setUploadedDocs((prev) =>
+            prev.map((d) =>
+              d.id === docId
+                ? {
+                    ...d,
+                    fileName: resolvedName,
+                    fileType: String(data.fileType || d.fileType),
+                    status: "success",
+                    statusText,
+                    warning: typeof data.warning === "string" ? data.warning : undefined,
+                    text: extracted.slice(0, MAX_RAW_CHARS),
+                    suggestedTopic: data.suggestedTopic ? String(data.suggestedTopic) : undefined,
+                    tables: parsedTables,
+                    selectedTableIds: parsedTables.map((t) => t.id),
+                  }
+                : d
+            )
+          );
+
+          // Mirror single prose doc into text state so switching to paste tab shows it seamlessly
+          if (activeNonErrorCount === 0 && batch.length === 1 && parsedTables.length === 0) {
+            setText(extracted.slice(0, MAX_RAW_CHARS));
+            setFileName(resolvedName);
+          }
+        } catch {
+          setUploadedDocs((prev) =>
+            prev.map((d) =>
+              d.id === docId
+                ? { ...d, status: "error", enabled: false, error: "网络异常，请重试" }
+                : d
+            )
+          );
+        }
       }
-      const extracted = String(data.text || "");
-      setText(extracted.slice(0, MAX_RAW_CHARS));
-      setFileName(data.fileName || file.name);
-      if (data.suggestedTopic) setTopic(String(data.suggestedTopic).slice(0, 60));
-      setUploadFiles([
-        {
-          id,
-          name: data.fileName || file.name,
-          size: file.size,
-          status: "success",
-          statusText:
-            extracted.length > MAX_CHARS
-              ? `已提取 ${extracted.length.toLocaleString("zh-CN")} 字（已开启长文档章节筛选）`
-              : `已提取 ${extracted.length.toLocaleString("zh-CN")} 字`,
-          warning: data.warning,
-        },
-      ]);
-      if (extracted.length > MAX_CHARS) {
-        setTab("paste");
+      if (firstSuggestedTopic && !topic.trim()) {
+        setTopic(firstSuggestedTopic);
       }
-    } catch {
-      setUploadFiles([{ id, name: file.name, size: file.size, status: "error", error: "网络异常，请重试" }]);
     } finally {
       setParsing(false);
     }
+  };
+
+  const toggleDocEnabled = (docId: string) => {
+    setUploadedDocs((prev) =>
+      prev.map((d) => (d.id === docId ? { ...d, enabled: !d.enabled } : d))
+    );
+  };
+
+  const toggleDocSheet = (docId: string, tableId: string) => {
+    setUploadedDocs((prev) =>
+      prev.map((d) => {
+        if (d.id !== docId) return d;
+        const exists = d.selectedTableIds.includes(tableId);
+        if (exists && d.selectedTableIds.length <= 1) {
+          showToast("至少保留勾选 1 张工作表（或直接取消勾选整个文件）", "default");
+          return d;
+        }
+        const nextIds = exists
+          ? d.selectedTableIds.filter((x) => x !== tableId)
+          : [...d.selectedTableIds, tableId];
+        return { ...d, selectedTableIds: nextIds };
+      })
+    );
+  };
+
+  const removeUploadedDoc = (docId: string) => {
+    setUploadedDocs((prev) => prev.filter((d) => d.id !== docId));
   };
 
   const handleRefineSlide = async (slide: PackSlide, instruction: string) => {
@@ -519,14 +678,14 @@ export default function PromptPackWorkbench({
   };
 
   const steps: StepperStep[] = useMemo(() => {
-    const hasText = effectiveSource.trim().length >= MIN_CHARS;
+    const hasText = effectiveSource.trim().length >= MIN_CHARS || activeUploadTables.length > 0;
     return [
       { id: "source", title: "资料", status: pack || hasText ? "completed" : "active" },
       { id: "style", title: "风格", status: pack ? "completed" : hasText ? "active" : "upcoming" },
       { id: "outline", title: "逐页大纲", status: pack ? "completed" : "upcoming" },
       { id: "export", title: "复制到 AI 工具", status: pack ? "active" : "upcoming" },
     ];
-  }, [pack, effectiveSource]);
+  }, [pack, effectiveSource, activeUploadTables.length]);
 
   const effectiveCharCount = effectiveSource.length;
 
@@ -631,7 +790,7 @@ export default function PromptPackWorkbench({
             </h2>
             <span className="gl-pack-count" aria-live="polite">
               {isLongDoc
-                ? `已选 ${effectiveCharCount.toLocaleString("zh-CN")} / ${MAX_CHARS.toLocaleString("zh-CN")} 字（原文 ${text.length.toLocaleString("zh-CN")} 字）`
+                ? `已选 ${effectiveCharCount.toLocaleString("zh-CN")} / ${MAX_CHARS.toLocaleString("zh-CN")} 字（原文 ${rawActiveText.length.toLocaleString("zh-CN")} 字）`
                 : `${effectiveCharCount.toLocaleString("zh-CN")} / ${MAX_CHARS.toLocaleString("zh-CN")} 字`}
             </span>
           </header>
@@ -671,18 +830,94 @@ export default function PromptPackWorkbench({
           ) : null}
 
           {tab === "upload" ? (
-            <UploadDropzone
-              variant="compact"
-              files={uploadFiles}
-              onFilesAccepted={handleFiles}
-              onRemoveFile={() => setUploadFiles([])}
-              uploading={parsing}
-              title="拖入 PDF / Word / PPTX / Markdown"
-              hint="单个文件 ≤ 10MB，只提取文字，不保存文件"
-              buttonLabel="选择文件"
-              inputId="pg-pack-file-input"
-              buttonId="pg-pack-file-btn"
-            />
+            <div className="gl-pack-upload-zone">
+              <UploadDropzone
+                variant="compact"
+                multiple
+                files={[]}
+                onFilesAccepted={handleFiles}
+                uploading={parsing}
+                title="拖入文档或汇总表（最多同时混传 5 份）"
+                hint="支持 PDF、Word (.docx)、PPT (.pptx)、Excel (.xlsx)、CSV、Markdown、TXT（单文件 ≤ 10 MB；数据表限 ≤ 30 行汇总表）"
+                buttonLabel={uploadedDocs.length > 0 ? "继续添加文件" : "选择文件"}
+                inputId="pg-pack-file-input"
+                buttonId="pg-pack-file-btn"
+              />
+              {uploadedDocs.length > 0 ? (
+                <ul className="gl-pack-multi-files" id="pg-pack-multi-files" aria-label="已上传资料列表">
+                  {uploadedDocs.map((doc) => {
+                    const isErr = doc.status === "error";
+                    return (
+                      <li
+                        key={doc.id}
+                        className={`gl-pack-doc-item ${isErr ? "is-error" : ""} ${!doc.enabled && !isErr ? "is-muted" : ""}`}
+                        data-doc-status={doc.status}
+                      >
+                        <div className="gl-pack-doc-head">
+                          {!isErr ? (
+                            <input
+                              type="checkbox"
+                              checked={doc.enabled}
+                              disabled={doc.status === "parsing"}
+                              aria-label={`启用资料 ${doc.fileName}`}
+                              onChange={() => toggleDocEnabled(doc.id)}
+                            />
+                          ) : (
+                            <AlertTriangle size={14} className="gl-pack-doc-err-icon" aria-hidden="true" />
+                          )}
+                          <span className="gl-pack-doc-ext">{doc.fileType.toUpperCase()}</span>
+                          <strong className="gl-pack-doc-name" title={doc.fileName}>
+                            {doc.fileName}
+                          </strong>
+                          <button
+                            type="button"
+                            className="gl-pack-doc-remove"
+                            aria-label={`移除文件 ${doc.fileName}`}
+                            onClick={() => removeUploadedDoc(doc.id)}
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                        {isErr && doc.error ? (
+                          <p className="gl-pack-doc-msg is-error" role="alert">
+                            {doc.error}
+                          </p>
+                        ) : doc.statusText ? (
+                          <p className="gl-pack-doc-msg">{doc.statusText}</p>
+                        ) : null}
+                        {doc.warning ? (
+                          <p className="gl-pack-doc-msg is-warning">{doc.warning}</p>
+                        ) : null}
+                        {doc.tables.length > 0 ? (
+                          <div className="gl-pack-sheet-chips" role="group" aria-label={`${doc.fileName} 工作表筛选`}>
+                            {doc.tables.map((tbl) => {
+                              const active = doc.selectedTableIds.includes(tbl.id);
+                              return (
+                                <button
+                                  key={tbl.id}
+                                  type="button"
+                                  data-sheet-chip={tbl.sheetName}
+                                  aria-pressed={active}
+                                  disabled={!doc.enabled}
+                                  className={`gl-pack-sheet-chip ${active ? "is-active" : ""}`}
+                                  onClick={() => toggleDocSheet(doc.id, tbl.id)}
+                                  title={`${tbl.sheetName}：${tbl.rowCount} 行 × ${tbl.colCount} 列（${tbl.mode === "table" ? "三线数据表" : "原生图表"}）`}
+                                >
+                                  <span>{tbl.sheetName}</span>
+                                  <em>
+                                    {tbl.rowCount}×{tbl.colCount} · {tbl.mode === "table" ? "三线表" : "图表"}
+                                  </em>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+            </div>
           ) : null}
 
           {tab === "sample" ? (
@@ -996,6 +1231,7 @@ export default function PromptPackWorkbench({
                 undoMap={undoMap}
                 onRefineSlide={(s, hint) => void handleRefineSlide(s, hint)}
                 onUndoRefine={handleUndoRefine}
+                onToast={showToast}
               />
             </div>
           ) : null}

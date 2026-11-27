@@ -1,8 +1,11 @@
 import React from "react";
 import type {
+  DataDisplayMode,
   DeckSlideBar,
   DeckSlideKpi,
   DeckSlideStep,
+  SlideChartSeries,
+  SlideTableData,
 } from "@/types/prompt";
 import { renderFooter, renderTopChrome } from "./SlideChrome";
 import { CN_NUMS, type SlideRenderContext } from "./types";
@@ -382,6 +385,7 @@ export function renderData(ctx: SlideRenderContext) {
   const {
     palette,
     typography,
+    layout,
     slideData,
     headingFont,
     monoFont,
@@ -390,6 +394,13 @@ export function renderData(ctx: SlideRenderContext) {
     radius,
     cardStyle,
   } = ctx;
+
+  const displayMode: DataDisplayMode = slideData?.dataDisplay || "col";
+  const isAcademicStyle =
+    layout.archetype === "academic-paper" ||
+    layout.archetype === "scientific-figure" ||
+    layout.archetype === "clinical-clean";
+
   const rawBars: DeckSlideBar[] =
     slideData?.bars && slideData.bars.length > 0
       ? slideData.bars
@@ -399,25 +410,37 @@ export function renderData(ctx: SlideRenderContext) {
           { label: "Q3", v1: 63, v2: 88 },
           { label: "Q4", v1: 74, v2: 112 },
         ];
-  const bars = rawBars.slice(0, 6);
+  const bars = rawBars.slice(0, 8);
   const isSingle = Boolean(slideData?.singleSeries);
-  const peak = Math.max(
-    0.5,
-    ...bars.flatMap((b) =>
-      isSingle
-        ? [Number(b.v2) || 0]
-        : [Number(b.v1) || 0, Number(b.v2) || 0]
-    )
+
+  const hasMultiSeries =
+    Boolean(slideData?.chartCategories?.length) &&
+    Boolean(slideData?.chartSeries?.length);
+
+  const categories: string[] = hasMultiSeries
+    ? slideData!.chartCategories!.slice(0, 8)
+    : bars.map((b) => b.label);
+
+  const seriesList: SlideChartSeries[] = hasMultiSeries
+    ? slideData!.chartSeries!.slice(0, 4)
+    : isSingle
+      ? [{ name: "核心实证值", values: bars.map((b) => Math.max(0, Number(b.v2) || 0)) }]
+      : [
+          { name: "基准方案", values: bars.map((b) => Math.max(0, Number(b.v1) || 0)) },
+          { name: "新架构", values: bars.map((b) => Math.max(0, Number(b.v2) || 0)) },
+        ];
+
+  const allSeriesVals = seriesList.flatMap((s) =>
+    categories.map((_, idx) => Math.max(0, Number(s.values[idx]) || 0))
   );
+  const peak = Math.max(0.5, ...allSeriesVals);
   const maxV =
     peak < 10
-      ? Number((peak * 1.2).toPrecision(2)) || 1
-      : Math.ceil((peak * 1.15) / 10) * 10;
+      ? Math.max(0.5, Number((peak * 1.2).toPrecision(2)) || 1)
+      : Math.max(10, Math.ceil((peak * 1.15) / 10) * 10);
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((r) =>
     maxV < 5 ? Number((maxV * r).toFixed(1)) : Math.round(maxV * r)
   );
-  const plotW = 372;
-  const stepX = plotW / Math.max(1, bars.length);
 
   const kpis: DeckSlideKpi[] =
     slideData?.kpis && slideData.kpis.length > 0
@@ -440,24 +463,778 @@ export function renderData(ctx: SlideRenderContext) {
           },
         ];
 
+  const topTagRight =
+    displayMode === "kpi-only"
+      ? "04 / KEY METRICS"
+      : displayMode === "data-matrix"
+        ? "04 / DATA TABLE"
+        : "04 / DATA INSIGHT";
+  const topTagLeft =
+    displayMode === "kpi-only"
+      ? "核心量化指标焦点"
+      : displayMode === "data-matrix"
+        ? isAcademicStyle
+          ? "学术三线表与实证对照"
+          : "多维指标评分矩阵"
+        : "数据洞察与增长曲线";
+
+  const headlineNode = (
+    <h3
+      style={{
+        fontFamily: headingFont,
+        fontWeight: typography.titleWeight,
+        letterSpacing: typography.titleTracking,
+        fontSize: isConsulting ? "23px" : "26px",
+        lineHeight: 1.25,
+        margin: "0 0 18px 0",
+        color: palette.text,
+      }}
+    >
+      {slideData?.title ||
+        "核心转化效率实现 2.6 倍跃升，单位履约成本同比下降 38%"}
+    </h3>
+  );
+
+  /* ---- 1. Pure Hero KPI Showcase (`big-number` / `kpi-only`) ---- */
+  if (displayMode === "kpi-only") {
+    const heroKpis = kpis.slice(0, 3);
+    const colCnt = Math.max(1, heroKpis.length);
+    const extraBullets = (slideData?.bullets || []).slice(0, 3);
+    return (
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        {renderTopChrome(ctx, topTagLeft, topTagRight)}
+        {headlineNode}
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "16px",
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${colCnt}, minmax(0, 1fr))`,
+              gap: "18px",
+              flex: extraBullets.length > 0 ? "1.35" : "1",
+              minHeight: 0,
+            }}
+          >
+            {heroKpis.map((kpi, idx) => {
+              const highlight = idx === 0;
+              return (
+                <div
+                  key={`hero-kpi-${idx}`}
+                  style={{
+                    ...cardStyle,
+                    padding: colCnt === 1 ? "26px 32px" : "22px 22px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    background: highlight ? palette.accentSoft : palette.surface,
+                    borderColor: highlight ? palette.accent : palette.border,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: monoFont,
+                      fontSize: "11.5px",
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      color: highlight && !isBrutalist ? palette.accent : palette.muted,
+                    }}
+                  >
+                    {kpi.label}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: headingFont,
+                      fontSize: colCnt === 1 ? "58px" : colCnt === 2 ? "46px" : "38px",
+                      fontWeight: 800,
+                      lineHeight: 1.05,
+                      color: highlight && !isBrutalist ? palette.accent : palette.text,
+                      margin: "8px 0",
+                    }}
+                  >
+                    {kpi.value}
+                  </div>
+                  <div
+                    style={{
+                      borderTop: `1px solid ${palette.border}`,
+                      paddingTop: "8px",
+                      fontSize: "12px",
+                      lineHeight: 1.45,
+                      color: palette.muted,
+                    }}
+                  >
+                    {kpi.note || "源资料实证核心指标"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {extraBullets.length > 0 && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${extraBullets.length}, minmax(0, 1fr))`,
+                gap: "14px",
+              }}
+            >
+              {extraBullets.map((b, bIdx) => (
+                <div
+                  key={`hero-pt-${bIdx}`}
+                  style={{
+                    ...cardStyle,
+                    padding: "10px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "999px",
+                      background: palette.accent,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span style={{ fontSize: "12px", color: palette.text, lineHeight: 1.4 }}>
+                    {b}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {renderFooter(ctx)}
+      </div>
+    );
+  }
+
+  /* ---- 2. Native Academic 3-Line / Executive Data Table (`data-matrix`) ---- */
+  if (displayMode === "data-matrix") {
+    const resolvedTable: SlideTableData =
+      slideData?.tableData &&
+      slideData.tableData.headers.length > 0 &&
+      slideData.tableData.rows.length > 0
+        ? slideData.tableData
+        : {
+            headers: ["指标维度", ...seriesList.map((s) => s.name)],
+            rows: categories.map((cat, rIdx) => [
+              cat,
+              ...seriesList.map((s) => {
+                const v = s.values[rIdx] ?? 0;
+                return s.unit ? `${v}${s.unit}` : String(v);
+              }),
+            ]),
+          };
+
+    const visibleHeaders = resolvedTable.headers.slice(0, 8);
+    const visibleRows = resolvedTable.rows.slice(0, 8);
+    const hlSet = new Set(
+      (resolvedTable.highlightCoords || []).map(([r, c]) => `${r}:${c}`)
+    );
+    const denseRows = visibleRows.length >= 6;
+
+    return (
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        {renderTopChrome(ctx, topTagLeft, topTagRight)}
+        {headlineNode}
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            gap: "12px",
+          }}
+        >
+          <div
+            style={
+              isAcademicStyle
+                ? {
+                    background: "transparent",
+                    padding: "4px 2px",
+                    overflow: "hidden",
+                  }
+                : {
+                    ...cardStyle,
+                    padding: "14px 18px",
+                    overflow: "hidden",
+                  }
+            }
+          >
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: denseRows ? "11.5px" : "12.5px",
+                borderTop: isAcademicStyle ? `2px solid ${palette.text}` : "none",
+                borderBottom: isAcademicStyle ? `2px solid ${palette.text}` : "none",
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    background: isAcademicStyle ? "transparent" : palette.accentSoft,
+                    borderBottom: isAcademicStyle
+                      ? `1.25px solid ${palette.text}`
+                      : `1.5px solid ${palette.border}`,
+                  }}
+                >
+                  {visibleHeaders.map((h, cIdx) => (
+                    <th
+                      key={`th-${cIdx}`}
+                      style={{
+                        padding: denseRows ? "7px 10px" : "9px 12px",
+                        textAlign: cIdx === 0 ? "left" : "right",
+                        fontWeight: 700,
+                        color: palette.text,
+                        fontFamily: cIdx === 0 ? headingFont : monoFont,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map((row, rIdx) => (
+                  <tr
+                    key={`tr-${rIdx}`}
+                    style={{
+                      borderBottom:
+                        isAcademicStyle || rIdx === visibleRows.length - 1
+                          ? "none"
+                          : `1px solid ${palette.border}`,
+                    }}
+                  >
+                    {visibleHeaders.map((_, cIdx) => {
+                      const isOptimal = hlSet.has(`${rIdx}:${cIdx}`);
+                      return (
+                        <td
+                          key={`td-${rIdx}-${cIdx}`}
+                          style={{
+                            padding: denseRows ? "6px 10px" : "8px 12px",
+                            textAlign: cIdx === 0 ? "left" : "right",
+                            fontFamily: cIdx === 0 ? undefined : monoFont,
+                            fontWeight: isOptimal || cIdx === 0 ? 700 : 500,
+                            color: isOptimal ? palette.accent : palette.text,
+                            background:
+                              isOptimal && !isAcademicStyle
+                                ? palette.accentSoft
+                                : "transparent",
+                          }}
+                        >
+                          {row[cIdx] ?? "—"}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {slideData?.bullets?.[0] && (
+            <div
+              style={{
+                fontSize: "12px",
+                color: palette.muted,
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: monoFont,
+                  fontSize: "10.5px",
+                  fontWeight: 700,
+                  color: palette.accent,
+                }}
+              >
+                TAKEAWAY
+              </span>
+              <span>{slideData.bullets[0]}</span>
+            </div>
+          )}
+        </div>
+        {renderFooter(ctx)}
+      </div>
+    );
+  }
+
+  /* ---- 3..6. Synchronized 4 Chart Variants (`col` | `bar` | `line` | `doughnut`) ---- */
+  const chartHeaderTitle =
+    displayMode === "bar"
+      ? "关键基准横向对比条形图"
+      : displayMode === "line"
+        ? "核心指标演进趋势折线图"
+        : displayMode === "doughnut"
+          ? "结构占比环形分布图"
+          : seriesList.length <= 1
+            ? "关键量化指标实证分布"
+            : "多维序列核心指标对比";
+
+  const seriesPalette = [
+    palette.chartColors[0],
+    palette.chartColors[1],
+    palette.chartColors[2],
+    palette.chartColors[3] || palette.accent,
+  ];
+
+  const renderChartSvg = () => {
+    const catCount = Math.max(1, categories.length);
+
+    if (displayMode === "doughnut") {
+      const vals = categories.map((_, idx) => Math.max(0, Number(seriesList[0]?.values[idx]) || 0));
+      const total = Math.max(1, vals.reduce((acc, v) => acc + v, 0));
+      const cx = 128;
+      const cy = 112;
+      const r = 74;
+      const circ = 2 * Math.PI * r;
+      let offset = 0;
+      const topIdx = vals.reduce((best, v, idx) => (v > (vals[best] ?? 0) ? idx : best), 0);
+      const topPct = Math.round(((vals[topIdx] ?? 0) / total) * 100);
+
+      return (
+        <svg
+          viewBox="0 0 430 225"
+          style={{ width: "100%", flex: 1, overflow: "visible" }}
+          role="img"
+          aria-label="结构占比环形分布图"
+        >
+          {categories.map((cat, idx) => {
+            const frac = Math.max(0.01, vals[idx] / total);
+            const dash = Number((frac * circ).toFixed(2));
+            const gap = Number(Math.max(0, circ - dash).toFixed(2));
+            const curOffset = Number((-offset).toFixed(2));
+            offset += dash;
+            return (
+              <circle
+                key={`dn-${idx}`}
+                cx={cx}
+                cy={cy}
+                r={r}
+                fill="none"
+                stroke={seriesPalette[idx % seriesPalette.length]}
+                strokeWidth="26"
+                strokeDasharray={`${dash} ${gap}`}
+                strokeDashoffset={curOffset}
+                transform={`rotate(-90 ${cx} ${cy})`}
+              />
+            );
+          })}
+          <text
+            x={cx}
+            y={cy - 2}
+            textAnchor="middle"
+            fill={palette.text}
+            fontSize="24"
+            fontWeight="800"
+            fontFamily={headingFont}
+          >
+            {`${topPct}%`}
+          </text>
+          <text
+            x={cx}
+            y={cy + 17}
+            textAnchor="middle"
+            fill={palette.muted}
+            fontSize="10.5"
+            fontFamily={monoFont}
+          >
+            {(categories[topIdx] || "核心项").slice(0, 9)}
+          </text>
+          {categories.slice(0, 6).map((cat, idx) => {
+            const ly = 36 + idx * 28;
+            const pct = Math.round((vals[idx] / total) * 100);
+            return (
+              <g key={`dn-leg-${idx}`}>
+                <rect
+                  x="242"
+                  y={ly - 8}
+                  width="10"
+                  height="10"
+                  rx="2"
+                  fill={seriesPalette[idx % seriesPalette.length]}
+                />
+                <text x="258" y={ly} fill={palette.text} fontSize="11">
+                  {cat.slice(0, 10)}
+                </text>
+                <text
+                  x="414"
+                  y={ly}
+                  textAnchor="end"
+                  fill={palette.muted}
+                  fontSize="11"
+                  fontWeight="700"
+                  fontFamily={monoFont}
+                >
+                  {`${pct}%`}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
+    if (displayMode === "bar") {
+      const rowCats = categories.slice(0, 6);
+      const rowStep = 190 / Math.max(1, rowCats.length);
+      const barLeft = 112;
+      const barMaxW = 266;
+      const activeSeries = seriesList.slice(0, 2);
+      return (
+        <svg
+          viewBox="0 0 430 225"
+          style={{ width: "100%", flex: 1, overflow: "visible" }}
+          role="img"
+          aria-label="关键基准横向对比条形图"
+        >
+          <line x1={barLeft} y1="14" x2={barLeft} y2="206" stroke={palette.border} strokeWidth="1" />
+          {rowCats.map((cat, idx) => {
+            const cy = 20 + idx * rowStep + rowStep / 2;
+            if (activeSeries.length === 1) {
+              const val = Math.max(0, Number(activeSeries[0].values[idx]) || 0);
+              const w = Math.max(4, Number(((val / maxV) * barMaxW).toFixed(1)));
+              const bh = Math.min(20, Math.max(11, rowStep * 0.54));
+              return (
+                <g key={`hbar-${idx}`}>
+                  <text
+                    x={barLeft - 8}
+                    y={cy + 4}
+                    textAnchor="end"
+                    fill={palette.text}
+                    fontSize="10.5"
+                    fontFamily={monoFont}
+                  >
+                    {cat.slice(0, 12)}
+                  </text>
+                  <rect
+                    x={barLeft}
+                    y={cy - bh / 2}
+                    width={w}
+                    height={bh}
+                    rx={Math.min(radius, 4)}
+                    fill={seriesPalette[idx === 0 ? 0 : idx % 2 === 0 ? 0 : 1]}
+                  />
+                  <text
+                    x={barLeft + w + 6}
+                    y={cy + 4}
+                    fill={palette.text}
+                    fontSize="10.5"
+                    fontWeight="700"
+                    fontFamily={monoFont}
+                  >
+                    {`${val}${activeSeries[0].unit || ""}`}
+                  </text>
+                </g>
+              );
+            }
+            const v0 = Math.max(0, Number(activeSeries[0].values[idx]) || 0);
+            const v1 = Math.max(0, Number(activeSeries[1].values[idx]) || 0);
+            const w0 = Math.max(3, Number(((v0 / maxV) * barMaxW).toFixed(1)));
+            const w1 = Math.max(3, Number(((v1 / maxV) * barMaxW).toFixed(1)));
+            const bh = Math.min(10, Math.max(6, rowStep * 0.3));
+            return (
+              <g key={`hbar-${idx}`}>
+                <text
+                  x={barLeft - 8}
+                  y={cy + 4}
+                  textAnchor="end"
+                  fill={palette.text}
+                  fontSize="10.5"
+                  fontFamily={monoFont}
+                >
+                  {cat.slice(0, 12)}
+                </text>
+                <rect
+                  x={barLeft}
+                  y={cy - bh - 1}
+                  width={w0}
+                  height={bh}
+                  rx="2"
+                  fill={seriesPalette[0]}
+                />
+                <rect
+                  x={barLeft}
+                  y={cy + 1}
+                  width={w1}
+                  height={bh}
+                  rx="2"
+                  fill={seriesPalette[1]}
+                  opacity="0.82"
+                />
+                <text
+                  x={barLeft + Math.max(w0, w1) + 6}
+                  y={cy + 4}
+                  fill={palette.text}
+                  fontSize="10"
+                  fontWeight="700"
+                  fontFamily={monoFont}
+                >
+                  {`${v0}${activeSeries[0].unit || ""}`}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
+    const plotW = 372;
+    const stepX = plotW / catCount;
+
+    if (displayMode === "line") {
+      return (
+        <svg
+          viewBox="0 0 430 225"
+          style={{ width: "100%", flex: 1, overflow: "visible" }}
+          role="img"
+          aria-label="核心指标趋势折线图"
+        >
+          {ticks.map((tick, tIdx) => {
+            const y = Number((195 - (tick / maxV) * 164).toFixed(1));
+            return (
+              <g key={`ltick-${tIdx}`}>
+                <line
+                  x1="38"
+                  y1={y}
+                  x2="416"
+                  y2={y}
+                  stroke={palette.border}
+                  strokeDasharray={tIdx === 0 ? "none" : "3 3"}
+                  strokeWidth="1"
+                />
+                <text
+                  x="30"
+                  y={y + 4}
+                  textAnchor="end"
+                  fill={palette.muted}
+                  fontSize="10"
+                  fontFamily={monoFont}
+                >
+                  {tick}
+                </text>
+              </g>
+            );
+          })}
+          {categories.map((cat, idx) => {
+            const cx = Number((44 + idx * stepX + stepX / 2).toFixed(1));
+            return (
+              <text
+                key={`lcat-${idx}`}
+                x={cx}
+                y="214"
+                textAnchor="middle"
+                fill={palette.muted}
+                fontSize="10.5"
+                fontFamily={monoFont}
+              >
+                {cat.slice(0, 10)}
+              </text>
+            );
+          })}
+          {seriesList.map((ser, sIdx) => {
+            const color = seriesPalette[sIdx % seriesPalette.length];
+            const pts = categories
+              .map((_, idx) => {
+                const cx = Number((44 + idx * stepX + stepX / 2).toFixed(1));
+                const v = Math.max(0, Number(ser.values[idx]) || 0);
+                const cy = Number((195 - (v / maxV) * 164).toFixed(1));
+                return `${cx},${cy}`;
+              })
+              .join(" ");
+            return (
+              <g key={`lser-${sIdx}`}>
+                <polyline fill="none" stroke={color} strokeWidth="2.8" points={pts} />
+                {categories.map((_, idx) => {
+                  const cx = Number((44 + idx * stepX + stepX / 2).toFixed(1));
+                  const v = Math.max(0, Number(ser.values[idx]) || 0);
+                  const cy = Number((195 - (v / maxV) * 164).toFixed(1));
+                  return (
+                    <g key={`ldot-${sIdx}-${idx}`}>
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r="4.2"
+                        fill={palette.surface}
+                        stroke={color}
+                        strokeWidth="2.4"
+                      />
+                      {sIdx === 0 && (
+                        <text
+                          x={cx}
+                          y={cy - 8}
+                          textAnchor="middle"
+                          fill={palette.text}
+                          fontSize="10.5"
+                          fontWeight="700"
+                          fontFamily={monoFont}
+                        >
+                          {v}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
+    /* Default: Vertical Column Chart (`col`), supporting 1..4 real series */
+    const sCount = Math.max(1, seriesList.length);
+    return (
+      <svg
+        viewBox="0 0 430 225"
+        style={{ width: "100%", flex: 1, overflow: "visible" }}
+        role="img"
+        aria-label="关键量化指标柱状图"
+      >
+        {ticks.map((tick, tIdx) => {
+          const y = Number((195 - (tick / maxV) * 168).toFixed(1));
+          return (
+            <g key={`tick-${tIdx}`}>
+              <line
+                x1="38"
+                y1={y}
+                x2="416"
+                y2={y}
+                stroke={palette.border}
+                strokeDasharray={tIdx === 0 ? "none" : "3 3"}
+                strokeWidth="1"
+              />
+              <text
+                x="30"
+                y={y + 4}
+                textAnchor="end"
+                fill={palette.muted}
+                fontSize="10"
+                fontFamily={monoFont}
+              >
+                {tick}
+              </text>
+            </g>
+          );
+        })}
+
+        {categories.map((cat, i) => {
+          const cx = Number((44 + i * stepX + stepX / 2).toFixed(1));
+          const r = Math.min(radius, 4);
+          if (sCount === 1) {
+            const v0 = Math.max(0, Number(seriesList[0].values[i]) || 0);
+            const h0 = Number(((v0 / maxV) * 168).toFixed(1));
+            const singleW = Math.min(36, Math.max(14, stepX * 0.44));
+            return (
+              <g key={`bar-${i}`}>
+                <rect
+                  x={cx - singleW / 2}
+                  y={195 - h0}
+                  width={singleW}
+                  height={h0}
+                  rx={r}
+                  fill={seriesPalette[i % 2 === 0 ? 0 : 1]}
+                />
+                <text
+                  x={cx}
+                  y={195 - h0 - 6}
+                  textAnchor="middle"
+                  fill={palette.text}
+                  fontSize="11"
+                  fontWeight="700"
+                  fontFamily={monoFont}
+                >
+                  {v0}
+                </text>
+                <text
+                  x={cx}
+                  y="214"
+                  textAnchor="middle"
+                  fill={palette.muted}
+                  fontSize="10.5"
+                  fontFamily={monoFont}
+                >
+                  {cat.slice(0, 10)}
+                </text>
+              </g>
+            );
+          }
+
+          const groupW = Math.min(54, stepX * 0.72);
+          const gap = 3;
+          const barW = Math.max(6, (groupW - gap * (sCount - 1)) / sCount);
+          const startX = cx - groupW / 2;
+
+          return (
+            <g key={`bar-grp-${i}`}>
+              {seriesList.map((ser, sIdx) => {
+                const v = Math.max(0, Number(ser.values[i]) || 0);
+                const h = Number(((v / maxV) * 168).toFixed(1));
+                const bx = startX + sIdx * (barW + gap);
+                const isLead = hasMultiSeries ? sIdx === 0 : sIdx === sCount - 1;
+                const fill = !hasMultiSeries && sCount === 2 && sIdx === 0
+                  ? palette.chartColors[2]
+                  : seriesPalette[sIdx % seriesPalette.length];
+                return (
+                  <g key={`bar-${i}-${sIdx}`}>
+                    <rect
+                      x={bx}
+                      y={195 - h}
+                      width={barW}
+                      height={h}
+                      rx={Math.min(r, 3)}
+                      fill={fill}
+                      opacity={!hasMultiSeries && sCount === 2 && sIdx === 0 ? 0.75 : 1}
+                    />
+                    {isLead && (
+                      <text
+                        x={bx + barW / 2}
+                        y={195 - h - 5}
+                        textAnchor="middle"
+                        fill={palette.text}
+                        fontSize="10"
+                        fontWeight="700"
+                        fontFamily={monoFont}
+                      >
+                        {v}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+              <text
+                x={cx}
+                y="214"
+                textAnchor="middle"
+                fill={palette.muted}
+                fontSize="10.5"
+                fontFamily={monoFont}
+              >
+                {cat.slice(0, 10)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    );
+  };
+
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-      {renderTopChrome(ctx, "数据洞察与增长曲线", "04 / DATA INSIGHT")}
-
-      <h3
-        style={{
-          fontFamily: headingFont,
-          fontWeight: typography.titleWeight,
-          letterSpacing: typography.titleTracking,
-          fontSize: isConsulting ? "23px" : "26px",
-          lineHeight: 1.25,
-          margin: "0 0 18px 0",
-          color: palette.text,
-        }}
-      >
-        {slideData?.title ||
-          "核心转化效率实现 2.6 倍跃升，单位履约成本同比下降 38%"}
-      </h3>
+      {renderTopChrome(ctx, topTagLeft, topTagRight)}
+      {headlineNode}
 
       <div
         style={{
@@ -482,6 +1259,7 @@ export function renderData(ctx: SlideRenderContext) {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
+              gap: "8px",
               marginBottom: "10px",
             }}
           >
@@ -492,199 +1270,46 @@ export function renderData(ctx: SlideRenderContext) {
                 color: palette.text,
               }}
             >
-              {isSingle ? "关键量化指标实证分布" : "季度核心效能指数对比（基准 vs 优化后）"}
+              {chartHeaderTitle}
             </span>
-            {isSingle ? null : (
+            {seriesList.length > 1 && displayMode !== "doughnut" ? (
               <div
                 style={{
                   display: "flex",
-                  gap: "12px",
+                  flexWrap: "wrap",
+                  gap: "10px",
                   fontFamily: monoFont,
-                  fontSize: "10.5px",
+                  fontSize: "10px",
                   color: palette.muted,
                 }}
               >
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
-                  <span
-                    style={{
-                      width: "8px",
-                      height: "8px",
-                      background: palette.chartColors[2],
-                      display: "inline-block",
-                    }}
-                  />
-                  基准方案
-                </span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
-                  <span
-                    style={{
-                      width: "8px",
-                      height: "8px",
-                      background: palette.chartColors[0],
-                      display: "inline-block",
-                    }}
-                  />
-                  新架构
-                </span>
-              </div>
-            )}
-          </div>
-
-          <svg
-            viewBox="0 0 430 225"
-            style={{ width: "100%", flex: 1, overflow: "visible" }}
-            role="img"
-            aria-label={isSingle ? "关键量化指标柱状图" : "季度核心效能对比柱状与趋势图"}
-          >
-            {ticks.map((tick, tIdx) => {
-              const y = 195 - (tick / maxV) * 168;
-              return (
-                <g key={`tick-${tIdx}`}>
-                  <line
-                    x1="38"
-                    y1={y}
-                    x2="416"
-                    y2={y}
-                    stroke={palette.border}
-                    strokeDasharray={tIdx === 0 ? "none" : "3 3"}
-                    strokeWidth="1"
-                  />
-                  <text
-                    x="30"
-                    y={y + 4}
-                    textAnchor="end"
-                    fill={palette.muted}
-                    fontSize="10"
-                    fontFamily={monoFont}
-                  >
-                    {tick}
-                  </text>
-                </g>
-              );
-            })}
-
-            {bars.map((b, i) => {
-              const cx = 44 + i * stepX + stepX / 2;
-              const v2 = Math.max(0, Number(b.v2) || 0);
-              const h2 = (v2 / maxV) * 168;
-              const r = Math.min(radius, 4);
-              if (isSingle) {
-                const singleW = Math.min(36, Math.max(16, stepX * 0.44));
-                return (
-                  <g key={`bar-${i}`}>
-                    <rect
-                      x={cx - singleW / 2}
-                      y={195 - h2}
-                      width={singleW}
-                      height={h2}
-                      rx={r}
-                      fill={palette.chartColors[i === 0 ? 0 : i % 2 === 0 ? 0 : 1]}
-                    />
-                    <text
-                      x={cx}
-                      y={195 - h2 - 6}
-                      textAnchor="middle"
-                      fill={palette.text}
-                      fontSize="11"
-                      fontWeight="700"
-                      fontFamily={monoFont}
-                    >
-                      {v2}
-                    </text>
-                    <text
-                      x={cx}
-                      y="214"
-                      textAnchor="middle"
-                      fill={palette.muted}
-                      fontSize="10.5"
-                      fontFamily={monoFont}
-                    >
-                      {b.label}
-                    </text>
-                  </g>
-                );
-              }
-              const barW = Math.min(24, Math.max(12, stepX * 0.28));
-              const v1 = Math.max(0, Number(b.v1) || 0);
-              const h1 = (v1 / maxV) * 168;
-              return (
-                <g key={`bar-${i}`}>
-                  <rect
-                    x={cx - barW - 3}
-                    y={195 - h1}
-                    width={barW}
-                    height={h1}
-                    rx={r}
-                    fill={palette.chartColors[2]}
-                    opacity="0.72"
-                  />
-                  <rect
-                    x={cx + 3}
-                    y={195 - h2}
-                    width={barW}
-                    height={h2}
-                    rx={r}
-                    fill={palette.chartColors[0]}
-                  />
-                  <text
-                    x={cx + 3 + barW / 2}
-                    y={195 - h2 - 6}
-                    textAnchor="middle"
-                    fill={palette.text}
-                    fontSize="11"
-                    fontWeight="700"
-                    fontFamily={monoFont}
-                  >
-                    {v2}
-                  </text>
-                  <text
-                    x={cx}
-                    y="214"
-                    textAnchor="middle"
-                    fill={palette.muted}
-                    fontSize="11"
-                    fontFamily={monoFont}
-                  >
-                    {b.label}
-                  </text>
-                </g>
-              );
-            })}
-
-            {isSingle ? null : (
-              <>
-                <polyline
-                  fill="none"
-                  stroke={palette.chartColors[1]}
-                  strokeWidth="2.5"
-                  points={bars
-                    .map((b, i) => {
-                      const cx = 44 + i * stepX + stepX / 2;
-                      const barW = Math.min(24, Math.max(12, stepX * 0.28));
-                      const v2 = Math.max(0, Number(b.v2) || 0);
-                      return `${cx + 3 + barW / 2},${195 - (v2 / maxV) * 168}`;
-                    })
-                    .join(" ")}
-                />
-                {bars.map((b, i) => {
-                  const cx = 44 + i * stepX + stepX / 2;
-                  const barW = Math.min(24, Math.max(12, stepX * 0.28));
-                  const v2 = Math.max(0, Number(b.v2) || 0);
+                {seriesList.map((ser, sIdx) => {
+                  const swatch =
+                    !hasMultiSeries && seriesList.length === 2 && sIdx === 0
+                      ? palette.chartColors[2]
+                      : seriesPalette[sIdx % seriesPalette.length];
                   return (
-                    <circle
-                      key={`dot-${i}`}
-                      cx={cx + 3 + barW / 2}
-                      cy={195 - (v2 / maxV) * 168}
-                      r="4"
-                      fill={palette.surface}
-                      stroke={palette.chartColors[1]}
-                      strokeWidth="2.5"
-                    />
+                    <span
+                      key={`leg-${sIdx}`}
+                      style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
+                    >
+                      <span
+                        style={{
+                          width: "8px",
+                          height: "8px",
+                          background: swatch,
+                          display: "inline-block",
+                        }}
+                      />
+                      {ser.name.slice(0, 10)}
+                    </span>
                   );
                 })}
-              </>
-            )}
-          </svg>
+              </div>
+            ) : null}
+          </div>
+
+          {renderChartSvg()}
         </div>
 
         {/* Right KPI Stack */}

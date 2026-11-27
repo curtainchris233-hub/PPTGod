@@ -19,11 +19,13 @@ export const ALLOWED_UPLOAD_EXTENSIONS = [
   "pdf",
   "docx",
   "pptx",
+  "xlsx",
+  "csv",
   "md",
   "txt",
 ] as const;
 export type AllowedUploadExtension = (typeof ALLOWED_UPLOAD_EXTENSIONS)[number];
-export const UPLOAD_ACCEPT_ATTR = ".pdf,.docx,.pptx,.md,.txt";
+export const UPLOAD_ACCEPT_ATTR = ".pdf,.docx,.pptx,.xlsx,.csv,.md,.txt";
 
 const ALLOWED_EXT_SET = new Set<string>(ALLOWED_UPLOAD_EXTENSIONS);
 const IMAGE_EXTENSIONS = new Set<string>([
@@ -41,6 +43,7 @@ const IMAGE_EXTENSIONS = new Set<string>([
 
 export type UploadValidationErrorCode =
   | "legacy-doc"
+  | "legacy-xls"
   | "unsupported-image"
   | "unsupported-ext"
   | "empty"
@@ -106,6 +109,19 @@ export function validateUploadFile(
     };
   }
 
+  if (ext === "xls") {
+    return {
+      ok: false,
+      error: {
+        fileName: file.name,
+        fileSize: file.size,
+        code: "legacy-xls",
+        message:
+          "检测到旧版二进制 .xls 格式，请先在 Excel / WPS 中另存为标准 .xlsx 或 .csv 格式后再上传",
+      },
+    };
+  }
+
   if (IMAGE_EXTENSIONS.has(ext) || file.type.startsWith("image/")) {
     return {
       ok: false,
@@ -114,7 +130,7 @@ export function validateUploadFile(
         fileSize: file.size,
         code: "unsupported-image",
         message:
-          "暂不支持图片文件 OCR 解析，请上传 .pdf、.docx、.pptx、.md、.txt 文档（或先提取文字后粘贴）",
+          "暂不支持图片文件 OCR 解析，请上传 .pdf、.docx、.pptx、.xlsx、.csv、.md、.txt 文档（或先提取文字后粘贴）",
       },
     };
   }
@@ -126,7 +142,7 @@ export function validateUploadFile(
         fileName: file.name,
         fileSize: file.size,
         code: "unsupported-ext",
-        message: `不支持的文件类型「.${ext || "未知"}」，仅支持 .pdf、.docx、.pptx、.md、.txt 文档`,
+        message: `不支持的文件类型「.${ext || "未知"}」，仅支持 .pdf、.docx、.pptx、.xlsx、.csv、.md、.txt 文档`,
       },
     };
   }
@@ -190,6 +206,9 @@ function getExtBadgeTone(ext: string): string {
       return "docx";
     case "pptx":
       return "pptx";
+    case "xlsx":
+    case "csv":
+      return "xlsx";
     default:
       return "doc";
   }
@@ -208,7 +227,7 @@ export function UploadDropzone({
   uploading = false,
   disabled = false,
   title,
-  hint = "支持 PDF、Word (.docx)、PPT (.pptx)、Markdown、TXT（单文件 ≤ 10 MB）",
+  hint = "支持 PDF、Word (.docx)、PPT (.pptx)、Excel (.xlsx)、CSV、Markdown、TXT（单文件 ≤ 10 MB）",
   buttonLabel = "选择文件",
   error,
   inputId,

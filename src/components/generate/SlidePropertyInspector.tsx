@@ -11,6 +11,7 @@ import {
   ALL_SLIDE_TYPES,
   SLIDE_TYPE_LABELS,
   SOURCE_STATUS_LABELS,
+  type DataDisplayMode,
   type DeckSlideItem,
   type LayoutArchetype,
   type SlideSourceStatus,
@@ -561,9 +562,30 @@ export default function SlidePropertyInspector({
           </div>
         ))}
 
-      {/* Data editor: bars + KPIs */}
+      {/* Data editor: display mode + bars + KPIs */}
       {currentSlide.slideType === "data" && (
         <>
+          <div className="pg-field">
+            <label htmlFor="pg-edit-data-display">数据呈现形态（画布 / HTML / PPTX 三端同步）</label>
+            <select
+              id="pg-edit-data-display"
+              value={currentSlide.dataDisplay || "col"}
+              onChange={(e) =>
+                onUpdateSlide(
+                  { dataDisplay: e.target.value as DataDisplayMode },
+                  false
+                )
+              }
+            >
+              <option value="col">竖向柱状图</option>
+              <option value="bar">横向对比条</option>
+              <option value="line">趋势折线图</option>
+              <option value="doughnut">占比环形图</option>
+              <option value="kpi-only">纯大数字英雄卡</option>
+              <option value="data-matrix">三线数据矩阵</option>
+            </select>
+          </div>
+
           <div className="pg-gen-subcard">
             <span className="pg-gen-subcard-title">柱状图数据序列</span>
             {(currentSlide.bars || []).map((bar, bIdx) => (
