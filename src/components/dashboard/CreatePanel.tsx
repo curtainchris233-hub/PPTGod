@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
+  ClipboardList,
   FileText,
   Languages,
   LayoutTemplate,
@@ -15,6 +16,7 @@ import { Button, Select, Tabs, TextInput, Textarea } from "@/components/ui";
 import type { SelectOption } from "@/components/ui";
 import { saveDocIntakeHandoff } from "@/lib/docIntakeHandoff";
 import { analyzeDocumentAndRecommendStyles } from "@/lib/documentAnalyzer";
+import { savePackHandoff } from "@/lib/promptPack";
 import {
   EVIDENCE_DENSITY_LABELS,
   type EvidenceDensity,
@@ -165,6 +167,21 @@ export default function CreatePanel({
       fileType: "paste",
       scenarioFromText: true,
     });
+  };
+
+  /** Prompt Pack path: hand the pasted material to /pack (auto-generates there). */
+  const handleSendToPack = () => {
+    const clean = pasteText.trim();
+    if (clean.length >= 20) {
+      savePackHandoff({
+        text: clean,
+        fileName: "粘贴的资料",
+        topic: topic.trim() || undefined,
+        audience,
+        slideCount: Number(slideCount),
+      });
+    }
+    router.push("/pack");
   };
 
   const handleCreateFromTemplate = () => {
@@ -347,6 +364,16 @@ export default function CreatePanel({
             {advancedFields}
             <div className="gl-dash-create-footer">
               {paramsRow}
+              <Button
+                variant="secondary"
+                size="md"
+                leftIcon={<ClipboardList size={15} />}
+                onClick={handleSendToPack}
+                id="pg-pack-from-paste-btn"
+                title="生成可复制到 ChatGPT / Gamma / Kimi / Claude 的风格提示词 + 逐页大纲"
+              >
+                生成提示词包
+              </Button>
               <Button
                 variant="primary"
                 size="md"

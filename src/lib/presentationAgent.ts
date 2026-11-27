@@ -6,12 +6,13 @@ import {
   type ProviderConfig,
 } from "@/lib/providerRequest";
 
-type AgentTask = "outline" | "generate" | "polish";
+type AgentTask = "outline" | "generate" | "polish" | "promptpack";
 
 const TASK_SETTINGS = {
   outline: { name: "Presentation outline", temperature: 0.45, timeoutMs: 45_000, maxOutputTokens: 6000 },
   generate: { name: "Presentation slides", temperature: 0.5, timeoutMs: 45_000, maxOutputTokens: 16_000 },
   polish: { name: "Presentation slide editor", temperature: 0.45, timeoutMs: 35_000, maxOutputTokens: 2500 },
+  promptpack: { name: "Presentation prompt pack", temperature: 0.5, timeoutMs: 60_000, maxOutputTokens: 10_000 },
 } as const;
 
 export async function generatePresentationJson({

@@ -343,6 +343,8 @@ def g3_flow_04_cross_route_creator_journey(ctx: TestContext) -> None:
 
 
 def get_specs() -> list[TestSpec]:
+    from .tier3_prompt_pack import get_specs as get_pack_specs
+
     return [
         TestSpec(
             "G3_FLOW_01",
@@ -376,4 +378,4 @@ def get_specs() -> list[TestSpec]:
             ("ui", "flow", "journey"),
             True,
         ),
-    ]
+    ] + get_pack_specs()

@@ -125,6 +125,97 @@
   margin-left: auto;
 }
 
+.gl-dash-create-footer > .gl-btn + .gl-btn {
+  margin-left: 0;
+}
+
+/* --- Prompt Pack promo strip (→ /pack) ------------------------------------- */
+.gl-dash-pack-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--gl-space-4);
+  min-width: 0;
+  padding: 14px 18px;
+  border: 1px solid var(--gl-info-border);
+  border-radius: var(--gl-radius-lg);
+  background: linear-gradient(100deg, #ffffff 0%, #eaf2ff 60%, #e0ecff 100%);
+  box-shadow: var(--gl-shadow-sm);
+  color: var(--gl-text);
+  text-decoration: none;
+  transition: box-shadow var(--gl-dur-hover, 150ms) var(--gl-ease, ease),
+    transform var(--gl-dur-hover, 150ms) var(--gl-ease, ease);
+}
+
+.gl-dash-pack-strip:hover {
+  box-shadow: var(--gl-shadow-md);
+  transform: translateY(-1px);
+}
+
+.gl-dash-pack-strip:focus-visible {
+  outline: 2px solid var(--gl-focus);
+  outline-offset: 2px;
+}
+
+.gl-dash-pack-strip-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--gl-radius-md);
+  background: var(--gl-primary-gradient);
+  color: #fff;
+  box-shadow: var(--gl-shadow-primary);
+}
+
+.gl-dash-pack-strip-text {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.gl-dash-pack-strip-text strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.gl-dash-pack-strip-text span {
+  font-size: 13px;
+  color: var(--gl-text-secondary);
+  line-height: 1.5;
+}
+
+.gl-dash-pack-strip-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: var(--gl-radius-btn);
+  background: var(--gl-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .gl-dash-pack-strip {
+    flex-wrap: wrap;
+  }
+  .gl-dash-pack-strip-cta {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gl-dash-pack-strip {
+    transition: none;
+  }
+}
+
 .gl-dash-params {
   display: flex;
   align-items: center;
