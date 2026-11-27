@@ -4,6 +4,7 @@ import React, { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
+  ClipboardList,
   Folder,
   HelpCircle,
   Home,
@@ -30,6 +31,7 @@ export interface WorkspaceNavItem {
 
 export const WORKSPACE_NAV_ITEMS: readonly WorkspaceNavItem[] = [
   { key: "home", label: "首页", href: "/", icon: Home },
+  { key: "pack", label: "提示词包", href: "/pack", icon: ClipboardList },
   { key: "create-deck", label: "新建演示", href: "/generate", icon: PlusSquare },
   { key: "projects", label: "我的项目", href: "/collections", icon: Folder },
   { key: "gallery", label: "风格画廊", href: "/gallery", icon: LayoutGrid },
@@ -64,6 +66,8 @@ export function isWorkspaceNavActive(
   switch (key) {
     case "home":
       return pathname === "/";
+    case "pack":
+      return pathname === "/pack" || pathname.startsWith("/pack/");
     case "create-deck":
       return pathname === "/generate" && panel !== "audit";
     case "projects":

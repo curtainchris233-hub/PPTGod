@@ -4,7 +4,7 @@
 
 **复杂留给系统，简洁留给用户 · 冰川白玻璃拟态 AI 演示文稿创作平台**
 
-丢入 PDF / Word / PPTX / Markdown，自动推风格、编提示词、生成可编辑幻灯片，直出原生 `.pptx` 与离线 `.html`
+丢入论文、课本或报告，一键得到 **定制风格 + 逐页大纲的「提示词包」**，直接粘贴到 ChatGPT / Gamma / Kimi / Claude；也可在站内生成原生 `.pptx` 与离线 `.html`
 
 ![Next.js 16](https://img.shields.io/badge/Next.js-16.4-172033?style=flat-square&logo=nextdotjs)
 ![React 19](https://img.shields.io/badge/React-19-172033?style=flat-square&logo=react)
@@ -28,6 +28,7 @@
 | 核心维度 | 工程落地与体验标准 |
 | --- | --- |
 | **Glacier UI 2.0 冰川白系统** | `70%` 实用留白 / `20%` 冰川玻璃拟态 / `10%` AI 科技蓝点缀（`#F0F6FC` 页面底、`#E7F1FB` 冰蓝舞台、`#2563EB` 主色、`#14243C` 深海墨字）；`@supports (backdrop-filter: blur(12px))` 仅用于顶栏、浮层与首屏核心卡，卡片网格采用纯白实底 + `content-visibility: auto`，全面支持 `prefers-reduced-motion` |
+| **资料 → 提示词包（核心）** | `/pack` 把资料变成可直接粘贴到外部 AI 工具的总提示词：6 色 HEX 色板 + 字体 + 版式语法 + 必须/避免规则，配合 11 种版式交替的逐页大纲；数字只取自原文，资料不够就如实少出页，不凑空洞内容 |
 | **端到端演示创作工作流** | 从 `/` 首页输入主题或拖入资料 → `/gallery` 36 套实时 16:9 画布选风格 → `/generate` 4 步向导规划大纲 → 全屏沉浸式编辑器逐页精修与 AI 润色 → 导出原生 `.pptx` / 离线 `.html` / Marp / 演讲提纲 `.md`，或直达 `/deck/[id]?rehearsal=1` 分屏提词排练 |
 | **纯本地工具与隐私隔离** | `/tools` 工具箱纯浏览器本地运行（时长节拍、PPTX 体检换肤、抽色 WCAG 校核、Visual Director v2 生图导演词）；BYOK 自定义大模型 Key 仅当次请求透传、永不落盘；私有风格与私有文稿全链路 `404` 严格隔离 |
 | **诚实能力边界（`B1–B16`）** | 严格剔除无后端支撑的示意性伪造控件：零假 Pro 付费卡、零假通知铃铛、零假反馈表单、零假协作/回收站/分组、零伪造 `%` 进度条、零假语音评分、零未实现的编辑器自由形状/动画工具 |
@@ -72,6 +73,22 @@
 ---
 
 ## 核心引擎能力深度解析
+
+### 0. 资料 → 提示词包（`/pack`）· 定制风格 × 逐页大纲 × 多工具适配
+
+多数人的真实流程是：把资料丢给 ChatGPT，让它先想风格提示词，再生成 PPT。`/pack` 把这一步做成可复用的工作台。粘贴或上传资料（也可以用 3 份内置示例：*Attention Is All You Need* 精读笔记、高中物理《牛顿第二定律》教案、示例 SaaS 季度经营复盘），得到一份能直接复制走的「提示词包」：
+
+| 环节 | 实现方式 |
+| --- | --- |
+| **① 资料洞察** | 识别章节结构、场景、受众与时长，抽取原文中的数字事实（带单位、去除年份噪音） |
+| **② 定制风格** | 11 个有真实参照的设计方向（Nature 期刊、教材插画、麦肯锡咨询、Apple Keynote、新中式等），按资料关键词与场景自动匹配；输出 6 色 HEX（对比度约束）、图表色序列、中英字体、版式语法、图片/图表规范与必须/避免清单；可一键换风格，大纲内容保持不变 |
+| **③ 逐页大纲** | 从 11 种版式中交替选用：封面、目录、大数字、图表、对比、时间线、流程、金句、图文、总结等。每页包含要点、数据、视觉建议、演讲备注和出处，均可在线编辑、排序、增删 |
+| **④ 多工具导出** | 按工具分别排版：ChatGPT（python-pptx 直出 `.pptx`）、Gamma（两段式：额外指令 + `---` 分卡正文）、Kimi、Claude（单文件 HTML 幻灯片）以及通用 Markdown；支持一键复制、下载 `.md`，也可交给站内工坊生成 `.pptx` |
+| **⑤ 引擎与诚实边界** | 浏览器里配置了 BYOK Key 时，由大模型定制风格与大纲，再经服务端净化：HEX 校验、版式白名单，数字不在原文中的数据会被丢弃。没有 Key 或调用失败时，自动回退到内置规则引擎，并展示回退原因。不显示伪造的进度百分比，API Key 只存在当前标签页 |
+
+<p align="center">
+  <img src="./docs/showcase/glacier_v2/12-prompt-pack.png" alt="提示词包工作台 /pack：资料洞察、定制风格色板、风格示意与多工具导出" width="100%" />
+</p>
 
 ### 1. 资料直通车引擎 · 6 类材料分流 × 证据契约 × 双样张校准
 
@@ -127,6 +144,7 @@
 | 路由 | 页面与核心能力 |
 | --- | --- |
 | `/` | **工作台首页 Dashboard**：AI 生成 / 资料转 PPT / 从模板新建、文档拖拽上传、同内容 3 风格实时对比、推荐风格、真实最近项目与快速工具；携带旧画廊查询参数时服务端自动重定向至 `/gallery` |
+| `/pack` | **提示词包工作台**：粘贴/上传/示例资料 → 定制风格（HEX 色板、字体、版式语法）+ 可编辑逐页大纲 → 按 ChatGPT / Gamma / Kimi / Claude / 通用格式导出；首页「资料转 PPT」可一键带入 |
 | `/gallery` | **风格画廊**：36 套全领域 `VisualSpec` 模板、实时统计 5 大人群分类、多维筛选与 URL 同步、详情抽屉（12 页型 + Hex 色板）、30 秒智能选词与资料直通车 |
 | `/generate` | **创作工坊 & 演示编辑器**：支持 `?style=`、`?topic=`、`?deck=`、`?handoff=1`、`?intake=1`、`?mode=create\|editor`、`?panel=audit` |
 | `/collections` | **我的项目与个人空间**：全部项目 / 最近编辑 / 公开分享 / 我收藏的 / 我发布的 / 我点赞的，完整项目 CRUD 与个人资料编辑 |
@@ -216,7 +234,7 @@ npm run typecheck
 npm run lint
 npm run build
 
-# 列出 Glacier UI 2.0 全部 79 项 4-Tier 用例
+# 列出 Glacier UI 2.0 全部 83 项 4-Tier 用例
 npm run test:e2e:list
 
 # 在独立端口 3010 启动生产构建后运行全量端到端验证（勿对 3000 端口运行）
@@ -232,5 +250,5 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_gla
 | --- | --- |
 | [docs/PPTGod_Glacier_UI_2.0_Development_Spec.md](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) | Glacier UI 2.0 视觉与开发执行规范（Tokens、组件、页面、响应式、验收清单） |
 | [docs/PROJECT.md](./docs/PROJECT.md) | Glacier UI 2.0 架构、功能清单 `F1–F41`、能力边界 `B1–B16` 与里程碑记录 |
-| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 79 项 4-Tier E2E 测试基础设施说明 |
+| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 83 项 4-Tier E2E 测试基础设施说明 |
 | [docs/PPTGod_UI_Design_Spec.md](./docs/PPTGod_UI_Design_Spec.md) | 冰川白工作台早期设计规范与首页改版对照图 |

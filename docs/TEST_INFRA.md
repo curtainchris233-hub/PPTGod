@@ -37,7 +37,7 @@
 
 ## 2. Authoritative 4-Tier E2E Package Layout (`tests/e2e/glacier_v2/**`)
 
-Obsolete v8 `tests/e2e/{config,helpers,run_e2e,tier1..tier10}.py` have been retired; `tests/e2e/glacier_v2/` is the single authoritative 79-test E2E suite (invocable via `npm run test:e2e` / `npm run test:e2e:list`):
+Obsolete v8 `tests/e2e/{config,helpers,run_e2e,tier1..tier10}.py` have been retired; `tests/e2e/glacier_v2/` is the single authoritative 83-test E2E suite (invocable via `npm run test:e2e` / `npm run test:e2e:list`):
 
 ```text
 tests/e2e/glacier_v2/
@@ -157,10 +157,11 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 \
 - `G3_FLOW_01`: Client-side URL & query sync regressions (`/generate` ↔ Sidebar `设计体检` `/generate?panel=audit` ↔ `返回工坊` ↔ `?mode=editor`/`?mode=create`; Topbar global search while already on `/gallery`; `/tools` ↔ Sidebar `?tab=pacing`; `/collections` `?tab=` sync).
 - `G3_FLOW_02`: Browser-local BYOK closed loop (`SettingsModal` ↔ Full-Bleed Editor reactive state sync, verifying `apiKey` lives strictly in `sessionStorage` and NEVER in `localStorage` or SQLite — `S22`).
 - `G3_FLOW_03`: Workshop Advanced Settings end-to-end parameter forwarding (`evidenceDensity: "high-evidence"` + `.pptx` auto-defaulted `routeMode: "beautify-1to1"` verified on `POST /api/generate`).
+- `G3_PACK_01..04`: Prompt Pack `/pack` workbench — sample → rule-engine pack (textbook direction auto-pick, outline/preview/export panels), tool tabs switch master prompt + clipboard copy, outline edit/add/delete reflected in prompt, homepage `CreatePanel` hand-off and broken-BYOK honest fallback notice.
 - `G3_FLOW_04`: Full cross-route creator journey (`/generate` → generate deck → Cloud Save → `/collections` verify saved card → `/deck/[id]?rehearsal=1` Rehearsal Cockpit → LIFO cleanup).
 
 ### Tier 4 — 5-Breakpoint RWD Gate, Mobile Editor Ergonomics & Glacier Visual Parity (`tier4_scenarios_rwd_perf.py` — 7 Tests)
-- `G4_RWD_01..05`: Isolated per-breakpoint (`1920`, `1440`, `1024`, `768`, `390px`) zero horizontal overflow (`scrollWidth <= innerWidth + 1`) and zero console/page error checks across all 9 routes (`/`, `/gallery`, `/generate`, `/generate?mode=editor`, `/collections`, `/tools`, `/compare`, `/creator/pptgod_lab`, `/studio/apple-soft-bento-modular`).
+- `G4_RWD_01..05`: Isolated per-breakpoint (`1920`, `1440`, `1024`, `768`, `390px`) zero horizontal overflow (`scrollWidth <= innerWidth + 1`) and zero console/page error checks across all 10 routes (`/`, `/pack`, `/gallery`, `/generate`, `/generate?mode=editor`, `/collections`, `/tools`, `/compare`, `/creator/pptgod_lab`, `/studio/apple-soft-bento-modular`).
 - `G4_RWD_06`: Mobile `390×844` Presentation Editor horizontal filmstrip anti-truncation check (card width `≥165px`, slide type label visible, inactive action bars hidden) + collapsible right inspector toggle (`aria-expanded` & zero overflow).
 - `G4_VISUAL_01`: Glacier UI 2.0 secondary-page visual parity (`/creator/pptgod_lab` & `/studio/apple-soft-bento-modular` sans-serif UI headings, `StyleCard` + `StyleDetailDrawer` on Creator Profile, zero double horizontal padding inside `.gl-main-inner`).
 

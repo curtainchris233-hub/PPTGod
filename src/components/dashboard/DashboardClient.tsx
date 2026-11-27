@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CloudUpload } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, ClipboardList, CloudUpload } from "lucide-react";
 import DocIntakeWorkbench, {
   type DocIntakeParsedState,
 } from "@/components/DocIntakeWorkbench";
@@ -223,6 +224,21 @@ export default function DashboardClient({ prompts }: DashboardClientProps) {
         }
         subtitle="从一个主题、一个文档，或一段想法，快速生成高质量的 PPT"
       />
+
+      <Link href="/pack" className="gl-dash-pack-strip" id="pg-pack-home-cta">
+        <span className="gl-dash-pack-strip-icon" aria-hidden="true">
+          <ClipboardList size={18} />
+        </span>
+        <span className="gl-dash-pack-strip-text">
+          <strong>资料 → 提示词包</strong>
+          <span>
+            上传论文、课本或报告，得到定制风格（色板 / 字体 / 版式）+ 逐页大纲，一键复制到 ChatGPT、Gamma、Kimi、Claude
+          </span>
+        </span>
+        <span className="gl-dash-pack-strip-cta">
+          生成提示词包 <ArrowRight size={15} aria-hidden="true" />
+        </span>
+      </Link>
 
       <div className="gl-dash-row gl-dash-row--create">
         <CreatePanel

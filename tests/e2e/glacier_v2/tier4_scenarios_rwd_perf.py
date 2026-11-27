@@ -34,6 +34,7 @@ _CORE_RWD_ROUTES: tuple[str, ...] = (
     "/compare",
     f"/creator/{ACCOUNT_OFFICIAL.username}",
     "/studio/apple-soft-bento-modular",
+    "/pack",
 )
 
 
@@ -226,11 +227,11 @@ def g4_visual_01_glacier_secondary_page_parity(ctx: TestContext) -> None:
 
 def get_specs() -> list[TestSpec]:
     return [
-        TestSpec("G4_RWD_01", 4, "Wide 1920px zero horizontal overflow across 9 routes", g4_rwd_01_wide_1920, ("ui", "rwd"), True),
-        TestSpec("G4_RWD_02", 4, "Desktop 1440px zero horizontal overflow across 9 routes", g4_rwd_02_desktop_1440, ("ui", "rwd"), True),
-        TestSpec("G4_RWD_03", 4, "Laptop 1024px zero horizontal overflow across 9 routes", g4_rwd_03_laptop_1024, ("ui", "rwd"), True),
-        TestSpec("G4_RWD_04", 4, "Tablet 768px zero horizontal overflow across 9 routes", g4_rwd_04_tablet_768, ("ui", "rwd"), True),
-        TestSpec("G4_RWD_05", 4, "Mobile 390px zero horizontal overflow across 9 routes", g4_rwd_05_mobile_390, ("ui", "rwd"), True),
+        TestSpec("G4_RWD_01", 4, "Wide 1920px zero horizontal overflow across 10 routes", g4_rwd_01_wide_1920, ("ui", "rwd"), True),
+        TestSpec("G4_RWD_02", 4, "Desktop 1440px zero horizontal overflow across 10 routes", g4_rwd_02_desktop_1440, ("ui", "rwd"), True),
+        TestSpec("G4_RWD_03", 4, "Laptop 1024px zero horizontal overflow across 10 routes", g4_rwd_03_laptop_1024, ("ui", "rwd"), True),
+        TestSpec("G4_RWD_04", 4, "Tablet 768px zero horizontal overflow across 10 routes", g4_rwd_04_tablet_768, ("ui", "rwd"), True),
+        TestSpec("G4_RWD_05", 4, "Mobile 390px zero horizontal overflow across 10 routes", g4_rwd_05_mobile_390, ("ui", "rwd"), True),
         TestSpec(
             "G4_RWD_06",
             4,
