@@ -37,7 +37,7 @@
 
 ## 2. Authoritative 4-Tier E2E Package Layout (`tests/e2e/glacier_v2/**`)
 
-Obsolete v8 `tests/e2e/{config,helpers,run_e2e,tier1..tier10}.py` have been retired; `tests/e2e/glacier_v2/` is the single authoritative 87-test E2E suite (invocable via `npm run test:e2e` / `npm run test:e2e:list`):
+Obsolete v8 `tests/e2e/{config,helpers,run_e2e,tier1..tier10}.py` have been retired; `tests/e2e/glacier_v2/` is the single authoritative 89-test E2E suite (invocable via `npm run test:e2e` / `npm run test:e2e:list`):
 
 ```text
 tests/e2e/glacier_v2/
@@ -56,7 +56,8 @@ tests/e2e/glacier_v2/
 ├── tier1_features.py             # Tier 1 (29 tests): 12 core API happy paths (G1_API_01..12) + 17 Glacier UI route tests
 ├── tier2_boundaries.py           # Tier 2 (39 tests): 12 API boundaries + 11 UI guards + 16 Honest Boundaries (B1-B16)
 ├── tier3_interactions.py         # Tier 3 (4 tests): Client-side URL query sync, browser-local BYOK loop (S22), Workshop density/routeMode & cross-route journey
-├── tier4_scenarios_rwd_perf.py   # Tier 4 (7 tests): 5 per-breakpoint 9-route zero-overflow gates (1920/1440/1024/768/390px), 390px Editor filmstrip/inspector & Glacier parity
+├── tier3_prompt_pack.py          # Tier 3 (10 tests): Prompt Pack (/pack) contracts, BYOK presets/SSRF, multi-tool copy, density, 1-click .pptx/.html & lossless editor handoff
+├── tier4_scenarios_rwd_perf.py   # Tier 4 (7 tests): 5 per-breakpoint 10-route zero-overflow gates (1920/1440/1024/768/390px), 390px Editor filmstrip/inspector & Glacier parity
 └── run_glacier_e2e.py            # Unified CLI runner (default http://127.0.0.1:3010; refuses port 3000 with exit code 2)
 ```
 
@@ -153,11 +154,11 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright /opt/pyenv/shims/python3 \
 | `G2_HONEST_15` | **B15** | Unconditional `#pg-param-lang` (`zh`→`en`→`bilingual`) alters compiled Studio prompt; Smart generation on `/generate` succeeds cleanly |
 | `G2_HONEST_16` | **B16** | Live 36 DOM `SlideCanvas` cards (zero raster slide mockups) & all 6 `#pg-domain-tab-*` badges match real DB counts (`36/11/5/6/9/7`) |
 
-### Tier 3 — Cross-Feature Interactions, URL Query Sync & Browser-Local BYOK (`tier3_interactions.py` — 4 Tests)
+### Tier 3 — Cross-Feature Interactions, URL Query Sync & Browser-Local BYOK (`tier3_interactions.py` + `tier3_prompt_pack.py` — 14 Tests)
 - `G3_FLOW_01`: Client-side URL & query sync regressions (`/generate` ↔ Sidebar `设计体检` `/generate?panel=audit` ↔ `返回工坊` ↔ `?mode=editor`/`?mode=create`; Topbar global search while already on `/gallery`; `/tools` ↔ Sidebar `?tab=pacing`; `/collections` `?tab=` sync).
 - `G3_FLOW_02`: Browser-local BYOK closed loop (`SettingsModal` ↔ Full-Bleed Editor reactive state sync, verifying `apiKey` lives strictly in `sessionStorage` and NEVER in `localStorage` or SQLite — `S22`).
 - `G3_FLOW_03`: Workshop Advanced Settings end-to-end parameter forwarding (`evidenceDensity: "high-evidence"` + `.pptx` auto-defaulted `routeMode: "beautify-1to1"` verified on `POST /api/generate`).
-- `G3_PACK_01..08`: Prompt Pack `/pack` workbench — sample → rule-engine pack (textbook direction auto-pick, outline/preview/export panels), tool tabs switch master prompt + clipboard copy, outline edit/add/delete reflected in prompt, homepage `CreatePanel` hand-off and broken-BYOK honest fallback notice.
+- `G3_PACK_01..10`: Prompt Pack `/pack` workbench — rule-engine contract & grounded data, broken-BYOK honest fallback, tool tabs & clipboard copy, 390px zero overflow, BYOK presets + `/api/byok/test` SSRF guard, Gamma two-part & ChatGPT two-step copy, inline HEX/data/note editing & 10-item history, `?style` anchor & >16k long-doc section picker, Assertion-Evidence titles + token-safe metrics + speaker/reading density prompts, and 1-click `.pptx`/`.html` binary downloads + lossless full-screen `/generate` Editor handoff.
 - `G3_FLOW_04`: Full cross-route creator journey (`/generate` → generate deck → Cloud Save → `/collections` verify saved card → `/deck/[id]?rehearsal=1` Rehearsal Cockpit → LIFO cleanup).
 
 ### Tier 4 — 5-Breakpoint RWD Gate, Mobile Editor Ergonomics & Glacier Visual Parity (`tier4_scenarios_rwd_perf.py` — 7 Tests)

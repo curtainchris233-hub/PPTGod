@@ -5,10 +5,12 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  Code2,
   Copy,
   Download,
   ExternalLink,
   Eye,
+  FileDown,
   FileJson,
   ImagePlus,
   Palette,
@@ -25,6 +27,7 @@ import {
 import SlideCanvas from "@/components/SlideCanvas";
 import { Button } from "@/components/ui";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import { exportStandaloneHtmlDeck } from "@/lib/htmlExporter";
 import { extractStyleFromImageData } from "@/lib/paletteExtractor";
 import {
   DESIGN_DIRECTIONS,
@@ -35,10 +38,12 @@ import {
   evaluatePackStyleContrast,
   extractedPaletteToPackStyle,
   getDesignDirection,
+  isWeakTopicTitle,
   newPackSlideId,
   packLayoutLabel,
   packSlideToCanvas,
   packStyleToVisualSpec,
+  packToDeckSlides,
   pickPreviewSlides,
   renderChatgptTwoStep,
   renderGammaParts,
@@ -48,6 +53,7 @@ import {
   serializePackJson,
   type ChatgptExportMode,
   type PackDatum,
+  type PackDensity,
   type PackLanguage,
   type PackLayout,
   type PackSlide,
@@ -566,6 +572,7 @@ export function PackOutlineEditor({
           const isPreviewed = activeSlideId === s.id;
           const isRefining = refiningSlideId === s.id;
           const canUndo = Boolean(undoMap?.[s.id]);
+          const weakTitle = isWeakTopicTitle(s.title, s.layout);
           return (
             <li
               key={s.id}
@@ -585,7 +592,10 @@ export function PackOutlineEditor({
                     if (nextOpen) onPreviewSlide?.(s.id);
                   }}
                 >
-                  <strong>{s.title}</strong>
+                  <strong>
+                    {s.title}
+                    {weakTitle ? <em className="gl-pack-weak-pill">建议写结论句</em> : null}
+                  </strong>
                   <span>
                     {s.layout === "agenda"
                       ? s.points.join(" / ")
@@ -643,8 +653,13 @@ export function PackOutlineEditor({
                     </select>
                   </label>
                   <label>
-                    <span>标题</span>
+                    <span>标题（建议写一句核心结论）</span>
                     <input value={s.title} maxLength={60} onChange={(e) => patch(s.id, { title: e.target.value })} />
+                    {weakTitle ? (
+                      <small className="gl-pack-weak-tip">
+                        提示：把「{s.title}」改成包含判断或数字的结论句，听众一眼就能抓住重点。
+                      </small>
+                    ) : null}
                   </label>
                   <label className="is-wide">
                     <span>要点（每行一条）</span>
@@ -779,6 +794,7 @@ export function PackExportPanel({
   pack,
   tool,
   language,
+  density,
   onToolChange,
   onToast,
   onSendToGenerate,
@@ -786,22 +802,28 @@ export function PackExportPanel({
   pack: PromptPack;
   tool: PackTool;
   language: PackLanguage;
+  density?: PackDensity;
   onToolChange: (t: PackTool) => void;
   onToast: (msg: string, tone?: "default" | "success" | "error") => void;
   onSendToGenerate: () => void;
 }) {
   const [chatgptMode, setChatgptMode] = useState<ChatgptExportMode>("oneshot");
+  const [exportingPptx, setExportingPptx] = useState(false);
+
   const prompt = useMemo(
-    () => renderMasterPrompt(pack, tool, language, { chatgptMode }),
-    [pack, tool, language, chatgptMode]
+    () => renderMasterPrompt(pack, tool, language, { chatgptMode, density }),
+    [pack, tool, language, chatgptMode, density]
   );
   const gammaParts = useMemo(
-    () => (tool === "gamma" ? renderGammaParts(pack, language) : null),
-    [pack, tool, language]
+    () => (tool === "gamma" ? renderGammaParts(pack, language, density) : null),
+    [pack, tool, language, density]
   );
   const chatgptSteps = useMemo(
-    () => (tool === "chatgpt" && chatgptMode === "twostep" ? renderChatgptTwoStep(pack, language) : null),
-    [pack, tool, chatgptMode, language]
+    () =>
+      tool === "chatgpt" && chatgptMode === "twostep"
+        ? renderChatgptTwoStep(pack, language, density)
+        : null,
+    [pack, tool, chatgptMode, language, density]
   );
 
   const meta = PACK_TOOLS.find((t) => t.id === tool) ?? PACK_TOOLS[0];
@@ -818,8 +840,7 @@ export function PackExportPanel({
     }
   };
 
-  const downloadFile = (content: string, filename: string, mime: string) => {
-    const blob = new Blob([content], { type: mime });
+  const downloadBlob = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -830,11 +851,65 @@ export function PackExportPanel({
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
+  const downloadFile = (content: string, filename: string, mime: string) => {
+    downloadBlob(new Blob([content], { type: mime }), filename);
+  };
+
+  const handleDownloadPptx = async () => {
+    if (exportingPptx) return;
+    setExportingPptx(true);
+    try {
+      const visualSpec = packStyleToVisualSpec(pack.style);
+      const slides = packToDeckSlides(pack);
+      const res = await fetch("/api/export/pptx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: pack.insight.topic,
+          subtitle: pack.slides[0]?.points[0] || pack.insight.scenario,
+          audience: pack.insight.audience,
+          styleName: pack.style.name,
+          visualSpec,
+          slides,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        onToast(err.error || "导出 .pptx 失败，请稍后重试", "error");
+        return;
+      }
+      const blob = await res.blob();
+      downloadBlob(blob, `${slugify(pack.insight.topic)}.pptx`);
+      onToast(`已下载原生可编辑 ${pack.slides.length} 页 .pptx（含母版、原生图表与演讲备注）`, "success");
+    } catch {
+      onToast("网络异常，导出 .pptx 失败", "error");
+    } finally {
+      setExportingPptx(false);
+    }
+  };
+
+  const handleDownloadHtml = () => {
+    try {
+      const html = exportStandaloneHtmlDeck({
+        title: pack.insight.topic,
+        subtitle: pack.slides[0]?.points[0] || pack.insight.scenario,
+        audience: pack.insight.audience,
+        styleName: pack.style.name,
+        spec: packStyleToVisualSpec(pack.style),
+        slides: packToDeckSlides(pack),
+      });
+      downloadFile(html, `${slugify(pack.insight.topic)}.html`, "text/html;charset=utf-8");
+      onToast("已下载单文件离线 .html 演示稿（双击即可全屏翻页，支持打印为 PDF）", "success");
+    } catch {
+      onToast("导出离线 .html 失败，请重试", "error");
+    }
+  };
+
   return (
     <section className="gl-pack-card gl-pack-export" id="pg-pack-export" aria-labelledby="pg-pack-export-title">
       <header className="gl-pack-card-head">
         <div>
-          <p className="gl-pack-eyebrow">导出总提示词</p>
+          <p className="gl-pack-eyebrow">导出总提示词 · 或免粘贴直出成品</p>
           <h2 className="gl-pack-h2" id="pg-pack-export-title">
             选择你要用的 AI 工具
           </h2>
@@ -984,10 +1059,38 @@ export function PackExportPanel({
             {meta.launch.label} <ExternalLink size={14} aria-hidden="true" />
           </a>
         ) : null}
-        <span className="gl-pack-export-spacer" />
-        <button type="button" className="gl-pack-textlink" onClick={onSendToGenerate} id="pg-pack-to-generate-btn">
-          或在站内直接生成 .pptx →
-        </button>
+      </div>
+
+      <div className="gl-pack-direct-deck" id="pg-pack-direct-deck">
+        <div className="gl-pack-direct-deck-info">
+          <strong>不想再复制去外部工具？直接导出当前成品</strong>
+          <span>完整保留当前 6 色色板、原生可编辑图表、表格与演讲备注</span>
+        </div>
+        <div className="gl-pack-direct-deck-btns">
+          <Button
+            size="sm"
+            variant="secondary"
+            id="pg-pack-download-pptx-btn"
+            loading={exportingPptx}
+            loadingText="正在生成 .pptx…"
+            leftIcon={<FileDown size={14} />}
+            onClick={() => void handleDownloadPptx()}
+          >
+            直接下载 .pptx
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            id="pg-pack-download-html-btn"
+            leftIcon={<Code2 size={14} />}
+            onClick={handleDownloadHtml}
+          >
+            下载离线 .html
+          </Button>
+          <button type="button" className="gl-pack-textlink" onClick={onSendToGenerate} id="pg-pack-to-generate-btn">
+            进全屏编辑器精修 →
+          </button>
+        </div>
       </div>
 
       <div className="gl-pack-export-subactions">
@@ -995,7 +1098,7 @@ export function PackExportPanel({
           type="button"
           id="pg-pack-copy-style-btn"
           className="gl-pack-mini-btn"
-          onClick={() => void copyPayload("style-only", renderStyleOnlyPrompt(pack, language), "仅风格提示词")}
+          onClick={() => void copyPayload("style-only", renderStyleOnlyPrompt(pack, language, density), "仅风格提示词")}
         >
           {copiedKey === "style-only" ? <Check size={12} /> : <Copy size={12} />}
           仅复制风格
@@ -1004,7 +1107,7 @@ export function PackExportPanel({
           type="button"
           id="pg-pack-copy-outline-btn"
           className="gl-pack-mini-btn"
-          onClick={() => void copyPayload("outline-only", renderOutlineOnlyPrompt(pack, language), "仅逐页大纲")}
+          onClick={() => void copyPayload("outline-only", renderOutlineOnlyPrompt(pack, language, density), "仅逐页大纲")}
         >
           {copiedKey === "outline-only" ? <Check size={12} /> : <Copy size={12} />}
           仅复制大纲

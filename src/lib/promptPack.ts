@@ -105,6 +105,28 @@ export const PACK_TOOLS: readonly {
 
 export type PackLanguage = "zh" | "en" | "bilingual";
 
+export type PackDensity = "speaker" | "reading";
+
+export const PACK_DENSITIES: readonly {
+  id: PackDensity;
+  label: string;
+  shortLabel: string;
+  hint: string;
+}[] = [
+  {
+    id: "speaker",
+    label: "现场演讲 · 字少大字（细节进备注）",
+    shortLabel: "现场演讲",
+    hint: "每页 2–3 条精炼结论、正文 20–24pt、留白 ≥40%，完整解释自动放入演讲备注",
+  },
+  {
+    id: "reading",
+    label: "书面汇报 · 详实自解释（适合传阅）",
+    shortLabel: "书面汇报",
+    hint: "每页 3–5 条完整论据卡片、正文 15–18pt，脱离讲解人也能独立读懂",
+  },
+];
+
 /* ==========================================================================
    2. Data model
    ========================================================================== */
@@ -161,6 +183,8 @@ export interface PackInsight {
   requestedSlides?: number;
   talkMinutes: number;
   tone: string;
+  /** Presentation density: live talk vs async reading deck. */
+  density?: PackDensity;
   keyFacts: string[];
   sections: string[];
   fileName: string;
@@ -772,6 +796,40 @@ function parseNumeric(value: string): number {
   return m ? Number(m[0]) : 0;
 }
 
+const WEAK_TOPIC_TITLE_RE =
+  /^(?:(?:abstract|introduction|background|related work|method(?:s|ology)?|experiments?|evaluation|results?|discussion|conclusions?|summary)\b|(?:研究|项目|业务|选题|写作)?(?:背景|意义|现状|概述|概览|方法|模型|架构|实验|结果|实验结果|讨论|问题|风险|挑战|总结|小结|结论|展望)(?:与(?:核心问题|研究意义|动机|挑战|风险|启示|展望))?)$/i;
+
+/**
+ * Flags bare directory-heading titles on body slides so the outline editor can
+ * gently nudge users toward Assertion-Evidence conclusion headlines.
+ */
+export function isWeakTopicTitle(title: string, layout: PackLayout): boolean {
+  if (layout === "cover" || layout === "agenda" || layout === "section") return false;
+  const clean = title.replace(/^[\d一二三四五六七八九十.、\s]+/, "").trim();
+  if (!clean) return true;
+  if (/\([1-9]\/[1-9]\)|（[1-9]\/[1-9]）/.test(clean)) return true;
+  if (/\d/.test(clean)) return false;
+  return clean.length <= 12 && WEAK_TOPIC_TITLE_RE.test(clean);
+}
+
+function inferComparisonHeadings(slide: PackSlide): { leftTitle: string; rightTitle: string } {
+  const vsMatch = slide.title.match(/^(.{2,16}?)\s*(?:vs\.?|VS|对比|相比|与)\s*(.{2,16})$/);
+  if (vsMatch) {
+    return {
+      leftTitle: vsMatch[1].trim().slice(0, 14),
+      rightTitle: vsMatch[2].trim().slice(0, 14),
+    };
+  }
+  const p0 = slide.points[0] ?? "";
+  const p1 = slide.points[Math.ceil(slide.points.length / 2)] ?? "";
+  const c0 = p0.match(/^([^：:，,]{2,12})[：:]/)?.[1]?.trim();
+  const c1 = p1.match(/^([^：:，,]{2,12})[：:]/)?.[1]?.trim();
+  if (c0 && c1 && c0 !== c1) {
+    return { leftTitle: c0, rightTitle: c1 };
+  }
+  return { leftTitle: "对照基准 / 现状", rightTitle: "核心方案 / 结论" };
+}
+
 export function packSlideToCanvas(
   slide: PackSlide,
   insight: PackInsight
@@ -782,8 +840,10 @@ export function packSlideToCanvas(
     slideType,
     title: slide.title,
     sectionTag: packLayoutLabel(slide.layout),
-    bullets: pts.slice(0, 4),
+    bullets: pts.slice(0, 5),
     speakerNotes: slide.note,
+    sourceStatus: "source-material",
+    sourceNote: slide.source,
   };
   switch (slide.layout) {
     case "cover":
@@ -799,8 +859,8 @@ export function packSlideToCanvas(
             const [head, ...rest] = p.split(/[：:]/);
             return {
               code: String(i + 1).padStart(2, "0"),
-              title: (rest.length ? head : p).slice(0, 16),
-              desc: (rest.length ? rest.join("：") : "").slice(0, 60),
+              title: (rest.length ? head : p).slice(0, 18),
+              desc: (rest.length ? rest.join("：") : p.length > 18 ? p.slice(18) : "").slice(0, 72),
             };
           }),
         },
@@ -810,29 +870,43 @@ export function packSlideToCanvas(
       const data = slide.data.length
         ? slide.data
         : pts.slice(0, 3).map((p, i) => ({ label: p.slice(0, 10), value: String(i + 1) }));
-      const max = Math.max(1, ...data.map((d) => Math.abs(parseNumeric(d.value))));
+      const rawVals = data.slice(0, 5).map((d) => Math.abs(parseNumeric(d.value)));
+      const nonZero = rawVals.filter((n) => n > 0);
+      const max = Math.max(1, ...rawVals);
+      const minPos = nonZero.length ? Math.min(...nonZero) : 1;
+      // Preserve literal numbers when comparable in magnitude; normalize only across huge mixed scales.
+      const keepRawScale = nonZero.length > 0 && max <= 1000 && max / Math.max(0.01, minPos) <= 25;
       return {
         slideType,
         slideData: {
           ...base,
-          kpis: data.slice(0, 3).map((d) => ({ label: d.label, value: d.value, note: "" })),
-          bars: data.slice(0, 4).map((d) => {
-            const v = Math.round((Math.abs(parseNumeric(d.value)) / max) * 100);
-            return { label: d.label.slice(0, 8), v1: v, v2: v };
+          singleSeries: true,
+          kpis: data.slice(0, 3).map((d, idx) => ({
+            label: d.label,
+            value: d.value,
+            note: idx === 0 && pts[0] ? pts[0].slice(0, 36) : slide.source || "",
+          })),
+          bars: data.slice(0, 5).map((d) => {
+            const raw = Math.abs(parseNumeric(d.value));
+            const v = keepRawScale
+              ? Number(raw.toFixed(raw < 10 && !Number.isInteger(raw) ? 1 : 0))
+              : Math.max(4, Math.round((raw / max) * 100));
+            return { label: d.label.slice(0, 12), v1: v, v2: v };
           }),
         },
       };
     }
     case "comparison": {
-      const half = Math.ceil(pts.length / 2);
+      const half = Math.max(1, Math.ceil(pts.length / 2));
+      const { leftTitle, rightTitle } = inferComparisonHeadings(slide);
       return {
         slideType,
         slideData: {
           ...base,
-          leftTitle: "A",
-          rightTitle: "B",
+          leftTitle,
+          rightTitle,
           leftPoints: pts.slice(0, half),
-          rightPoints: pts.slice(half),
+          rightPoints: pts.slice(half).length ? pts.slice(half) : [slide.visual || pts[0]],
         },
       };
     }
@@ -840,19 +914,46 @@ export function packSlideToCanvas(
     case "quote":
       return {
         slideType,
-        slideData: { ...base, quoteText: pts[0] || slide.title, quoteAuthor: slide.source || insight.topic },
+        slideData: {
+          ...base,
+          quoteText: pts[0] || slide.title,
+          quoteAuthor: slide.source || insight.topic,
+          kpis: slide.data.slice(0, 3).map((d) => ({ label: d.label, value: d.value, note: "" })),
+        },
       };
     case "summary":
       return {
         slideType,
         slideData: {
           ...base,
-          steps: pts.slice(0, 3).map((p, i) => ({ code: String(i + 1).padStart(2, "0"), title: p.slice(0, 16), desc: p.slice(16, 70) })),
+          steps: pts.slice(0, 3).map((p, i) => {
+            const [head, ...rest] = p.split(/[：:，,]/);
+            const useSplit = rest.length > 0 && head.length >= 4 && head.length <= 18;
+            return {
+              code: String(i + 1).padStart(2, "0"),
+              title: (useSplit ? head : p.slice(0, 16)).trim(),
+              desc: (useSplit ? rest.join("，") : p.slice(16, 72)).trim(),
+            };
+          }),
         },
       };
     default:
       return { slideType, slideData: base };
   }
+}
+
+/** Convert an entire PromptPack into ready-to-render/export DeckSlideItem slides. */
+export function packToDeckSlides(pack: PromptPack): DeckSlideItem[] {
+  return pack.slides.map((slide, i) => {
+    const { slideType, slideData } = packSlideToCanvas(slide, pack.insight);
+    return {
+      id: slide.id || `pack_slide_${i + 1}`,
+      slideType,
+      sectionTag: slideData.sectionTag || packLayoutLabel(slide.layout),
+      title: slide.title,
+      ...slideData,
+    };
+  });
 }
 
 /** Choose up to 3 visually distinct slides for the live style proof (optionally pinning an active slide). */
@@ -894,6 +995,17 @@ const LANG_LINE: Record<PackLanguage, string> = {
   bilingual: "标题使用中文 + 小号英文副标题，正文使用中文。",
 };
 
+const DENSITY_RULE: Record<PackDensity, string> = {
+  speaker:
+    "用途密度【现场演讲 · 字少大字】：画面留白 ≥ 40%，正文 18–22pt，单页 ≤ 3 条短句（每条 ≤ 28 字）；所有长句推导与背景补充只放进演讲备注（Notes），严禁把整段文字堆上屏幕。",
+  reading:
+    "用途密度【书面汇报 · 详实自解释】：正文 14–17pt，用结构化 Bento 卡片或双栏矩阵承载 3–5 条完整论据与数据口径，确保读者在没有讲解人的情况下异步阅读也能独立读懂。",
+};
+
+function resolveDensity(pack: PromptPack, override?: PackDensity): PackDensity {
+  return override ?? (pack.insight.density === "reading" ? "reading" : "speaker");
+}
+
 function styleBlock(style: PackStyle): string {
   const colorLines = style.colors.map((c) => `  - ${c.role}：${c.hex}`).join("\n");
   return [
@@ -923,11 +1035,13 @@ function slidesBlock(pack: PromptPack, withNotes = true): string {
   return pack.slides.map((s, i) => slideBlock(s, i, pack.slides.length, withNotes)).join("\n\n");
 }
 
-function contextBlock(pack: PromptPack): string {
+function contextBlock(pack: PromptPack, density?: PackDensity): string {
   const i = pack.insight;
+  const d = resolveDensity(pack, density);
+  const densityLabel = d === "reading" ? "书面汇报（详实自解释）" : "现场演讲（字少大字）";
   return [
     `- 主题：${i.topic}${i.subtitle ? `（${i.subtitle}）` : ""}`,
-    `- 受众：${i.audience}；场景：${i.scenario}；时长约 ${i.talkMinutes} 分钟；共 ${pack.slides.length} 页`,
+    `- 受众：${i.audience}；场景：${i.scenario}；用途：${densityLabel}；时长约 ${i.talkMinutes} 分钟；共 ${pack.slides.length} 页`,
     i.keyFacts.length ? `- 资料中的关键事实：${i.keyFacts.join("；")}` : "",
   ]
     .filter(Boolean)
@@ -935,47 +1049,62 @@ function contextBlock(pack: PromptPack): string {
 }
 
 const LAYOUT_RULE =
-  "每页严格按【版式】实现，不要把所有页面都做成“标题 + 项目符号”；大数字页数字字号 ≥ 96pt，图表页使用真正的图表，对比页左右分栏。";
+  "每页严格按【版式】实现，严禁把所有页面做成雷同的“标题 + 项目符号列表”；每页标题必须是结论句（Assertion Headline），大数字页核心数值字号 64–88pt，图表页使用原生可编辑图表，对比页使用双栏或原生表格。";
 const HONESTY_RULE =
-  "只使用上面给出的事实与数据；资料中没有的数据写成「[待补充]」，不要编造数字、引用或人名。";
+  "只使用上面给出的事实与数据；资料中没有的数据写成「[待补充]」，严禁编造数字、引用或人名。";
+const PPTX_QA_RULE =
+  "【必须执行的代码自检】保存 .pptx 后，在代码解释器中用 python-pptx 重新读取文件并逐页断言：① 总页数一致；② 所有 shape 满足 left >= 0、top >= 0 且 left + width <= Inches(13.333)、top + height <= Inches(7.5)（零越界裁切）；③ 文本框之间无矩形重叠；④ 文本内无残留的 `#`、`*`、`**` 等 Markdown 符号（加粗请用 run.font.bold = True）。若发现越界或重叠，必须在代码里修正坐标后重新导出再给出下载链接。";
 
-export function renderStyleOnlyPrompt(pack: PromptPack, language: PackLanguage = "zh"): string {
+export function renderStyleOnlyPrompt(
+  pack: PromptPack,
+  language: PackLanguage = "zh",
+  density?: PackDensity
+): string {
+  const d = resolveDensity(pack, density);
   return [
     `你是一位顶级演示文稿视觉设计总监。下面是我即将制作的 PPT 的背景与设计规范，请先记住并确认这套视觉系统（暂不生成文件）。`,
-    `## 背景\n${contextBlock(pack)}`,
+    `## 背景\n${contextBlock(pack, d)}`,
     `## 设计规范\n${styleBlock(pack.style)}`,
     `**为什么适合这份资料：**${pack.style.rationale}`,
-    `## 规则\n- ${LAYOUT_RULE}\n- ${HONESTY_RULE}\n- ${LANG_LINE[language]}\n- 请简要确认你理解的配色层级、版式节奏，回复「风格已就绪，请发送逐页大纲」。`,
+    `## 规则\n- ${LAYOUT_RULE}\n- ${DENSITY_RULE[d]}\n- ${HONESTY_RULE}\n- ${LANG_LINE[language]}\n- 请简要确认你理解的配色层级、版式节奏，回复「风格已就绪，请发送逐页大纲」。`,
   ].join("\n\n");
 }
 
-export function renderOutlineOnlyPrompt(pack: PromptPack, language: PackLanguage = "zh"): string {
+export function renderOutlineOnlyPrompt(
+  pack: PromptPack,
+  language: PackLanguage = "zh",
+  density?: PackDensity
+): string {
   const n = pack.slides.length;
+  const d = resolveDensity(pack, density);
   return [
     `请严格按照刚才确认的「设计规范」，根据下面的逐页内容（共 ${n} 页），用代码解释器（python-pptx）生成一份 16:9（13.333in × 7.5in）的 .pptx 文件并提供下载链接。`,
     `## 逐页内容（共 ${n} 页）\n${slidesBlock(pack)}`,
-    `## 实现要求\n1. ${LAYOUT_RULE}\n2. 图表页用 python-pptx 原生图表（可在 PowerPoint 中编辑），按图表色序列着色，直接标注数据标签。\n3. 字号：标题 32–40pt，正文 16–20pt；单页 ≤ 5 条要点，每条 ≤ 30 字；四周留 ≥ 0.6in 边距。\n4. 把「演讲备注」写入每页 notes；页脚放页码。\n5. ${HONESTY_RULE}\n6. ${LANG_LINE[language]}`,
+    `## 实现要求\n1. 画布坐标铁律：prs.slide_width = Inches(13.333)，prs.slide_height = Inches(7.5)；顶部眉标区 top=0.45in，结论标题区 top=0.82in (h=0.9in, 26–32pt 加粗)，主内容舞台 top=1.9in..6.65in (左右留白 ≥ 0.65in)，页脚出处与页码 top=6.9in。\n2. ${LAYOUT_RULE}\n3. ${DENSITY_RULE[d]}\n4. 图表页用 python-pptx 原生图表（可在 PowerPoint 中双击编辑数据），去除杂乱边框网格线，按图表色序列着色并开启数据标签直接显示数值。\n5. 把每页「演讲备注」写入 slide.notes_slide.notes_text_frame。\n6. ${HONESTY_RULE}\n7. ${LANG_LINE[language]}\n8. ${PPTX_QA_RULE}`,
   ].join("\n\n");
 }
 
 export function renderGammaParts(
   pack: PromptPack,
-  language: PackLanguage = "zh"
+  language: PackLanguage = "zh",
+  density?: PackDensity
 ): { instructions: string; cards: string } {
+  const d = resolveDensity(pack, density);
   const instructions = [
     `设计方向：${pack.style.name}（参考 ${pack.style.reference}）。`,
     `配色：${pack.style.colors.map((c) => `${c.role} ${c.hex}`).join("，")}；图表色 ${pack.style.chartColors.join("、")}。`,
     `字体：标题 ${pack.style.headingFont}，正文 ${pack.style.bodyFont}。`,
     `版式：${pack.style.layoutGrammar}。图片：${pack.style.imagery}。`,
-    `每张卡片按标注的【版式】排版，避免全部是要点列表。${HONESTY_RULE}${LANG_LINE[language]}`,
+    `${DENSITY_RULE[d]}`,
+    `每张卡片按标注的【版式】生成差异化视觉模块（大数字卡、图表、双栏对比、步骤流），避免全部是普通列表。${HONESTY_RULE}${LANG_LINE[language]}`,
   ].join("\n");
   const cards = pack.slides
     .map((s) => {
       const body = [
         `# ${s.title}`,
         ...s.points.map((p) => `- ${p}`),
-        s.data.length ? s.data.map((d) => `**${d.value}** ${d.label}`).join(" ｜ ") : "",
-        s.visual ? `> 视觉：${s.visual}` : "",
+        s.data.length ? s.data.map((dItem) => `**${dItem.value}** ${dItem.label}`).join(" ｜ ") : "",
+        s.visual ? `> 视觉与图表：${s.visual}` : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -987,11 +1116,12 @@ export function renderGammaParts(
 
 export function renderChatgptTwoStep(
   pack: PromptPack,
-  language: PackLanguage = "zh"
+  language: PackLanguage = "zh",
+  density?: PackDensity
 ): { step1: string; step2: string } {
   return {
-    step1: renderStyleOnlyPrompt(pack, language),
-    step2: renderOutlineOnlyPrompt(pack, language),
+    step1: renderStyleOnlyPrompt(pack, language, density),
+    step2: renderOutlineOnlyPrompt(pack, language, density),
   };
 }
 
@@ -999,63 +1129,69 @@ export function renderMasterPrompt(
   pack: PromptPack,
   tool: PackTool,
   language: PackLanguage = "zh",
-  options?: { chatgptMode?: ChatgptExportMode }
+  options?: { chatgptMode?: ChatgptExportMode; density?: PackDensity }
 ): string {
   const n = pack.slides.length;
+  const d = resolveDensity(pack, options?.density);
   switch (tool) {
     case "chatgpt": {
       if (options?.chatgptMode === "twostep") {
-        const { step1, step2 } = renderChatgptTwoStep(pack, language);
+        const { step1, step2 } = renderChatgptTwoStep(pack, language, d);
         return `【第 1 轮 · 发送风格规范（确认视觉基准）】\n\n${step1}\n\n---\n\n【第 2 轮 · 发送逐页大纲（生成 .pptx）】\n\n${step2}`;
       }
       return [
         `你是一位顶级演示文稿设计师兼 python-pptx 工程师。请根据下面的「设计规范」与「逐页内容」，用代码解释器生成一份 16:9（13.333in × 7.5in）的 .pptx 文件并提供下载链接。`,
-        `## 背景\n${contextBlock(pack)}`,
+        `## 背景\n${contextBlock(pack, d)}`,
         `## 设计规范\n${styleBlock(pack.style)}`,
         `## 逐页内容（共 ${n} 页）\n${slidesBlock(pack)}`,
-        `## 实现要求\n1. ${LAYOUT_RULE}\n2. 图表页用 python-pptx 原生图表（可在 PowerPoint 中编辑），按图表色序列着色，直接标注数据标签。\n3. 字号：标题 32–40pt，正文 16–20pt；单页 ≤ 5 条要点，每条 ≤ 30 字；四周留 ≥ 0.6in 边距。\n4. 把「演讲备注」写入每页 notes；页脚放页码。\n5. 需要配图的位置放置与色板协调的占位色块，并在占位框内写明图片内容建议。\n6. ${HONESTY_RULE}\n7. ${LANG_LINE[language]}\n8. 生成后先列出每页的版式与标题供我核对，再给出下载链接。`,
+        `## 实现要求\n1. 画布与安全区：prs.slide_width = Inches(13.333)，prs.slide_height = Inches(7.5)；顶部眉标区 top=0.45in，结论标题区 top=0.82in (26–32pt 加粗，封面主标题 40–48pt)，主内容区 top=1.9in..6.65in (左右边距 ≥ 0.65in)，页脚出处与页码 top=6.9in。\n2. ${LAYOUT_RULE}\n3. ${DENSITY_RULE[d]}\n4. 图表页用 python-pptx 原生图表（可在 PowerPoint 中编辑），去除多余网格线边框，按图表色序列着色并直接显示数据标签。\n5. 把每页「演讲备注」写入 notes；需要配图的位置放置与色板协调的几何视觉模块或清晰占位说明框。\n6. ${HONESTY_RULE}\n7. ${LANG_LINE[language]}\n8. ${PPTX_QA_RULE}`,
       ].join("\n\n");
     }
     case "gamma": {
-      const { instructions, cards } = renderGammaParts(pack, language);
+      const { instructions, cards } = renderGammaParts(pack, language, d);
       return `【① 粘贴到 Gamma「额外指令 / Additional instructions」】\n${instructions}\n\n【② 粘贴到 Gamma「粘贴文本 / Paste in text」，选择“按 --- 分卡”】\n\n${cards}`;
     }
     case "kimi":
       return [
-        `请帮我制作一份 ${n} 页的 PPT。先严格按下面的大纲生成，再在模板中选择最接近「${pack.style.name}」的风格，并按设计规范调整配色与字体。`,
-        `## 背景\n${contextBlock(pack)}`,
+        `请帮我制作一份 ${n} 页的 PPT。先严格按下面的结论式大纲生成，再在模板中选择最接近「${pack.style.name}」的风格，并按设计规范调整配色与字体。`,
+        `## 背景\n${contextBlock(pack, d)}`,
         `## 设计规范\n${styleBlock(pack.style)}`,
         `## 大纲\n${pack.slides
           .map((s, i) => {
             const pts = s.points.map((p) => `  - ${p}`).join("\n");
-            const data = s.data.length ? `\n  - 数据：${s.data.map((d) => `${d.label} ${d.value}`).join("；")}` : "";
+            const data = s.data.length ? `\n  - 数据：${s.data.map((dItem) => `${dItem.label} ${dItem.value}`).join("；")}` : "";
             return `${i + 1}. 【${packLayoutLabel(s.layout)}】${s.title}\n${pts}${data}`;
           })
           .join("\n")}`,
-        `## 要求\n- ${LAYOUT_RULE}\n- ${HONESTY_RULE}\n- ${LANG_LINE[language]}`,
+        `## 要求\n- ${LAYOUT_RULE}\n- ${DENSITY_RULE[d]}\n- ${HONESTY_RULE}\n- ${LANG_LINE[language]}`,
       ].join("\n\n");
     case "claude":
       return [
-        `请生成一个单文件 HTML 幻灯片（index.html，无外部依赖，可离线打开）。`,
-        `## 技术要求\n- 每页 1920×1080 的 <section>，按窗口等比缩放居中；← → / 空格翻页，右下角显示页码；支持浏览器打印为 PDF（每页一张）。\n- 在 :root 中用 CSS 变量定义色板与字体，所有颜色只能引用这些变量。\n- 图表用内联 SVG 绘制（不要用图片），数据标签直接写在图形上。`,
-        `## 背景\n${contextBlock(pack)}`,
+        `请生成一个单文件 HTML 幻灯片（index.html，零外部 CDN 依赖，可完全离线打开演示与打印 PDF）。`,
+        `## 舞台与交互架构（必须严格遵守）\n- 固定画布比例：每页 <section class="slide"> 固定为 1920px × 1080px（overflow: hidden; box-sizing: border-box），外层舞台使用 JS 计算 transform: scale(Math.min(window.innerWidth / 1920, window.innerHeight / 1080)) 居中缩放，严禁在窄窗口下流式折行破坏版面。\n- 翻页显隐控制：非当前页用 opacity: 0; visibility: hidden; pointer-events: none; 切换（避免 display: none 与 .slide { display: flex/grid } 优先级冲突）。\n- 演示控制：支持键盘 ← / → / Space 翻页、F 键全屏、N 键呼出底部「演讲备注」浮层（展示每页备注）、顶部细进度条与右下角页码。\n- 矢量导出支持：内置 @media print { @page { size: 1920px 1080px; margin: 0; } } 样式，让浏览器「打印 → 另存为 PDF」一页一张无损分页。\n- 在 :root 中用 CSS 变量定义 6 色色板与字体，所有图表用内联 SVG 绘制并直接标注数值标签。`,
+        `## 背景\n${contextBlock(pack, d)}`,
         `## 设计规范\n${styleBlock(pack.style)}`,
-        `## 逐页内容（共 ${n} 页）\n${slidesBlock(pack, false)}`,
-        `## 质量要求\n- ${LAYOUT_RULE}\n- 排版精致：清晰的层级、统一的间距体系（8px 基准）、标题与正文字重对比明显。\n- ${HONESTY_RULE}\n- ${LANG_LINE[language]}\n- 只输出完整 HTML 代码。`,
+        `## 逐页内容（共 ${n} 页）\n${slidesBlock(pack, true)}`,
+        `## 质量要求\n- ${LAYOUT_RULE}\n- ${DENSITY_RULE[d]}\n- 排版精致：8px 间距栅格、大标题与 KPI 数字跃迁对比鲜明、严禁文字溢出 1920×1080 边界。\n- ${HONESTY_RULE}\n- ${LANG_LINE[language]}\n- 只输出完整可运行的 HTML 代码。`,
       ].join("\n\n");
     default:
-      return renderPackMarkdown(pack, language);
+      return renderPackMarkdown(pack, language, d);
   }
 }
 
-export function renderPackMarkdown(pack: PromptPack, language: PackLanguage = "zh"): string {
+export function renderPackMarkdown(
+  pack: PromptPack,
+  language: PackLanguage = "zh",
+  density?: PackDensity
+): string {
+  const d = resolveDensity(pack, density);
   return [
     `# ${pack.insight.topic} · PPT 提示词包`,
     `> 由 PPTGod 生成（${pack.engine === "llm" ? `大模型 ${pack.model ?? ""}`.trim() : "内置规则引擎"}）。可直接粘贴到任意 AI 演示工具。`,
-    `## 背景\n${contextBlock(pack)}`,
+    `## 背景\n${contextBlock(pack, d)}`,
     `## 设计规范\n${styleBlock(pack.style)}\n\n**为什么适合这份资料：**${pack.style.rationale}`,
     `## 逐页内容（共 ${pack.slides.length} 页）\n${slidesBlock(pack)}`,
-    `## 生成要求\n- ${LAYOUT_RULE}\n- ${HONESTY_RULE}\n- ${LANG_LINE[language]}`,
+    `## 生成要求\n- ${LAYOUT_RULE}\n- ${DENSITY_RULE[d]}\n- ${HONESTY_RULE}\n- ${LANG_LINE[language]}`,
   ].join("\n\n");
 }
 

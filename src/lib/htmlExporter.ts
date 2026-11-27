@@ -826,7 +826,8 @@ export function exportStandaloneHtmlDeck(options: {
             })
         : [];
       const bars = rawBars.length > 0 ? rawBars : DEFAULT_BARS;
-      const rawMax = Math.max(0, ...bars.flatMap((b) => [b.v1, b.v2]));
+      const isSingle = Boolean(s.singleSeries) && rawBars.length > 0;
+      const rawMax = Math.max(0, ...bars.flatMap((b) => (isSingle ? [b.v2] : [b.v1, b.v2])));
       const maxV = rawMax > 0 ? rawMax * 1.1 : 1;
 
       const plotLeft = 30;
@@ -839,6 +840,7 @@ export function exportStandaloneHtmlDeck(options: {
       const groupW = Math.min(64, slotW * 0.72);
       const barGap = Math.max(1, Math.min(6, groupW * 0.12));
       const bw = Math.max(1, (groupW - barGap) / 2);
+      const singleW = Math.min(40, Math.max(14, slotW * 0.44));
       const pairW = bw * 2 + barGap;
       const rx = Math.min(3, bw / 3);
       const fontSize = n <= 4 ? 11 : n <= 8 ? 9.5 : 8;
@@ -856,10 +858,18 @@ export function exportStandaloneHtmlDeck(options: {
               ${bars
                 .map((b, i) => {
                   const cx = plotLeft + (i + 0.5) * slotW;
+                  const h2 = Math.round((b.v2 / maxV) * maxBarH);
+                  if (isSingle) {
+                    const sx = cx - singleW / 2;
+                    return `
+                      <rect x="${sx.toFixed(1)}" y="${(baselineY - h2).toFixed(1)}" width="${singleW.toFixed(1)}" height="${h2}" rx="${rx.toFixed(1)}" fill="${esc(safeChartColors[i % 2 === 0 ? 0 : 1])}"/>
+                      <text x="${cx.toFixed(1)}" y="${(baselineY - h2 - 6).toFixed(1)}" text-anchor="middle" fill="${esc(cssText)}" font-size="${fontSize}" font-weight="700">${esc(b.v2)}</text>
+                      <text x="${cx.toFixed(1)}" y="206" text-anchor="middle" fill="${esc(cssMuted)}" font-size="${fontSize}">${esc(b.label)}</text>
+                    `;
+                  }
                   const x1 = cx - pairW / 2;
                   const x2 = x1 + bw + barGap;
                   const h1 = Math.round((b.v1 / maxV) * maxBarH);
-                  const h2 = Math.round((b.v2 / maxV) * maxBarH);
                   return `
                     <rect x="${x1.toFixed(1)}" y="${(baselineY - h1).toFixed(1)}" width="${bw.toFixed(1)}" height="${h1}" rx="${rx.toFixed(1)}" fill="${esc(safeChartColors[2])}" opacity="0.7"/>
                     <rect x="${x2.toFixed(1)}" y="${(baselineY - h2).toFixed(1)}" width="${bw.toFixed(1)}" height="${h2}" rx="${rx.toFixed(1)}" fill="${esc(safeChartColors[0])}"/>

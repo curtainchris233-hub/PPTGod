@@ -16,6 +16,7 @@ from typing import Any
 
 from .config import MOBILE_390
 from .helpers import (
+    PptxVerifier,
     TestContext,
     TestSpec,
     click_resilient,
@@ -404,6 +405,161 @@ def g3_pack_08_topbar_style_anchor_and_long_doc_picker(ctx: TestContext) -> None
         guard.assert_no_browser_errors("G3_PACK_08")
 
 
+_R1_SOURCE = """DeepSeek-R1：强化学习激发大模型长思维链推理
+# 研究背景与核心问题
+大语言模型在复杂数学与代码推理任务中高度依赖人工标注的长思维链（SFT），标注成本高且泛化受限。本文探讨能否跳过监督微调，直接通过大规模纯强化学习让模型自主涌现反思、验证与长程推理能力。
+# 四阶段冷启动与对齐管线
+为解决纯 RL 输出可读性差与中英混杂问题，DeepSeek-R1 引入四阶段训练流程。首先使用数千条冷启动高质量长思维链数据做监督微调；其次进行面向推理的强化学习；再次通过拒绝采样筛选 60 万条推理数据与 20 万条通用数据二次微调；最后做全场景人类偏好对齐。
+# 基准实验结果
+在 AIME 2024 数学竞赛基准上，DeepSeek-R1 取得 79.8% Pass@1，较基线模型明显提升。在 MATH-500 基准上达到 97.3% 准确率，在 Codeforces 竞赛评测中达到 96.3% 百分位。
+# 小模型推理蒸馏对比
+将 DeepSeek-R1 生成的 80 万条高质量推理样本蒸馏至开源稠密模型，验证强推理轨迹迁移的价值。蒸馏版 32B 模型在 AIME 2024 上达到 72.6%，比同尺寸直接做强化学习的模型高出 25.6 个百分点；蒸馏版 7B 模型也在 MATH-500 上达到 92.8%。
+# 总结与启示
+大规模强化学习能够有效激发推理能力，而“强推理模型蒸馏小模型”在算力性价比上远优于对小模型直接做 RL。
+"""
+
+
+def g3_pack_09_assertion_titles_clean_facts_and_density(ctx: TestContext) -> None:
+    # 1. API check: speaker vs reading density + clean facts + zero (1/2) titles
+    spk_resp = ctx.api().post(
+        "/api/prompt-pack",
+        json_body={
+            "text": _R1_SOURCE,
+            "fileName": "r1.md",
+            "slideCount": 9,
+            "density": "speaker",
+            "mode": "smart",
+        },
+    ).assert_status(200, "G3_PACK_09 speaker pack")
+    spk = spk_resp.require_json()["pack"]
+    assert spk["insight"]["density"] == "speaker"
+
+    rd_resp = ctx.api().post(
+        "/api/prompt-pack",
+        json_body={
+            "text": _R1_SOURCE,
+            "fileName": "r1.md",
+            "slideCount": 9,
+            "density": "reading",
+            "mode": "smart",
+        },
+    ).assert_status(200, "G3_PACK_09 reading pack")
+    rd = rd_resp.require_json()["pack"]
+    assert rd["insight"]["density"] == "reading"
+
+    for s in spk["slides"]:
+        title = s["title"]
+        assert "1/2" not in title and "2/2" not in title, f"Split directory suffix leaked in {title!r}"
+        assert title not in {"研究背景与核心问题", "基准实验结果", "小模型推理蒸馏对比", "总结与启示"}, (
+            f"Bare directory heading leaked into slide title: {title!r}"
+        )
+
+    all_labels = [d["label"] for s in spk["slides"] for d in s.get("data", [])]
+    all_vals = [d["value"] for s in spk["slides"] for d in s.get("data", [])]
+    joined_labels = " | ".join(all_labels)
+    assert "forces" not in [lbl.split()[0] for lbl in all_labels if lbl], f"Mid-word slice in {all_labels!r}"
+    assert "条推理数据与" not in joined_labels, f"Measure-word connector leaked in {all_labels!r}"
+    assert "Pass1" not in joined_labels, f"@ stripped from Pass@1 in {all_labels!r}"
+    assert "Pass@1" in joined_labels, f"Expected Pass@1 in {all_labels!r}"
+    for expected_val in ("60万条", "20万条", "79.8%", "97.3%", "96.3%", "72.6%"):
+        assert expected_val in all_vals, f"Expected grounded metric {expected_val} in {all_vals!r}"
+
+    # 2. UI check: density switch immediately updates ChatGPT QA & Claude 1920x1080 prompts
+    with ctx.browser_page() as guard:
+        page = guard.page
+        guard.goto_ok(f"{ctx.base_url}/pack")
+        page.evaluate("() => { try { localStorage.removeItem('pptgod_prompt_pack_v1'); } catch (e) {} }")
+        page.reload()
+        page.wait_for_load_state("networkidle")
+
+        click_resilient(page, ["#pg-pack-tab-sample"], description="Sample tab")
+        click_resilient(page, ["#pg-pack-sample-deepseek-r1"], description="DeepSeek-R1 sample")
+        page.wait_for_selector("#pg-pack-export", timeout=30_000)
+
+        chatgpt_prompt = page.locator("#pg-pack-prompt-preview").inner_text()
+        assert "现场演讲" in chatgpt_prompt
+        assert "Inches(13.333)" in chatgpt_prompt and "必须执行的代码自检" in chatgpt_prompt
+
+        page.locator("#pg-pack-density").select_option("reading")
+        page.wait_for_function(
+            "() => (document.querySelector('#pg-pack-prompt-preview')?.textContent || '').includes('书面汇报')",
+            timeout=5_000,
+        )
+
+        click_resilient(page, ["#pg-pack-tool-claude"], description="Claude tab")
+        claude_prompt = page.locator("#pg-pack-prompt-preview").inner_text()
+        assert "1920px × 1080px" in claude_prompt and "visibility: hidden" in claude_prompt
+        guard.assert_no_browser_errors("G3_PACK_09")
+
+
+def g3_pack_10_direct_pptx_html_and_lossless_editor_handoff(ctx: TestContext) -> None:
+    with ctx.browser_page() as guard:
+        page = guard.page
+        guard.goto_ok(f"{ctx.base_url}/pack")
+        page.evaluate(
+            """() => {
+              try {
+                localStorage.removeItem('pptgod_prompt_pack_v1');
+                sessionStorage.removeItem('pptgod_doc_intake_v1');
+              } catch (e) {}
+            }"""
+        )
+        page.reload()
+        page.wait_for_load_state("networkidle")
+
+        # 1. Generate SaaS Q3 pack & customize primary HEX to #0F766E
+        click_resilient(page, ["#pg-pack-tab-sample"], description="Sample tab")
+        click_resilient(page, ["#pg-pack-sample-saas-q3"], description="SaaS Q3 sample")
+        page.wait_for_selector("#pg-pack-direct-deck", timeout=30_000)
+
+        click_resilient(page, ["#pg-pack-style-edit-toggle"], description="Open style editor")
+        locate_first(page, ["#pg-pack-color-input-4"], description="Primary color HEX").fill("#0F766E")
+        page.wait_for_timeout(150)
+
+        # 2. One-click direct .pptx download from /pack verified via PptxVerifier
+        with page.expect_download(timeout=30_000) as dl_pptx_info:
+            click_resilient(page, ["#pg-pack-download-pptx-btn"], description="Direct .pptx download in /pack")
+        dl_pptx = dl_pptx_info.value
+        pptx_path = dl_pptx.path()
+        assert pptx_path is not None, "Playwright did not materialize downloaded .pptx file"
+        with open(pptx_path, "rb") as fh:
+            pptx_bytes = fh.read()
+
+        PptxVerifier.verify(
+            pptx_bytes,
+            min_size=24_000,
+            expected_slide_count=10,
+            require_slide_master=True,
+            require_notes=True,
+            require_chart_types=("barChart",),
+            expected_slide_texts=("1.26", "38%"),
+        )
+
+        # 3. One-click offline .html download from /pack
+        with page.expect_download(timeout=15_000) as dl_html_info:
+            click_resilient(page, ["#pg-pack-download-html-btn"], description="Direct .html download in /pack")
+        dl_html = dl_html_info.value
+        html_path = dl_html.path()
+        assert html_path is not None, "Playwright did not materialize downloaded .html file"
+        with open(html_path, "r", encoding="utf-8") as fh:
+            html_text = fh.read()
+        assert "<!DOCTYPE html>" in html_text and "#0F766E" in html_text.upper() and "1.26" in html_text
+
+        # 4. Lossless handoff into full-screen /generate Editor preserving custom HEX & slides
+        click_resilient(page, ["#pg-pack-to-generate-btn"], description="Handoff to full-screen editor")
+        locate_first(page, ["#pg-edit-slide-title"], timeout_ms=20_000, description="Full-screen Editor title input")
+        body_text = guard.get_body_text()
+        assert "云帆科技" in body_text and "1.26" in body_text
+        # Confirm custom #0F766E accent persisted into rendered stage & deck auto-save
+        page.wait_for_function(
+            "() => (localStorage.getItem('pptgod_unsaved_draft_v4') || '').toUpperCase().includes('#0F766E')",
+            timeout=5_000,
+        )
+        draft_raw = page.evaluate("() => localStorage.getItem('pptgod_unsaved_draft_v4') || ''")
+        assert "#0F766E" in draft_raw.upper(), f"Custom #0F766E accent was lost on handoff: {draft_raw[:240]!r}"
+        guard.assert_no_browser_errors("G3_PACK_10")
+
+
 def get_specs() -> list[TestSpec]:
     return [
         TestSpec(
@@ -468,6 +624,22 @@ def get_specs() -> list[TestSpec]:
             "Topbar /pack active pill, ?style reference anchor & >16k long-doc section picker",
             g3_pack_08_topbar_style_anchor_and_long_doc_picker,
             ("ui", "pack", "integration"),
+            True,
+        ),
+        TestSpec(
+            "G3_PACK_09",
+            3,
+            "Assertion titles, token-safe metric extraction & speaker/reading density prompts",
+            g3_pack_09_assertion_titles_clean_facts_and_density,
+            ("api", "ui", "pack", "quality"),
+            True,
+        ),
+        TestSpec(
+            "G3_PACK_10",
+            3,
+            "/pack 1-click .pptx & .html downloads + lossless full-screen /generate editor handoff",
+            g3_pack_10_direct_pptx_html_and_lossless_editor_handoff,
+            ("ui", "pack", "export", "pptx"),
             True,
         ),
     ]

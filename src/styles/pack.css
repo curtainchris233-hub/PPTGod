@@ -1643,6 +1643,67 @@
   border-top: 1px dashed var(--gl-border);
 }
 
+/* --- M8: Direct deliverable bar & weak-title helpers ---------------------- */
+.gl-pack-direct-deck {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--gl-radius-md);
+  border: 1px solid var(--gl-border);
+  background: var(--gl-bg-subtle);
+}
+
+.gl-pack-direct-deck-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gl-pack-direct-deck-info strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gl-text);
+}
+
+.gl-pack-direct-deck-info span {
+  font-size: 12px;
+  color: var(--gl-muted);
+}
+
+.gl-pack-direct-deck-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gl-pack-weak-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: var(--gl-radius-full);
+  background: var(--gl-warning-bg);
+  border: 1px solid var(--gl-warning-border);
+  color: var(--gl-warning);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.gl-pack-weak-tip {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--gl-warning);
+}
+
 @media (max-width: 1024px) {
   .gl-pack-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -1677,9 +1738,13 @@
   .gl-pack-color-editor-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .gl-pack-split-card {
+  .gl-pack-split-card,
+  .gl-pack-direct-deck {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .gl-pack-direct-deck-btns {
+    width: 100%;
   }
   .gl-pack-swatches {
     grid-template-columns: repeat(3, minmax(0, 1fr));

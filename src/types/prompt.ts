@@ -409,6 +409,8 @@ export interface DeckSlideItem {
   contentRelation?: string;
   sourceStatus?: SlideSourceStatus;
   sourceNote?: string;
+  /** M8: Render data chart as a clean single series when sourced from 1D document facts */
+  singleSeries?: boolean;
 }
 
 export interface OutlineDraftItem {

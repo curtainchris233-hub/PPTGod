@@ -400,12 +400,22 @@ export function renderData(ctx: SlideRenderContext) {
           { label: "Q4", v1: 74, v2: 112 },
         ];
   const bars = rawBars.slice(0, 6);
+  const isSingle = Boolean(slideData?.singleSeries);
   const peak = Math.max(
-    10,
-    ...bars.flatMap((b) => [Number(b.v1) || 0, Number(b.v2) || 0])
+    0.5,
+    ...bars.flatMap((b) =>
+      isSingle
+        ? [Number(b.v2) || 0]
+        : [Number(b.v1) || 0, Number(b.v2) || 0]
+    )
   );
-  const maxV = Math.ceil((peak * 1.15) / 10) * 10;
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((r) => Math.round(maxV * r));
+  const maxV =
+    peak < 10
+      ? Number((peak * 1.2).toPrecision(2)) || 1
+      : Math.ceil((peak * 1.15) / 10) * 10;
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((r) =>
+    maxV < 5 ? Number((maxV * r).toFixed(1)) : Math.round(maxV * r)
+  );
   const plotW = 372;
   const stepX = plotW / Math.max(1, bars.length);
 
@@ -482,47 +492,49 @@ export function renderData(ctx: SlideRenderContext) {
                 color: palette.text,
               }}
             >
-              季度核心效能指数对比（基准 vs 优化后）
+              {isSingle ? "关键量化指标实证分布" : "季度核心效能指数对比（基准 vs 优化后）"}
             </span>
-            <div
-              style={{
-                display: "flex",
-                gap: "12px",
-                fontFamily: monoFont,
-                fontSize: "10.5px",
-                color: palette.muted,
-              }}
-            >
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
-                <span
-                  style={{
-                    width: "8px",
-                    height: "8px",
-                    background: palette.chartColors[2],
-                    display: "inline-block",
-                  }}
-                />
-                基准方案
-              </span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
-                <span
-                  style={{
-                    width: "8px",
-                    height: "8px",
-                    background: palette.chartColors[0],
-                    display: "inline-block",
-                  }}
-                />
-                新架构
-              </span>
-            </div>
+            {isSingle ? null : (
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  fontFamily: monoFont,
+                  fontSize: "10.5px",
+                  color: palette.muted,
+                }}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                  <span
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      background: palette.chartColors[2],
+                      display: "inline-block",
+                    }}
+                  />
+                  基准方案
+                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                  <span
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      background: palette.chartColors[0],
+                      display: "inline-block",
+                    }}
+                  />
+                  新架构
+                </span>
+              </div>
+            )}
           </div>
 
           <svg
             viewBox="0 0 430 225"
             style={{ width: "100%", flex: 1, overflow: "visible" }}
             role="img"
-            aria-label="季度核心效能对比柱状与趋势图"
+            aria-label={isSingle ? "关键量化指标柱状图" : "季度核心效能对比柱状与趋势图"}
           >
             {ticks.map((tick, tIdx) => {
               const y = 195 - (tick / maxV) * 168;
@@ -553,12 +565,48 @@ export function renderData(ctx: SlideRenderContext) {
 
             {bars.map((b, i) => {
               const cx = 44 + i * stepX + stepX / 2;
-              const barW = Math.min(24, Math.max(12, stepX * 0.28));
-              const v1 = Math.max(0, Number(b.v1) || 0);
               const v2 = Math.max(0, Number(b.v2) || 0);
-              const h1 = (v1 / maxV) * 168;
               const h2 = (v2 / maxV) * 168;
               const r = Math.min(radius, 4);
+              if (isSingle) {
+                const singleW = Math.min(36, Math.max(16, stepX * 0.44));
+                return (
+                  <g key={`bar-${i}`}>
+                    <rect
+                      x={cx - singleW / 2}
+                      y={195 - h2}
+                      width={singleW}
+                      height={h2}
+                      rx={r}
+                      fill={palette.chartColors[i === 0 ? 0 : i % 2 === 0 ? 0 : 1]}
+                    />
+                    <text
+                      x={cx}
+                      y={195 - h2 - 6}
+                      textAnchor="middle"
+                      fill={palette.text}
+                      fontSize="11"
+                      fontWeight="700"
+                      fontFamily={monoFont}
+                    >
+                      {v2}
+                    </text>
+                    <text
+                      x={cx}
+                      y="214"
+                      textAnchor="middle"
+                      fill={palette.muted}
+                      fontSize="10.5"
+                      fontFamily={monoFont}
+                    >
+                      {b.label}
+                    </text>
+                  </g>
+                );
+              }
+              const barW = Math.min(24, Math.max(12, stepX * 0.28));
+              const v1 = Math.max(0, Number(b.v1) || 0);
+              const h1 = (v1 / maxV) * 168;
               return (
                 <g key={`bar-${i}`}>
                   <rect
@@ -603,35 +651,39 @@ export function renderData(ctx: SlideRenderContext) {
               );
             })}
 
-            <polyline
-              fill="none"
-              stroke={palette.chartColors[1]}
-              strokeWidth="2.5"
-              points={bars
-                .map((b, i) => {
+            {isSingle ? null : (
+              <>
+                <polyline
+                  fill="none"
+                  stroke={palette.chartColors[1]}
+                  strokeWidth="2.5"
+                  points={bars
+                    .map((b, i) => {
+                      const cx = 44 + i * stepX + stepX / 2;
+                      const barW = Math.min(24, Math.max(12, stepX * 0.28));
+                      const v2 = Math.max(0, Number(b.v2) || 0);
+                      return `${cx + 3 + barW / 2},${195 - (v2 / maxV) * 168}`;
+                    })
+                    .join(" ")}
+                />
+                {bars.map((b, i) => {
                   const cx = 44 + i * stepX + stepX / 2;
                   const barW = Math.min(24, Math.max(12, stepX * 0.28));
                   const v2 = Math.max(0, Number(b.v2) || 0);
-                  return `${cx + 3 + barW / 2},${195 - (v2 / maxV) * 168}`;
-                })
-                .join(" ")}
-            />
-            {bars.map((b, i) => {
-              const cx = 44 + i * stepX + stepX / 2;
-              const barW = Math.min(24, Math.max(12, stepX * 0.28));
-              const v2 = Math.max(0, Number(b.v2) || 0);
-              return (
-                <circle
-                  key={`dot-${i}`}
-                  cx={cx + 3 + barW / 2}
-                  cy={195 - (v2 / maxV) * 168}
-                  r="4"
-                  fill={palette.surface}
-                  stroke={palette.chartColors[1]}
-                  strokeWidth="2.5"
-                />
-              );
-            })}
+                  return (
+                    <circle
+                      key={`dot-${i}`}
+                      cx={cx + 3 + barW / 2}
+                      cy={195 - (v2 / maxV) * 168}
+                      r="4"
+                      fill={palette.surface}
+                      stroke={palette.chartColors[1]}
+                      strokeWidth="2.5"
+                    />
+                  );
+                })}
+              </>
+            )}
           </svg>
         </div>
 
