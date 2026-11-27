@@ -1279,11 +1279,14 @@ def g2_honest_05_b5_no_trash_bin_and_permanent_delete_confirm(ctx: TestContext) 
             card = guard.page.locator("article, [data-project-card], .gl-project-card").filter(
                 has_text=title
             ).first
+            card.wait_for(state="visible", timeout=ctx.timeout_ms)
+            card.scroll_into_view_if_needed()
             more = card.locator(
                 'button[aria-label*="更多"], button[aria-haspopup="menu"], button:has-text("⋯"), button:has-text("...")'
             )
             if more.count() > 0 and more.first.is_visible():
                 more.first.click()
+                guard.page.wait_for_timeout(120)
             click_resilient(
                 guard.page,
                 [

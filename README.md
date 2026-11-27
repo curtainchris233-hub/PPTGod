@@ -214,21 +214,20 @@ docker compose up -d --build
 curl http://localhost:3000/api/health
 ```
 
-### 3. 生产构建与 Glacier UI 2.0 独立 68 项 E2E 套件
+### 3. 生产构建与 Glacier UI 2.0 独立 79 项 4-Tier E2E 套件
 
 ```bash
 # 静态类型检查、React 19 严格 ESLint 与生产构建
-npx tsc --noEmit --incremental false
+npm run typecheck
 npm run lint
 npm run build
 
-# 列出 Glacier UI 2.0 全部 68 项用例
-python3 tests/e2e/glacier_v2/run_glacier_e2e.py --list
+# 列出 Glacier UI 2.0 全部 79 项用例（Tiers 1–4）
+npm run test:e2e:list
 
 # 在独立端口 3010 运行全量黑盒端到端验证（自动执行 WAL 安全快照与数据卫生审计）
-npx next start --port 3010 --hostname 127.0.0.1
-PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_glacier_e2e.py \
-  --base-url http://127.0.0.1:3010 --tier all --backup-db
+./node_modules/.bin/next start --port 3010 --hostname 127.0.0.1
+PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright npm run test:e2e
 ```
 
 ### 实测验收报告
@@ -236,9 +235,9 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_gla
 | 检查项 | 实测结果 |
 | --- | --- |
 | **TypeScript / ESLint / Next Build** | `0 errors, 0 warnings` |
-| **5 断点响应式（`1920 / 1440 / 1024 / 768 / 390px`）** | 全站核心与次级路由 **`0px` 水平溢出**、**`0` 控制台/运行时错误** |
+| **5 断点响应式（`1920 / 1440 / 1024 / 768 / 390px`）** | 全站 9 大核心与次级路由（45 组合） **`0px` 水平溢出**、**`0` 控制台/运行时错误**，`390px` 移动端编辑器胶片条防截断与可折叠检查器实测通过 |
 | **Web Vitals & 键盘无障碍（8 路由实测）** | **LCP `420–1080 ms`**（目标 `≤ 2500 ms`）、**CLS `0.0000–0.0003`**（目标 `≤ 0.1`），完整 `:focus-visible` 焦点环与 `<main>`/`<h1>` 地标 |
-| **Glacier E2E 68 项全量套件（单次连续运行）** | **68/68 PASS**（Tier-1 API `12/12` · Tier-1 UI `17/17` · Tier-2 API `12/12` · Tier-2 UI `11/11` · 诚实边界 `B1–B16` `16/16`） |
+| **Glacier E2E 79 项 4-Tier 全量套件（单次连续运行）** | **79/79 PASS**（Tier-1 API `12/12` · Tier-1 UI `17/17` · Tier-2 API `12/12` · Tier-2 UI `11/11` · 诚实边界 `B1–B16` `16/16` · Tier-3 交互与本地 BYOK `4/4` · Tier-4 5断点/视觉一致性 `7/7`） |
 | **SQLite WAL 数据卫生（`--backup-db`）** | **`[DB HYGIENE PASS]`**（`users=3`、`prompts=36`、`prompt_comments=5`、`saved_decks=0`、`[E2E%` 残留 `0`、`sessions_delta=0`） |
 
 ---
@@ -249,5 +248,5 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright python3 tests/e2e/glacier_v2/run_gla
 | --- | --- |
 | [docs/PPTGod_Glacier_UI_2.0_Development_Spec.md](./docs/PPTGod_Glacier_UI_2.0_Development_Spec.md) | Glacier UI 2.0 视觉与开发执行规范（Tokens、组件、页面、响应式、验收清单） |
 | [docs/PROJECT.md](./docs/PROJECT.md) | Glacier UI 2.0 架构、功能清单 `F1–F41`、能力边界 `B1–B16` 与里程碑记录 |
-| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 68 项 E2E 测试基础设施说明 |
+| [docs/TEST_INFRA.md](./docs/TEST_INFRA.md) | Glacier UI 2.0 独立 79 项 4-Tier E2E 测试基础设施说明 |
 | [docs/PPTGod_UI_Design_Spec.md](./docs/PPTGod_UI_Design_Spec.md) | 冰川白工作台早期设计规范与首页改版对照图 |

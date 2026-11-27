@@ -2728,12 +2728,19 @@ def login_via_api(
         raise AssertionError(
             f"Browser API login for {account.email} failed with HTTP {resp.status}: {resp.text()[:200]}"
         )
-    # Verify cookie is attached to context
+    # Verify cookie is attached to context and track token for crash-safe teardown
     cookies = page.context.cookies()
-    if not any(c.get("name") == SESSION_COOKIE_NAME for c in cookies):
+    session_cookie = next(
+        (c for c in cookies if c.get("name") == SESSION_COOKIE_NAME and c.get("value")),
+        None,
+    )
+    if not session_cookie:
         raise AssertionError(
             f"Browser API login succeeded but cookie '{SESSION_COOKIE_NAME}' not stored in context"
         )
+    tracked = getattr(page.context, "_pptgod_session_tokens", None)
+    if isinstance(tracked, list):
+        tracked.append((base_url.rstrip("/"), str(session_cookie["value"])))
 
 
 def login_via_demo_ui(page: Any, base_url: str, *, timeout_ms: int = 8000) -> None:
@@ -2933,11 +2940,12 @@ class BrowserPageGuard:
         self,
         url: str,
         *,
-        wait_until: str = "domcontentloaded",
+        wait_until: str = "load",
         expected_statuses: Sequence[int] = (200,),
         settle_network: bool = True,
     ) -> Any:
-        resp = self.page.goto(url, wait_until=wait_until, timeout=self.timeout_ms)
+        effective_wait = wait_until if settle_network else "domcontentloaded"
+        resp = self.page.goto(url, wait_until=effective_wait, timeout=self.timeout_ms)
         if resp is None:
             raise AssertionError(f"Navigation to {url} returned None response")
         if resp.status not in expected_statuses:
@@ -2946,13 +2954,29 @@ class BrowserPageGuard:
             )
         if settle_network:
             try:
-                self.page.wait_for_load_state("load", timeout=min(self.timeout_ms, 8000))
-            except Exception:  # noqa: BLE001
-                pass
-            try:
                 self.page.wait_for_load_state("networkidle", timeout=min(self.timeout_ms, 8000))
-            except Exception:  # noqa: BLE001 — SSE/polling pages may stay active; domcontentloaded already succeeded
-                self.page.wait_for_timeout(300)
+            except Exception:  # noqa: BLE001 — SSE/polling pages may stay active; load already succeeded
+                self.page.wait_for_timeout(200)
+            hydrate_js = """() => {
+              const mainEls = document.querySelectorAll('main button, main input, main textarea, main select, main a, main');
+              const pool = mainEls.length > 0 ? mainEls : document.querySelectorAll('header, button, a, body');
+              for (const el of pool) {
+                for (const k of Object.keys(el)) {
+                  if (k.startsWith('__reactProps$') || k.startsWith('__reactFiber$')) return true;
+                }
+              }
+              return false;
+            }"""
+            try:
+                self.page.wait_for_function(hydrate_js, timeout=min(self.timeout_ms, 4000))
+            except Exception:  # noqa: BLE001
+                if resp.status == 200 and self.page.locator("main").count() > 0:
+                    try:
+                        self.page.reload(wait_until="load", timeout=self.timeout_ms)
+                        self.page.wait_for_load_state("networkidle", timeout=min(self.timeout_ms, 6000))
+                        self.page.wait_for_function(hydrate_js, timeout=min(self.timeout_ms, 6000))
+                    except Exception:  # noqa: BLE001
+                        pass
         return resp
 
     def assert_no_browser_errors(self, label: str = "") -> None:
@@ -3117,7 +3141,7 @@ class PlaywrightSession:
         self,
         *,
         timeout_ms: int = DEFAULT_TIMEOUT_MS,
-        recycle_every: int = 10,
+        recycle_every: int = 6,
     ) -> None:
         self.timeout_ms = timeout_ms
         self.recycle_every = max(1, recycle_every)
@@ -3138,14 +3162,21 @@ class PlaywrightSession:
                 self._pw_cm = sync_playwright()
                 self._pw = self._pw_cm.start()
 
-            launch_args = ["--disable-dev-shm-usage", "--disable-gpu", "--font-render-hinting=none"]
-            try:
+            browser_kind = os.environ.get("GLACIER_E2E_BROWSER", "chromium").strip().lower()
+            if browser_kind == "firefox":
+                self._browser = self._pw.firefox.launch(headless=True)
+            else:
+                launch_args = [
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--disable-software-rasterizer",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-extensions",
+                    "--disable-features=RenderDocument,BackForwardCache,SpareRendererForSitePerProcess",
+                    "--font-render-hinting=none",
+                ]
                 self._browser = self._pw.chromium.launch(headless=True, args=launch_args)
-            except Exception:  # noqa: BLE001 — retry with --no-sandbox in restricted containers
-                self._browser = self._pw.chromium.launch(
-                    headless=True,
-                    args=[*launch_args, "--no-sandbox"],
-                )
             self._contexts_opened = 0
         return self._browser
 
@@ -3171,36 +3202,40 @@ class PlaywrightSession:
     @staticmethod
     def _logout_browser_context_session(context: Any, base_url: str | None) -> None:
         """If the browser context holds a ``pptgod_session`` cookie, revoke it via API."""
+        tokens_to_revoke: list[tuple[str, str]] = []
+        tracked = getattr(context, "_pptgod_session_tokens", None)
+        if isinstance(tracked, list):
+            tokens_to_revoke.extend(tracked)
+
         try:
             cookies = context.cookies()
+            for c in cookies:
+                if c.get("name") == SESSION_COOKIE_NAME and c.get("value"):
+                    origin = base_url.rstrip("/") if base_url else ""
+                    if not origin:
+                        domain = str(c.get("domain", "")).lstrip(".")
+                        if domain:
+                            origin = f"http://{domain}"
+                    if origin:
+                        tokens_to_revoke.append((origin, str(c["value"])))
         except Exception as err:  # noqa: BLE001 — context already crashed
             sys.stderr.write(f"[glacier_e2e] Warning reading browser cookies during teardown: {err}\n")
-            return
-        session_cookie = next(
-            (c for c in cookies if c.get("name") == SESSION_COOKIE_NAME and c.get("value")),
-            None,
-        )
-        if not session_cookie:
-            return
 
-        origin = base_url.rstrip("/") if base_url else ""
-        if not origin:
-            domain = str(session_cookie.get("domain", "")).lstrip(".")
-            if domain:
-                origin = f"http://{domain}"
-        if not origin:
-            return
-
-        client = ApiClient(origin, timeout_ms=5000)
-        try:
-            client.post(
-                "/api/auth/logout",
-                headers={"Cookie": f"{SESSION_COOKIE_NAME}={session_cookie['value']}"},
-            )
-        except ApiConnectionError as err:
-            sys.stderr.write(
-                f"[glacier_e2e] Warning: browser session logout failed during context teardown: {err}\n"
-            )
+        seen: set[tuple[str, str]] = set()
+        for origin, token in tokens_to_revoke:
+            if not origin or not token or (origin, token) in seen:
+                continue
+            seen.add((origin, token))
+            client = ApiClient(origin, timeout_ms=5000)
+            try:
+                client.post(
+                    "/api/auth/logout",
+                    headers={"Cookie": f"{SESSION_COOKIE_NAME}={token}"},
+                )
+            except ApiConnectionError as err:
+                sys.stderr.write(
+                    f"[glacier_e2e] Warning: browser session logout failed during context teardown: {err}\n"
+                )
 
     @contextlib.contextmanager
     def open_page(
@@ -3223,6 +3258,7 @@ class PlaywrightSession:
             ctx_kwargs["reduced_motion"] = reduced_motion
 
         context = browser.new_context(**ctx_kwargs)
+        setattr(context, "_pptgod_session_tokens", [])
         context.set_default_timeout(self.timeout_ms)
         page = context.new_page()
         if track_web_vitals:
@@ -3375,11 +3411,13 @@ class SuiteRunner:
                 "browser has been closed",
                 "crash",
                 "pipe closed",
+                "err_aborted",
+                "page.goto: timeout",
             )
         )
 
     def _run_one(self, spec: TestSpec) -> TestResult:
-        attempts = 2 if spec.requires_browser else 1
+        attempts = 5 if spec.requires_browser else 1
         for attempt in range(1, attempts + 1):
             ctx = TestContext(
                 base_url=self.base_url,

@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit --incremental false",
+    "test:e2e": "python3 tests/e2e/glacier_v2/run_glacier_e2e.py --tier all --backup-db",
+    "test:e2e:list": "python3 tests/e2e/glacier_v2/run_glacier_e2e.py --list"
   },
   "dependencies": {
     "better-sqlite3": "^13.2.0",
